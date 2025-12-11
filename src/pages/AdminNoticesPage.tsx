@@ -352,53 +352,53 @@ const AdminNoticesPage: React.FC = () => {
       const cy = new Date().getFullYear();
       const baseYear = prev.year || cy;
 
-      let next = { ...prev };
+      let next: typeof prev;
 
       if (type === "year") {
         next = {
           ...prev,
           year: baseYear,
-          month: "",
-          quarter: "",
-          half: "",
-          semesterId: "",
+          month: "" as const,
+          quarter: "" as const,
+          half: "" as const,
+          semesterId: "" as const,
         };
       } else if (type === "half") {
         next = {
           ...prev,
           year: baseYear,
           half: (prev.half as number) || 1,
-          month: "",
-          quarter: "",
-          semesterId: "",
+          month: "" as const,
+          quarter: "" as const,
+          semesterId: "" as const,
         };
       } else if (type === "quarter") {
         next = {
           ...prev,
           year: baseYear,
           quarter: (prev.quarter as number) || 1,
-          month: "",
-          half: "",
-          semesterId: "",
+          month: "" as const,
+          half: "" as const,
+          semesterId: "" as const,
         };
       } else if (type === "month") {
         next = {
           ...prev,
           year: baseYear,
           month: (prev.month as number) || currentMonth,
-          quarter: "",
-          half: "",
-          semesterId: "",
+          quarter: "" as const,
+          half: "" as const,
+          semesterId: "" as const,
         };
       } else {
         // 학기 모드
         next = {
           ...prev,
-          year: "",
-          month: "",
-          quarter: "",
-          half: "",
-          semesterId: prev.semesterId || "",
+          year: "" as const,
+          month: "" as const,
+          quarter: "" as const,
+          half: "" as const,
+          semesterId: prev.semesterId || ("" as const),
         };
       }
 
@@ -420,10 +420,10 @@ const AdminNoticesPage: React.FC = () => {
       const next = {
         ...prev,
         year: baseYear,
-        month: unit === "month" ? value : "",
-        quarter: unit === "quarter" ? value : "",
-        half: unit === "half" ? value : "",
-        semesterId: "",
+        month: unit === "month" ? value : ("" as const),
+        quarter: unit === "quarter" ? value : ("" as const),
+        half: unit === "half" ? value : ("" as const),
+        semesterId: "" as const,
       };
 
       const nextPage = 0;
@@ -437,12 +437,13 @@ const AdminNoticesPage: React.FC = () => {
     setFilters((prev) => {
       const next = {
         ...prev,
-        semesterId,
-        year: "",
-        month: "",
-        quarter: "",
-        half: "",
+        semesterId: semesterId as typeof prev.semesterId,
+        year: "" as typeof prev.year,
+        month: "" as typeof prev.month,
+        quarter: "" as typeof prev.quarter,
+        half: "" as typeof prev.half,
       };
+
       const nextPage = 0;
       setCurrentPage(nextPage);
       syncSearchParams(next, filterType, unitType, sortOrder, nextPage);

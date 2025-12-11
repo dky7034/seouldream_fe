@@ -622,7 +622,7 @@ export interface DashboardDto {
   recentNotices: RecentNoticeInfo[];
   weeklyPrayerCount: number;
   weeklyNoticeCount: number;
-  overallAttendanceSummary: OverallAttendanceSummaryDto;
+  overallAttendanceSummary: OverallAttendanceSummaryDto | OverallAttendanceStatDto;
   cellAttendanceSummaries: CellAttendanceSummaryDto[];
   attendanceKeyMetrics: AttendanceKeyMetricsDto;
   attendanceTrend?: AggregatedTrendDto[];
