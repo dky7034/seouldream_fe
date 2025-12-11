@@ -114,8 +114,6 @@ const authService = {
           password,
         });
 
-      console.log("Login Response Body:", response.data); // DEBUGGING
-
       const {
         accessToken,
         refreshToken,
@@ -132,7 +130,6 @@ const authService = {
       }
 
       const decodedToken = jwtDecode<JwtPayload>(accessToken);
-      console.log("Decoded JWT:", decodedToken); // DEBUGGING
 
       // ✅ 백엔드에서 온 문자열 role을 UserRole로 안전하게 변환
       const allowedRoles: UserRole[] = ["EXECUTIVE", "CELL_LEADER", "MEMBER"];

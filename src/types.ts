@@ -108,6 +108,7 @@ export interface TeamDto {
   code: string;
   description?: string;
   active: boolean;
+  memberCount?: number; // Added to display member count in AdminTeamsPage
   createdAt: string;
   updatedAt: string;
 }
@@ -115,6 +116,7 @@ export interface TeamDto {
 export interface CreateTeamRequest {
   name: string;
   description?: string;
+  active?: boolean;
 }
 
 export interface UpdateTeamRequest {
@@ -151,6 +153,7 @@ export interface CreateCellRequest {
   leaderId?: number;
   viceLeaderId?: number;
   description?: string;
+  memberIds?: number[]; // Added to support multiple members on cell creation
 }
 
 export interface UpdateCellRequest {
@@ -309,6 +312,18 @@ export interface IncompleteCheckReportDto {
   missedDates: string[];
 }
 
+// ✅ NEW: 셀 멤버별 출석 요약 DTO
+export interface CellMemberAttendanceSummaryDto {
+  memberId: number;
+  memberName: string;
+  gender: Gender; // "MALE" | "FEMALE"
+  birthDate: string; // LocalDate (YYYY-MM-DD)
+  joinYear: number;
+  active: boolean;
+  lastAttendanceDate: string | null; // 최근 PRESENT 날짜, 없으면 null
+  consecutiveAbsences: number; // 최근 출석 이후 연속 결석 횟수
+}
+
 // Updated interface for aggregated attendance trend data, renamed from TrendItemDto
 export interface AggregatedTrendDto {
   dateGroup: string; // Changed from 'date' to 'dateGroup'
@@ -346,6 +361,30 @@ export interface PrayerDto {
   updatedAt: string; // LocalDateTime
 }
 
+/**
+ * EXECUTIVE용 멤버별 기도제목 요약
+ * GET /api/admin/prayers/summary/members 응답 DTO
+ */
+export interface PrayerMemberSummaryDto {
+  memberId: number;
+  memberName: string;
+  cellId: number | null;
+  cellName: string | null;
+  totalCount: number;
+  latestCreatedAt: string; // LocalDateTime
+}
+
+/**
+ * EXECUTIVE용 셀별 기도제목 요약
+ * GET /api/admin/prayers/summary/cells 응답 DTO
+ */
+export interface PrayerCellSummaryDto {
+  cellId: number;
+  cellName: string;
+  totalCount: number;
+  latestCreatedAt: string; // LocalDateTime
+}
+
 export interface CreatePrayerRequest {
   memberId: number;
   content: string;
@@ -357,6 +396,7 @@ export interface CreatePrayerRequest {
 export interface UpdatePrayerRequest {
   content?: string;
   weekOfMonth?: number;
+  createdAt?: string;
   visibility?: PrayerVisibility;
 }
 
@@ -580,9 +620,12 @@ export interface DashboardDto {
   totalMonthlyBirthdays: number;
   recentPrayers: RecentPrayerInfo[];
   recentNotices: RecentNoticeInfo[];
+  weeklyPrayerCount: number;
+  weeklyNoticeCount: number;
   overallAttendanceSummary: OverallAttendanceSummaryDto;
   cellAttendanceSummaries: CellAttendanceSummaryDto[];
   attendanceKeyMetrics: AttendanceKeyMetricsDto;
+  attendanceTrend?: AggregatedTrendDto[];
 }
 
 export interface MyProfileFormErrors {
@@ -746,4 +789,9 @@ export interface UpdateSemesterRequest {
   startDate?: string; // LocalDate
   endDate?: string; // LocalDate
   isActive?: boolean; // Add isActive field
+}
+
+export interface OptionType {
+  value: string;
+  label: string;
 }

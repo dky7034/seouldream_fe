@@ -1,5 +1,6 @@
+// src/pages/AdminCellsPage.tsx
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { cellService } from "../services/cellService";
 import { attendanceService } from "../services/attendanceService";
 import type {
@@ -16,17 +17,22 @@ import { memberService } from "../services/memberService";
 import { semesterService } from "../services/semesterService";
 import type { SemesterDto } from "../types";
 
+type SortKey =
+  | "name"
+  | "leaderName"
+  | "viceLeaderName"
+  | "memberCount"
+  | "attendanceRate"
+  | "active"
+  | "maleCount"
+  | "femaleCount";
+
 type SortConfig = {
-  key:
-    | keyof CellDto
-    | "leaderName"
-    | "viceLeaderName"
-    | "memberCount"
-    | "attendanceRate";
+  key: SortKey;
   direction: "ascending" | "descending";
 };
 
-// ✅ 기간 계산용 유틸 (출석 페이지와 동일 규칙 적용)
+// ✅ 기간 계산용 유틸
 const pad = (n: number) => n.toString().padStart(2, "0");
 
 // month: 1~12, 결과는 해당 달의 마지막 날(28/29/30/31)
@@ -50,8 +56,9 @@ type Filters = {
 const AdminCellsPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [semesters, setSemesters] = useState<SemesterDto[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
 
+  const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const hasActiveSemesters = semesters.length > 0;
 
   const [cellPage, setCellPage] = useState<Page<CellDto> | null>(null);
@@ -83,13 +90,7 @@ const AdminCellsPage: React.FC = () => {
     semesterId: "",
   });
 
-  const [sortConfig, setSortConfig] = useState<SortConfig>({
-    key: "name",
-    direction: "ascending",
-  });
-  const [currentPage, setCurrentPage] = useState(0);
   const [filterType, setFilterType] = useState<"unit" | "range">("unit");
-
   const [unitType, setUnitType] = useState<
     "year" | "half" | "quarter" | "month" | "semester"
   >("year");
@@ -100,6 +101,53 @@ const AdminCellsPage: React.FC = () => {
   const [rateLoading, setRateLoading] = useState<boolean>(false);
 
   const debouncedNameFilter = useDebounce(filters.name, 500);
+
+  // 🔹 URL에서 유효한 sortKey 파싱
+  const getValidSortKey = (value: string | null): SortKey => {
+    if (value === "name") return "name";
+    if (value === "leaderName") return "leaderName";
+    if (value === "viceLeaderName") return "viceLeaderName";
+    if (value === "memberCount") return "memberCount";
+    if (value === "attendanceRate") return "attendanceRate";
+    if (value === "active") return "active";
+    if (value === "maleCount") return "maleCount";
+    if (value === "femaleCount") return "femaleCount";
+    return "name";
+  };
+
+  // 🔹 URL에서 초기 정렬/페이지 읽기
+  const [sortConfig, setSortConfig] = useState<SortConfig>(() => {
+    const key = getValidSortKey(searchParams.get("sortKey"));
+    const dirParam = searchParams.get("sortDir");
+    const direction: SortConfig["direction"] =
+      dirParam === "ascending" ? "ascending" : "descending";
+    return { key, direction };
+  });
+
+  const [currentPage, setCurrentPage] = useState(() => {
+    const pageParam = searchParams.get("page");
+    const pageNum = pageParam ? Number(pageParam) : 0;
+    return Number.isNaN(pageNum) || pageNum < 0 ? 0 : pageNum;
+  });
+
+  // 🔹 브라우저 뒤로가기/앞으로가기 등으로 쿼리가 바뀔 때 상태 동기화
+  useEffect(() => {
+    const key = getValidSortKey(searchParams.get("sortKey"));
+    const dirParam = searchParams.get("sortDir");
+    const direction: SortConfig["direction"] =
+      dirParam === "ascending" ? "ascending" : "descending";
+
+    const pageParam = searchParams.get("page");
+    const pageNum = pageParam ? Number(pageParam) : 0;
+    const safePage = Number.isNaN(pageNum) || pageNum < 0 ? 0 : pageNum;
+
+    setSortConfig((prev) =>
+      prev.key === key && prev.direction === direction
+        ? prev
+        : { key, direction }
+    );
+    setCurrentPage((prev) => (prev === safePage ? prev : safePage));
+  }, [searchParams]);
 
   // ✅ 출석 데이터에서 사용 가능한 연도 목록
   const fetchAvailableYears = useCallback(async () => {
@@ -389,20 +437,41 @@ const AdminCellsPage: React.FC = () => {
     return rows;
   }, [cellPage, sortConfig, attendanceRates]);
 
-  const requestSort = (key: SortConfig["key"]) => {
-    setSortConfig((prev) => ({
-      key,
-      direction:
+  const requestSort = (key: SortKey) => {
+    setSortConfig((prev) => {
+      const nextDirection: SortConfig["direction"] =
         prev.key === key && prev.direction === "ascending"
           ? "descending"
-          : "ascending",
-    }));
-    setCurrentPage(0);
+          : "ascending";
+
+      const nextConfig: SortConfig = { key, direction: nextDirection };
+
+      // 정렬 바뀌면 페이지 0으로 초기화 + URL 쿼리 반영
+      setCurrentPage(0);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set("sortKey", nextConfig.key);
+      nextParams.set("sortDir", nextConfig.direction);
+      nextParams.set("page", "0");
+      setSearchParams(nextParams);
+
+      return nextConfig;
+    });
   };
 
-  const getSortIndicator = (key: SortConfig["key"]) => {
+  const getSortIndicator = (key: SortKey) => {
     if (sortConfig.key !== key) return " ↕";
     return sortConfig.direction === "ascending" ? " ▲" : " ▼";
+  };
+
+  const handlePageChange = (page: number) => {
+    const safePage = page < 0 ? 0 : page;
+    setCurrentPage(safePage);
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("page", String(safePage));
+    nextParams.set("sortKey", sortConfig.key);
+    nextParams.set("sortDir", sortConfig.direction);
+    setSearchParams(nextParams);
   };
 
   const handleDelete = (cell: CellDto) => {
@@ -433,6 +502,13 @@ const AdminCellsPage: React.FC = () => {
   const handleFilterChange = (field: keyof Filters, value: any) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
     setCurrentPage(0);
+
+    // 필터 변경 시 page 0으로 초기화 + 현재 sort 유지
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("page", "0");
+    nextParams.set("sortKey", sortConfig.key);
+    nextParams.set("sortDir", sortConfig.direction);
+    setSearchParams(nextParams);
   };
 
   const handleSemesterClick = (id: number) => {
@@ -441,6 +517,12 @@ const AdminCellsPage: React.FC = () => {
       semesterId: prev.semesterId === id ? "" : id,
     }));
     setCurrentPage(0);
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("page", "0");
+    nextParams.set("sortKey", sortConfig.key);
+    nextParams.set("sortDir", sortConfig.direction);
+    setSearchParams(nextParams);
   };
 
   // ✅ 단위 버튼 클릭 (연/반기/분기/월/학기)
@@ -496,6 +578,12 @@ const AdminCellsPage: React.FC = () => {
       return next;
     });
     setCurrentPage(0);
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("page", "0");
+    nextParams.set("sortKey", sortConfig.key);
+    nextParams.set("sortDir", sortConfig.direction);
+    setSearchParams(nextParams);
   };
 
   const handleUnitValueClick = (
@@ -509,18 +597,24 @@ const AdminCellsPage: React.FC = () => {
       half: unit === "half" ? value : "",
     }));
     setCurrentPage(0);
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("page", "0");
+    nextParams.set("sortKey", sortConfig.key);
+    nextParams.set("sortDir", sortConfig.direction);
+    setSearchParams(nextParams);
   };
 
   const renderUnitButtons = () => {
     switch (unitType) {
       case "month":
         return (
-          <div className="grid grid-cols-6 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
               <button
                 key={m}
                 onClick={() => handleUnitValueClick("month", m)}
-                className={`px-2 py-1 border rounded-full text-xs ${
+                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.month === m ? "bg-blue-500 text-white" : "bg-white"
                 }`}
               >
@@ -531,12 +625,12 @@ const AdminCellsPage: React.FC = () => {
         );
       case "quarter":
         return (
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {Array.from({ length: 4 }, (_, i) => i + 1).map((q) => (
               <button
                 key={q}
                 onClick={() => handleUnitValueClick("quarter", q)}
-                className={`px-2 py-1 border rounded-full text-sm ${
+                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.quarter === q ? "bg-blue-500 text-white" : "bg-white"
                 }`}
               >
@@ -552,7 +646,7 @@ const AdminCellsPage: React.FC = () => {
               <button
                 key={h}
                 onClick={() => handleUnitValueClick("half", h)}
-                className={`px-2 py-1 border rounded-full text-sm ${
+                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.half === h ? "bg-blue-500 text-white" : "bg-white"
                 }`}
               >
@@ -577,7 +671,7 @@ const AdminCellsPage: React.FC = () => {
               <button
                 key={s.id}
                 onClick={() => handleSemesterClick(s.id)}
-                className={`px-2 py-1 border rounded-full text-sm ${
+                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.semesterId === s.id
                     ? "bg-blue-500 text-white"
                     : "bg-white"
@@ -594,428 +688,558 @@ const AdminCellsPage: React.FC = () => {
     }
   };
 
+  // 권한 없는 경우 빠른 리턴 (레이아웃 포함)
   if (error && (!user || user.role !== "EXECUTIVE")) {
-    return <p className="mt-4 text-red-600 text-center">{error}</p>;
-  }
-
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">셀 관리</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            셀 조직과 셀장 정보를 관리하고, 기간별 출석률을 한눈에 확인하는 임원
-            전용 페이지입니다.
+    return (
+      <div className="bg-gray-50 min-h-screen">
+        <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
+          <p className="mt-4 text-red-600 text-center text-sm sm:text-base">
+            {error}
           </p>
         </div>
       </div>
+    );
+  }
 
-      {error && user && user.role === "EXECUTIVE" && (
-        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-          {error}
-        </div>
-      )}
-
-      {/* 필터 영역 */}
-      <div className="p-4 bg-gray-50 rounded-lg mb-6 shadow-sm space-y-4">
-        <div className="flex items-center space-x-4">
-          <h3 className="text-lg font-semibold">
-            조회 기간 설정 (셀 생성일 기준)
-          </h3>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setFilterType("unit")}
-              className={`px-3 py-1 text-sm rounded-full ${
-                filterType === "unit"
-                  ? "bg-blue-500 text-white"
-                  : "bg-white border"
-              }`}
-            >
-              단위로 조회
-            </button>
-            <button
-              onClick={() => setFilterType("range")}
-              className={`px-3 py-1 text-sm rounded-full ${
-                filterType === "range"
-                  ? "bg-blue-500 text-white"
-                  : "bg-white border"
-              }`}
-            >
-              기간으로 조회
-            </button>
+  return (
+    <div className="bg-gray-50 min-h-screen">
+      <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              셀 관리
+            </h1>
+            <p className="mt-1 text-sm text-gray-600">
+              셀 조직과 셀장 정보를 관리하고, 기간별 출석률을 한눈에 확인하는
+              임원 전용 페이지입니다.
+            </p>
           </div>
         </div>
 
-        {filterType === "range" ? (
-          // ✅ 직접 기간 선택
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                기간 시작
-              </label>
-              <input
-                type="date"
-                value={filters.startDate}
-                onChange={(e) =>
-                  handleFilterChange("startDate", e.target.value)
-                }
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                기간 종료
-              </label>
-              <input
-                type="date"
-                value={filters.endDate}
-                onChange={(e) => handleFilterChange("endDate", e.target.value)}
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3"
-              />
-            </div>
-          </div>
-        ) : (
-          // ✅ 단위 조회 (연/반기/분기/월/학기)
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  연도
-                </label>
-                <select
-                  value={filters.year}
-                  onChange={(e) =>
-                    handleFilterChange(
-                      "year",
-                      e.target.value ? Number(e.target.value) : ""
-                    )
-                  }
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3"
-                  disabled={unitType === "semester"}
-                >
-                  <option value="">전체 연도</option>
-                  {yearOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}년
-                    </option>
-                  ))}
-                </select>
-                {unitType === "semester" && (
-                  <p className="mt-1 text-[11px] text-gray-500">
-                    학기 단위 조회 시 연도를 선택할 수 없습니다.
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  조회 단위
-                </label>
-                <div className="flex items-center space-x-2 mt-1">
-                  <button
-                    type="button"
-                    onClick={() => handleUnitTypeClick("year")}
-                    className={`px-3 py-1 text-sm rounded-full ${
-                      unitType === "year"
-                        ? "bg-blue-500 text-white"
-                        : "bg-white border"
-                    }`}
-                  >
-                    연간
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleUnitTypeClick("half")}
-                    className={`px-3 py-1 text-sm rounded-full ${
-                      unitType === "half"
-                        ? "bg-blue-500 text-white"
-                        : "bg-white border"
-                    }`}
-                  >
-                    반기
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleUnitTypeClick("quarter")}
-                    className={`px-3 py-1 text-sm rounded-full ${
-                      unitType === "quarter"
-                        ? "bg-blue-500 text-white"
-                        : "bg-white border"
-                    }`}
-                  >
-                    분기
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleUnitTypeClick("month")}
-                    className={`px-3 py-1 text-sm rounded-full ${
-                      unitType === "month"
-                        ? "bg-blue-500 text-white"
-                        : "bg-white border"
-                    }`}
-                  >
-                    월간
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      hasActiveSemesters && handleUnitTypeClick("semester")
-                    }
-                    disabled={!hasActiveSemesters}
-                    className={`px-3 py-1 text-sm rounded-full border ${
-                      hasActiveSemesters
-                        ? unitType === "semester"
-                          ? "bg-blue-500 text-white border-blue-500"
-                          : "bg-white"
-                        : "bg-gray-100 text-gray-400 border-dashed cursor-not-allowed"
-                    }`}
-                  >
-                    학기
-                  </button>
-                </div>
-
-                {!hasActiveSemesters && (
-                  <p className="mt-1 text-xs text-red-500">
-                    활성화된 학기가 없어 학기 단위 조회를 사용할 수 없습니다.
-                  </p>
-                )}
-              </div>
-            </div>
-            {renderUnitButtons()}
+        {error && user && user.role === "EXECUTIVE" && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+            {error}
           </div>
         )}
 
-        <hr />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              셀 이름
-            </label>
-            <input
-              type="text"
-              placeholder="이름으로 검색..."
-              value={filters.name}
-              onChange={(e) => handleFilterChange("name", e.target.value)}
-              className="p-2 border rounded-md w-full"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              상태
-            </label>
-            <select
-              value={filters.active}
-              onChange={(e) =>
-                handleFilterChange(
-                  "active",
-                  e.target.value as Filters["active"]
-                )
-              }
-              className="p-2 border rounded-md w-full"
-            >
-              <option value="all">모든 상태</option>
-              <option value="true">활성 셀만</option>
-              <option value="false">비활성 셀만</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex justify-end mb-4">
-        <button
-          onClick={() => navigate("/admin/cells/add")}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-        >
-          + 새 셀 추가
-        </button>
-      </div>
-
-      {loading && <p>로딩 중...</p>}
-
-      {!loading && cellPage && (
-        <>
-          <div className="bg-white shadow-md rounded-lg overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th
-                    onClick={() => requestSort("name")}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  >
-                    이름{getSortIndicator("name")}
-                  </th>
-                  <th
-                    onClick={() => requestSort("leaderName")}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  >
-                    셀장{getSortIndicator("leaderName")}
-                  </th>
-                  <th
-                    onClick={() => requestSort("active")}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  >
-                    활성{getSortIndicator("active")}
-                  </th>
-                  <th
-                    onClick={() => requestSort("memberCount")}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  >
-                    인원{getSortIndicator("memberCount")}
-                  </th>
-                  <th
-                    onClick={() => requestSort("maleCount")}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  >
-                    남성{getSortIndicator("maleCount" as SortConfig["key"])}
-                  </th>
-                  <th
-                    onClick={() => requestSort("femaleCount")}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  >
-                    여성{getSortIndicator("femaleCount" as SortConfig["key"])}
-                  </th>
-                  <th
-                    onClick={() => requestSort("attendanceRate")}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  >
-                    출석률
-                    {getSortIndicator("attendanceRate" as SortConfig["key"])}
-                  </th>
-                  <th className="relative px-6 py-3">
-                    <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {sortedCells.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={9}
-                      className="px-6 py-4 text-center text-sm text-gray-500"
-                    >
-                      조건에 맞는 셀이 없습니다. 필터를 변경해 보세요.
-                    </td>
-                  </tr>
-                ) : (
-                  sortedCells.map((cell) => {
-                    const rateInfo = attendanceRates.get(cell.id);
-                    return (
-                      <tr
-                        key={cell.id}
-                        className={
-                          !cell.active ? "bg-gray-100 text-gray-500" : ""
-                        }
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <button
-                            onClick={() => navigate(`/admin/cells/${cell.id}`)}
-                            className="text-indigo-600 hover:text-indigo-900"
-                          >
-                            {cell.name}
-                          </button>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {cell.leader
-                            ? formatDisplayName(
-                                {
-                                  name: cell.leader.name,
-                                  birthDate: cell.leader.birthDate,
-                                },
-                                allMembersForNameCheck
-                              )
-                            : "미정"}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <span
-                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              cell.active
-                                ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800"
-                            }`}
-                          >
-                            {cell.active ? "활성" : "비활성"}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {cell.memberCount}명
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {cell.maleCount}명
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {cell.femaleCount}명
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {rateLoading
-                            ? "..."
-                            : `${(rateInfo?.attendanceRate ?? 0).toFixed(1)}%`}
-                        </td>
-
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            onClick={() =>
-                              navigate(`/admin/cells/${cell.id}/edit`)
-                            }
-                            className="text-indigo-600 hover:text-indigo-900 mr-4"
-                          >
-                            수정
-                          </button>
-                          <button
-                            onClick={() => handleDelete(cell)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            삭제
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-          <Pagination
-            currentPage={cellPage.number}
-            totalPages={cellPage.totalPages}
-            totalElements={cellPage.totalElements}
-            onPageChange={setCurrentPage}
-            itemLabel="개 셀"
-          />
-        </>
-      )}
-
-      {showDeleteConfirmModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-          <div className="bg-white p-8 rounded-lg shadow-xl max-w-sm w-full">
-            <h2 className="text-xl font-bold mb-4">셀 삭제 확인</h2>
-            <p className="text-gray-700 mb-2">
-              정말로 &quot;{cellToDelete?.name}&quot; 셀을 삭제하시겠습니까?
-            </p>
-            <p className="text-xs text-gray-500 mb-4">
-              셀을 삭제하면 해당 셀에 소속된 멤버/출석 정보에 영향을 줄 수
-              있습니다. 필요하다면 먼저 셀 구성과 출석 데이터를 확인해 주세요.
-            </p>
-            {deleteError && (
-              <div className="p-3 text-sm font-medium text-red-700 bg-red-100 border border-red-400 rounded-md mb-4">
-                {deleteError}
-              </div>
-            )}
-            <div className="flex justify-end">
+        {/* 필터 영역 */}
+        <div className="p-4 bg-gray-50 rounded-lg mb-6 shadow-sm space-y-4">
+          {/* 상단: 제목 + 단위/기간 토글 */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h3 className="text-base sm:text-lg font-semibold">
+              조회 기간 설정 (셀 생성일 기준)
+            </h3>
+            <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={handleCloseDeleteModal}
-                className="bg-gray-300 text-gray-800 px-4 py-2 rounded-md mr-2"
+                onClick={() => setFilterType("unit")}
+                className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
+                  filterType === "unit"
+                    ? "bg-blue-500 text-white"
+                    : "bg-white border"
+                }`}
               >
-                취소
+                단위로 조회
               </button>
               <button
-                onClick={handleConfirmDelete}
-                className="bg-red-600 text-white px-4 py-2 rounded-md"
+                onClick={() => setFilterType("range")}
+                className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
+                  filterType === "range"
+                    ? "bg-blue-500 text-white"
+                    : "bg-white border"
+                }`}
               >
-                삭제
+                기간으로 조회
               </button>
             </div>
           </div>
+
+          {filterType === "range" ? (
+            // ✅ 직접 기간 선택
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  기간 시작
+                </label>
+                <input
+                  type="date"
+                  value={filters.startDate}
+                  onChange={(e) =>
+                    handleFilterChange("startDate", e.target.value)
+                  }
+                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  기간 종료
+                </label>
+                <input
+                  type="date"
+                  value={filters.endDate}
+                  onChange={(e) =>
+                    handleFilterChange("endDate", e.target.value)
+                  }
+                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
+                />
+              </div>
+            </div>
+          ) : (
+            // ✅ 단위 조회 (연/반기/분기/월/학기)
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    연도
+                  </label>
+                  <select
+                    value={filters.year}
+                    onChange={(e) =>
+                      handleFilterChange(
+                        "year",
+                        e.target.value ? Number(e.target.value) : ""
+                      )
+                    }
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
+                    disabled={unitType === "semester"}
+                  >
+                    <option value="">전체 연도</option>
+                    {yearOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}년
+                      </option>
+                    ))}
+                  </select>
+                  {unitType === "semester" && (
+                    <p className="mt-1 text-[11px] text-gray-500">
+                      학기 단위 조회 시 연도를 선택할 수 없습니다.
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    조회 단위
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleUnitTypeClick("year")}
+                      className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
+                        unitType === "year"
+                          ? "bg-blue-500 text-white"
+                          : "bg-white border"
+                      }`}
+                    >
+                      연간
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUnitTypeClick("half")}
+                      className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
+                        unitType === "half"
+                          ? "bg-blue-500 text-white"
+                          : "bg-white border"
+                      }`}
+                    >
+                      반기
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUnitTypeClick("quarter")}
+                      className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
+                        unitType === "quarter"
+                          ? "bg-blue-500 text-white"
+                          : "bg-white border"
+                      }`}
+                    >
+                      분기
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUnitTypeClick("month")}
+                      className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
+                        unitType === "month"
+                          ? "bg-blue-500 text-white"
+                          : "bg-white border"
+                      }`}
+                    >
+                      월간
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        hasActiveSemesters && handleUnitTypeClick("semester")
+                      }
+                      disabled={!hasActiveSemesters}
+                      className={`px-3 py-1 text-xs sm:text-sm rounded-full border ${
+                        hasActiveSemesters
+                          ? unitType === "semester"
+                            ? "bg-blue-500 text-white border-blue-500"
+                            : "bg-white"
+                          : "bg-gray-100 text-gray-400 border-dashed cursor-not-allowed"
+                      }`}
+                    >
+                      학기
+                    </button>
+                  </div>
+
+                  {!hasActiveSemesters && (
+                    <p className="mt-1 text-xs text-red-500">
+                      활성화된 학기가 없어 학기 단위 조회를 사용할 수 없습니다.
+                    </p>
+                  )}
+                </div>
+              </div>
+              {renderUnitButtons()}
+            </div>
+          )}
+
+          <hr />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                셀 이름
+              </label>
+              <input
+                type="text"
+                placeholder="이름으로 검색..."
+                value={filters.name}
+                onChange={(e) => handleFilterChange("name", e.target.value)}
+                className="p-2 border rounded-md w-full text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                상태
+              </label>
+              <select
+                value={filters.active}
+                onChange={(e) =>
+                  handleFilterChange(
+                    "active",
+                    e.target.value as Filters["active"]
+                  )
+                }
+                className="p-2 border rounded-md w-full text-sm"
+              >
+                <option value="all">모든 상태</option>
+                <option value="true">활성 셀만</option>
+                <option value="false">비활성 셀만</option>
+              </select>
+            </div>
+          </div>
         </div>
-      )}
+
+        {/* 🔹 필터 아래 우측: 새 셀 추가 버튼 (페이지 통일) */}
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={() => navigate("/admin/cells/add")}
+            className="rounded-md bg-indigo-600 px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            + 새 셀 추가
+          </button>
+        </div>
+
+        {loading && (
+          <div className="flex items-center justify-center min-h-[30vh]">
+            <p className="text-sm text-gray-600">로딩 중...</p>
+          </div>
+        )}
+
+        {!loading && cellPage && (
+          <>
+            {/* 🔹 모바일: 카드 리스트 */}
+            <div className="space-y-3 md:hidden mb-4">
+              {sortedCells.length === 0 ? (
+                <div className="bg-white rounded-lg shadow border border-gray-100 p-4 text-center text-xs text-gray-500">
+                  조건에 맞는 셀이 없습니다. 필터를 변경해 보세요.
+                </div>
+              ) : (
+                sortedCells.map((cell) => {
+                  const rateInfo = attendanceRates.get(cell.id);
+                  const attendanceText = rateLoading
+                    ? "계산 중..."
+                    : `${(rateInfo?.attendanceRate ?? 0).toFixed(1)}%`;
+
+                  const leaderName = cell.leader
+                    ? formatDisplayName(
+                        {
+                          name: cell.leader.name,
+                          birthDate: cell.leader.birthDate,
+                        },
+                        allMembersForNameCheck
+                      )
+                    : "미정";
+
+                  return (
+                    <div
+                      key={cell.id}
+                      className={`bg-white rounded-lg shadow border border-gray-100 p-4 text-xs space-y-2 ${
+                        !cell.active ? "bg-gray-100 text-gray-500" : ""
+                      }`}
+                    >
+                      {/* 상단: 셀 이름 + 활성 여부 */}
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <button
+                            onClick={() => navigate(`/admin/cells/${cell.id}`)}
+                            className="text-sm font-semibold text-indigo-600 hover:text-indigo-800"
+                          >
+                            {cell.name}
+                          </button>
+                          <p className="mt-1 text-[11px] text-gray-500">
+                            셀장:{" "}
+                            <span className="font-medium text-gray-700">
+                              {leaderName}
+                            </span>
+                          </p>
+                        </div>
+                        <span
+                          className={`px-2 inline-flex text-[11px] leading-5 font-semibold rounded-full ${
+                            cell.active
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {cell.active ? "활성" : "비활성"}
+                        </span>
+                      </div>
+
+                      {/* 중간: 인원/성비/출석률 */}
+                      <div className="grid grid-cols-3 gap-2 mt-2">
+                        <div>
+                          <p className="text-[11px] text-gray-500">총 인원</p>
+                          <p className="text-[12px] font-semibold">
+                            {cell.memberCount}명
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-gray-500">남 / 여</p>
+                          <p className="text-[12px] font-semibold">
+                            {cell.maleCount} / {cell.femaleCount}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-gray-500">출석률</p>
+                          <p className="text-[12px] font-semibold">
+                            {attendanceText}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* 하단: 액션 버튼 */}
+                      <div className="pt-2 flex justify-end gap-2">
+                        <button
+                          onClick={() =>
+                            navigate(`/admin/cells/${cell.id}/edit`)
+                          }
+                          className="text-[11px] font-medium text-indigo-600 hover:text-indigo-900"
+                        >
+                          수정
+                        </button>
+                        <button
+                          onClick={() => handleDelete(cell)}
+                          className="text-[11px] font-medium text-red-600 hover:text-red-800"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* 🔹 데스크탑: 테이블 */}
+            <div className="hidden md:block bg-white shadow-md rounded-lg overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th
+                      onClick={() => requestSort("name")}
+                      className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
+                    >
+                      이름{getSortIndicator("name")}
+                    </th>
+                    <th
+                      onClick={() => requestSort("leaderName")}
+                      className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
+                    >
+                      셀장{getSortIndicator("leaderName")}
+                    </th>
+                    <th
+                      onClick={() => requestSort("active")}
+                      className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
+                    >
+                      활성{getSortIndicator("active")}
+                    </th>
+                    <th
+                      onClick={() => requestSort("memberCount")}
+                      className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
+                    >
+                      인원{getSortIndicator("memberCount")}
+                    </th>
+                    <th
+                      onClick={() => requestSort("maleCount")}
+                      className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
+                    >
+                      남성{getSortIndicator("maleCount")}
+                    </th>
+                    <th
+                      onClick={() => requestSort("femaleCount")}
+                      className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
+                    >
+                      여성{getSortIndicator("femaleCount")}
+                    </th>
+                    <th
+                      onClick={() => requestSort("attendanceRate")}
+                      className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
+                    >
+                      출석률{getSortIndicator("attendanceRate")}
+                    </th>
+                    <th className="relative px-3 sm:px-6 py-2 sm:py-3">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {sortedCells.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={8}
+                        className="px-3 sm:px-6 py-4 text-center text-sm text-gray-500"
+                      >
+                        조건에 맞는 셀이 없습니다. 필터를 변경해 보세요.
+                      </td>
+                    </tr>
+                  ) : (
+                    sortedCells.map((cell) => {
+                      const rateInfo = attendanceRates.get(cell.id);
+                      return (
+                        <tr
+                          key={cell.id}
+                          className={
+                            !cell.active ? "bg-gray-100 text-gray-500" : ""
+                          }
+                        >
+                          <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
+                            <button
+                              onClick={() =>
+                                navigate(`/admin/cells/${cell.id}`)
+                              }
+                              className="text-indigo-600 hover:text-indigo-900"
+                            >
+                              {cell.name}
+                            </button>
+                          </td>
+                          <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
+                            {cell.leader
+                              ? formatDisplayName(
+                                  {
+                                    name: cell.leader.name,
+                                    birthDate: cell.leader.birthDate,
+                                  },
+                                  allMembersForNameCheck
+                                )
+                              : "미정"}
+                          </td>
+                          <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
+                            <span
+                              className={`px-2 inline-flex text-[11px] sm:text-xs leading-5 font-semibold rounded-full ${
+                                cell.active
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              {cell.active ? "활성" : "비활성"}
+                            </span>
+                          </td>
+                          <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
+                            {cell.memberCount}명
+                          </td>
+                          <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
+                            {cell.maleCount}명
+                          </td>
+                          <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
+                            {cell.femaleCount}명
+                          </td>
+                          <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
+                            {rateLoading
+                              ? "..."
+                              : `${(rateInfo?.attendanceRate ?? 0).toFixed(
+                                  1
+                                )}%`}
+                          </td>
+
+                          <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
+                            <button
+                              onClick={() =>
+                                navigate(`/admin/cells/${cell.id}/edit`)
+                              }
+                              className="text-indigo-600 hover:text-indigo-900 mr-3 sm:mr-4"
+                            >
+                              수정
+                            </button>
+                            <button
+                              onClick={() => handleDelete(cell)}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              삭제
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <Pagination
+              currentPage={cellPage.number}
+              totalPages={cellPage.totalPages}
+              totalElements={cellPage.totalElements}
+              onPageChange={handlePageChange}
+              itemLabel="개 셀"
+            />
+          </>
+        )}
+
+        {showDeleteConfirmModal && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+            <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl max-w-sm w-full">
+              <h2 className="text-lg sm:text-xl font-bold mb-4">
+                셀 삭제 확인
+              </h2>
+              <p className="text-gray-700 mb-2 text-sm">
+                정말로 &quot;{cellToDelete?.name}&quot; 셀을 삭제하시겠습니까?
+              </p>
+              <p className="text-xs text-gray-500 mb-4">
+                셀을 삭제하면 해당 셀에 소속된 멤버/출석 정보에 영향을 줄 수
+                있습니다. 필요하다면 먼저 셀 구성과 출석 데이터를 확인해 주세요.
+              </p>
+              {deleteError && (
+                <div className="p-3 text-sm font-medium text-red-700 bg-red-100 border border-red-400 rounded-md mb-4">
+                  {deleteError}
+                </div>
+              )}
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={handleCloseDeleteModal}
+                  className="bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  className="bg-red-600 text-white px-4 py-2 rounded-md text-sm"
+                >
+                  삭제
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

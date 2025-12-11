@@ -50,18 +50,28 @@
 - `birthDate` (LocalDate, Nullable)
 - `phone` (String, Nullable)
 - `email` (String, Nullable, Email)
-- `cellId` (Long, Nullable): 소속 셀 변경
+- `cellId` (Long, Nullable): 소속 셀 변경.
+  - **셀 배정/변경**: 변경할 셀의 ID를 숫자로 보냅니다 (예: `123`).
+  - **셀 배정 해제**: `0`을 보냅니다.
+  - **변경 안 함**: `null`을 보내거나 이 필드를 포함하지 않습니다.
 - `role` (String, Nullable): 권한 변경
 - `joinYear` (Integer, Nullable)
 - `active` (Boolean, Nullable): 활동 상태 (휴식/탈퇴 처리 시 `false`로)
 - `address` (String, Nullable)
 - `note` (String, Nullable)
 
-**Example:**
+**Example (셀 변경):**
 ```json
 {
   "cellId": 7,
-  "note": "2팀으로 소속 변경"
+  "note": "믿음셀로 소속 변경"
+}
+```
+
+**Example (셀 배정 해제):**
+```json
+{
+  "cellId": 0
 }
 ```
 
@@ -264,6 +274,8 @@
 
 #### 6. 멤버를 셀에서 제외하기 (Unassign from Cell)
 특정 멤버의 소속 셀 정보를 제거하여 미소속 상태로 변경합니다. 셀리더는 셀에서 제외할 수 없습니다.
+
+- **참고:** 이 기능은 이제 멤버 정보 수정 API (`PATCH /api/members/{id}`)에 통합되었습니다. 해당 API에 `cellId`를 `0`으로 보내는 것이 권장되는 방식입니다. 이 엔드포인트는 하위 호환성을 위해 유지됩니다.
 
 - **Method:** `DELETE`
 - **URL:** `/api/members/{memberId}/cell`

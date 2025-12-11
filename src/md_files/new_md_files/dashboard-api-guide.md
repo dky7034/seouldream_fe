@@ -38,9 +38,13 @@
     -   **N+1 조회 방식**: '더보기' 버튼 표시 여부를 위해 6개를 조회합니다. (화면에는 5개만 표시)
     -   **임원단:** 모든 공개범위의 최신 기도제목
     -   **셀리더:** '전체공개'이거나, '셀공개'인 소속 셀의 기도제목
+-   `weeklyPrayerCount` (Integer): 이번 주(일~토)에 등록된 기도제목의 총 개수입니다.
+    -   **임원단:** 전체 기도제목 수
+    -   **셀리더:** 소속 셀의 기도제목 수 ('전체공개' 또는 '셀공개')
 -   `recentNotices` (List<`RecentNoticeInfo`>): 전체 공지 중 최신 공지사항 목록 (최대 6개).
     -   **정렬 순서**: 고정 공지(`pinned: true`)가 항상 상단에 먼저 오고, 그 안에서 최신순으로 정렬됩니다. 일반 공지는 그 뒤를 이어 최신순으로 정렬됩니다.
     -   **N+1 조회 방식**: '더보기' 버튼 표시 여부를 위해 6개를 조회합니다. (화면에는 5개만 표시)
+-   `weeklyNoticeCount` (Integer): 이번 주(일~토)에 등록된 공지사항의 총 개수입니다. (전체 대상 공지만 해당)
 -   `overallAttendanceSummary` (OverallAttendanceSummaryDto): 출석 요약 통계.
     -   **임원단:** 전체 교회 출석 요약
     -   **셀리더:** 소속 셀의 출석 요약
@@ -154,6 +158,7 @@
       "createdAt": "2025-12-04T11:30:00"
     }
   ],
+  "weeklyPrayerCount": 5,
   "recentNotices": [
     {
       "noticeId": 5,
@@ -162,6 +167,7 @@
       "pinned": true
     }
   ],
+  "weeklyNoticeCount": 2,
   "overallAttendanceSummary": {
     "periodSummaries": [
       {

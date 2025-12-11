@@ -3,73 +3,104 @@ import { useNavigate, useParams } from "react-router-dom";
 import { noticeService } from "../services/noticeService";
 import type { NoticeDto, UpdateNoticeRequest } from "../types";
 import { useAuth } from "../hooks/useAuth";
-import NoticeForm from "../components/NoticeForm";
+import NoticeForm, { type NoticeFormData } from "../components/NoticeForm";
 
 const EditNoticePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const [loading, setLoading] = useState<boolean>(true);
+  const [isFetching, setIsFetching] = useState<boolean>(true);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [editingNotice, setEditingNotice] = useState<NoticeDto | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) {
-      setError("로그인이 필요합니다.");
-      setLoading(false);
-      return;
-    }
+    // user 정보가 아직 없는 경우: auth 로딩 중일 수 있으니 대기
+    if (!user) return;
 
+    // EXECUTIVE가 아니면 공지 수정 페이지 접근 불가 → 목록으로 돌려보내기
     if (user.role !== "EXECUTIVE") {
-      setError("공지사항을 수정할 권한이 없습니다.");
-      setLoading(false);
+      navigate("/admin/notices");
       return;
     }
 
     const fetchNotice = async () => {
+      // id 유효성 체크
+      if (!id) {
+        setError("유효하지 않은 공지사항 ID 입니다.");
+        setIsFetching(false);
+        return;
+      }
+
+      const noticeId = Number(id);
+      if (Number.isNaN(noticeId)) {
+        setError("유효하지 않은 공지사항 ID 입니다.");
+        setIsFetching(false);
+        return;
+      }
+
       try {
-        setLoading(true);
-        if (id) {
-          const noticeData = await noticeService.getNoticeById(Number(id));
-          setEditingNotice(noticeData);
-        }
+        setIsFetching(true);
+        const noticeData = await noticeService.getNoticeById(noticeId);
+        setEditingNotice(noticeData);
       } catch (err) {
-        setError("공지사항 정보를 불러오는 데 실패했습니다.");
         console.error(err);
+        setError("공지사항 정보를 불러오는 데 실패했습니다.");
       } finally {
-        setLoading(false);
+        setIsFetching(false);
       }
     };
 
     fetchNotice();
-  }, [id, user]);
+  }, [id, user, navigate]);
 
-  const handleSubmit = async (formData: UpdateNoticeRequest) => {
-    setLoading(true);
-    setSubmitError(null);
+  const handleSubmit = async (formData: NoticeFormData) => {
     if (!editingNotice) {
       setSubmitError("수정할 공지사항 정보를 찾을 수 없습니다.");
-      setLoading(false);
       return;
     }
 
+    setIsSubmitting(true);
+    setSubmitError(null);
+
     try {
-      await noticeService.updateNotice(editingNotice.id, formData);
+      await noticeService.updateNotice(
+        editingNotice.id,
+        formData as UpdateNoticeRequest
+      );
       navigate("/admin/notices");
     } catch (err: any) {
-      setSubmitError(
-        err.response?.data?.message || "공지사항 수정에 실패했습니다."
-      );
       console.error("공지사항 수정 오류:", err);
+      setSubmitError(
+        err?.response?.data?.message || "공지사항 수정에 실패했습니다."
+      );
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  if (loading) {
-    return <p className="mt-4 text-gray-600">로딩 중...</p>;
+  // auth 로딩 중 (user 아직 null)
+  if (!user) {
+    return (
+      <p className="mt-4 text-gray-600">
+        로딩 중입니다. 잠시만 기다려 주세요...
+      </p>
+    );
+  }
+
+  // EXECUTIVE가 아니면 useEffect에서 이미 navigate 중이므로 여기서는 렌더 막기
+  if (user.role !== "EXECUTIVE") {
+    return null;
+  }
+
+  if (isFetching) {
+    return (
+      <p className="mt-4 text-gray-600">
+        로딩 중입니다. 잠시만 기다려 주세요...
+      </p>
+    );
   }
 
   if (error) {
@@ -96,10 +127,10 @@ const EditNoticePage: React.FC = () => {
     <NoticeForm
       initialData={initialFormData}
       onSubmit={handleSubmit}
-      loading={loading}
+      loading={isSubmitting}
       submitError={submitError}
       isEditing={true}
-      createdAt={editingNotice.createdAt} // 🔹 작성일 전달
+      createdAt={editingNotice.createdAt}
     />
   );
 };

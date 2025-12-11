@@ -31,7 +31,6 @@ const LoginPage: React.FC = () => {
       setRememberMe(true);
     }
 
-    // 마지막에 포커스
     usernameInputRef.current?.focus();
   }, []);
 
@@ -40,13 +39,21 @@ const LoginPage: React.FC = () => {
     setError(null);
     setLoading(true);
 
-    try {
-      // ✅ login 함수에 rememberMe 값을 전달
-      await login(username, password, rememberMe);
+    const trimmedUsername = username.trim();
+    const trimmedPassword = password.trim();
 
-      // ✅ 로그인 성공 후 rememberMe 처리
+    // 이중 방어: 버튼 disabled 외에 코드 레벨에서도 체크
+    if (!trimmedUsername || !trimmedPassword) {
+      setError("아이디와 비밀번호를 입력해 주세요.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      await login(trimmedUsername, trimmedPassword, rememberMe);
+
       if (rememberMe) {
-        localStorage.setItem("rememberedUsername", username);
+        localStorage.setItem("rememberedUsername", trimmedUsername);
         localStorage.setItem("rememberMe", "true");
       } else {
         localStorage.removeItem("rememberedUsername");
@@ -56,6 +63,7 @@ const LoginPage: React.FC = () => {
       navigate("/dashboard");
     } catch (err: any) {
       const errorMessage = err?.response?.data?.message;
+
       if (errorMessage === "자격 증명에 실패했습니다.") {
         setError(
           "로그인에 실패했습니다. 아이디와 비밀번호를 다시 확인해주세요."
@@ -71,26 +79,28 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const isSubmitDisabled = loading || !username || !password;
+  const isSubmitDisabled = loading || !username.trim() || !password.trim();
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-200">
-      <div className="w-full max-w-md px-8 py-10 space-y-6 bg-white rounded-2xl shadow-lg">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 flex items-center justify-center px-4 sm:px-6">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-lg px-6 py-8 sm:px-8 sm:py-10 space-y-6">
         {/* 상단 로고/타이틀 영역 */}
         <div className="text-center">
           <div className="inline-flex items-center justify-center w-12 h-12 mb-3 rounded-full bg-indigo-600 text-white font-bold text-lg">
             D
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">출석 관리 시스템</h1>
-          <p className="mt-2 text-sm text-gray-600">
-            계정으로 로그인하여 출석, 셀원, 기도제목을 한 곳에서 관리하세요.
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            출석 관리 시스템
+          </h1>
+          <p className="mt-2 text-xs sm:text-sm text-gray-600">
+            출석, 셀원, 기도제목을 한 곳에서 관리하세요.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-6">
+        <form onSubmit={handleSubmit} className="mt-2 space-y-5 sm:space-y-6">
           {/* 에러 메시지 */}
           {error && (
-            <div className="p-3 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-md">
+            <div className="p-3 text-xs sm:text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-md">
               {error}
             </div>
           )}
@@ -111,8 +121,11 @@ const LoginPage: React.FC = () => {
               ref={usernameInputRef}
               required
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              onChange={(e) => {
+                setUsername(e.target.value);
+                if (error) setError(null);
+              }}
+              className="mt-1 block w-full px-3 py-2 text-sm placeholder-gray-400 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
               disabled={loading}
             />
           </div>
@@ -133,8 +146,11 @@ const LoginPage: React.FC = () => {
                 autoComplete="current-password"
                 required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="block w-full px-3 py-2 pr-10 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (error) setError(null);
+                }}
+                className="block w-full px-3 py-2 pr-10 text-sm placeholder-gray-400 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                 disabled={loading}
               />
               <button
@@ -153,7 +169,7 @@ const LoginPage: React.FC = () => {
           </div>
 
           {/* 옵션 영역: 로그인 유지 */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <label className="flex items-center space-x-2">
               <input
                 type="checkbox"
@@ -165,20 +181,21 @@ const LoginPage: React.FC = () => {
               <span className="text-xs text-gray-600">로그인 상태 유지</span>
             </label>
 
-            <button
+            {/* 향후 비밀번호 찾기 버튼 자리 */}
+            {/* <button
               type="button"
-              className="text-xs font-medium text-indigo-600 hover:text-indigo-500"
+              className="text-xs font-medium text-indigo-400 cursor-default"
               disabled
             >
-              {/* 비밀번호 찾기 준비 중 */}
-            </button>
+              비밀번호 찾기 준비 중
+            </button> */}
           </div>
 
           {/* 로그인 버튼 */}
           <div>
             <button
               type="submit"
-              className="flex items-center justify-center w-full px-4 py-2 text-sm font-semibold text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex items-center justify-center w-full px-4 py-2.5 text-sm font-semibold text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
               disabled={isSubmitDisabled}
             >
               {loading && (
@@ -191,7 +208,7 @@ const LoginPage: React.FC = () => {
 
         {/* 하단 회원가입/안내 영역 */}
         <div className="pt-4 mt-2 border-t border-gray-100">
-          <p className="text-sm text-center text-gray-600">
+          <p className="text-xs sm:text-sm text-center text-gray-600">
             계정이 없으신가요?{" "}
             <Link
               to="/register"

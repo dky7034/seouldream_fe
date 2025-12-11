@@ -194,3 +194,25 @@
   - `teamId` (Long): 멤버를 조회할 팀의 고유 ID
 - **Success Response:** `200 OK`
   - **Body:** `List<MemberDto>`
+
+### 7. 팀에 멤버 추가
+
+특정 팀에 한 명 이상의 멤버를 추가합니다. 이미 팀에 속한 멤버는 무시됩니다.
+
+- **Method:** `POST`
+- **URL:** `/api/teams/{teamId}/members`
+- **Authorization:** `ROLE_EXECUTIVE` (임원단) 권한 필요
+- **Path Variable:**
+  - `teamId` (Long): 멤버를 추가할 팀의 고유 ID
+- **Request Body:** `List<Long>`
+
+**Example Request Body:**
+```json
+[15, 23, 42]
+```
+
+- **Success Response:** `201 CREATED`
+- **Error Responses:**
+  - `400 Bad Request`: 요청 본문이 유효하지 않을 경우 (예: `memberIds`가 비어있음)
+  - `403 Forbidden`: `EXECUTIVE` 권한이 없는 경우
+  - `404 Not Found`: 해당 `teamId`의 팀이나 요청된 `memberIds` 중 일부 멤버를 찾을 수 없는 경우

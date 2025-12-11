@@ -18,7 +18,7 @@ interface NoticeFormProps {
   isEditing?: boolean;
   submitError: string | null;
   loading: boolean;
-  createdAt?: string; // ✅ 추가: 공지 작성일(수정 페이지용)
+  createdAt?: string;
 }
 
 const NoticeForm: React.FC<NoticeFormProps> = ({
@@ -32,7 +32,6 @@ const NoticeForm: React.FC<NoticeFormProps> = ({
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // ✅ createdById는 여기서 다루지 않습니다.
   const [formData, setFormData] = useState<NoticeFormData>(
     initialData ?? {
       title: "",
@@ -62,7 +61,6 @@ const NoticeForm: React.FC<NoticeFormProps> = ({
     }
   }, [user]);
 
-  // ✅ initialData 변경 시에만 formData 동기화 (createdById 안 건드림)
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
@@ -90,7 +88,6 @@ const NoticeForm: React.FC<NoticeFormProps> = ({
         newFormData[name] = value;
       }
 
-      // 대상이 CELL가 아니면 targetCellId 제거
       if (name === "target" && value !== "CELL") {
         delete newFormData.targetCellId;
       }
@@ -140,36 +137,41 @@ const NoticeForm: React.FC<NoticeFormProps> = ({
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-2">
-        {isEditing ? "공지사항 수정" : "새 공지사항 추가"}
-      </h1>
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8">
+      {/* 헤더 영역 */}
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+          {isEditing ? "공지사항 수정" : "새 공지사항 추가"}
+        </h1>
 
-      {/* ✅ 새 공지 추가 시: 오늘 날짜 안내 */}
-      {!isEditing && (
-        <p className="mb-6 text-sm text-gray-500">
-          오늘 작성 기준 날짜:{" "}
-          <span className="font-medium text-gray-800">{todayLabel}</span>
-        </p>
-      )}
+        {!isEditing && (
+          <p className="mt-2 text-xs sm:text-sm text-gray-500">
+            오늘 작성 기준 날짜:{" "}
+            <span className="font-medium text-gray-800">{todayLabel}</span>
+          </p>
+        )}
+        {isEditing && createdAt && (
+          <p className="mt-2 text-xs sm:text-sm text-gray-500">
+            공지 작성일:{" "}
+            <span className="font-medium text-gray-800">
+              {format(new Date(createdAt), "yyyy-MM-dd")}
+            </span>
+          </p>
+        )}
+      </div>
 
-      {/* ✅ 수정 모드일 때: 기존 공지 작성일 표시 */}
-      {isEditing && createdAt && (
-        <p className="mb-6 text-sm text-gray-500">
-          공지 작성일:{" "}
-          <span className="font-medium text-gray-800">
-            {format(new Date(createdAt), "yyyy-MM-dd")}
-          </span>
-        </p>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-6">
+      {/* 카드 레이아웃 */}
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 space-y-5 sm:space-y-6"
+      >
         {submitError && (
-          <div className="p-3 text-sm font-medium text-red-700 bg-red-100 border border-red-400 rounded-md mb-4">
+          <div className="p-3 text-xs sm:text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-md">
             {submitError}
           </div>
         )}
 
+        {/* 제목 */}
         <div>
           <label
             htmlFor="title"
@@ -184,13 +186,16 @@ const NoticeForm: React.FC<NoticeFormProps> = ({
             required
             value={formData.title}
             onChange={handleChange}
-            className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            className="mt-1 block w-full px-3 py-2.5 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           />
           {formErrors.title && (
-            <p className="mt-1 text-sm text-red-600">{formErrors.title}</p>
+            <p className="mt-1 text-xs sm:text-sm text-red-600">
+              {formErrors.title}
+            </p>
           )}
         </div>
 
+        {/* 내용 */}
         <div>
           <label
             htmlFor="content"
@@ -201,18 +206,21 @@ const NoticeForm: React.FC<NoticeFormProps> = ({
           <textarea
             id="content"
             name="content"
-            rows={8}
+            rows={7}
             required
             value={formData.content}
             onChange={handleChange}
-            className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            className="mt-1 block w-full px-3 py-2.5 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           />
           {formErrors.content && (
-            <p className="mt-1 text-sm text-red-600">{formErrors.content}</p>
+            <p className="mt-1 text-xs sm:text-sm text-red-600">
+              {formErrors.content}
+            </p>
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* 공지 대상 + 대상 셀 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6">
           <div>
             <label
               htmlFor="target"
@@ -226,7 +234,7 @@ const NoticeForm: React.FC<NoticeFormProps> = ({
               required
               value={formData.target}
               onChange={handleChange}
-              className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              className="mt-1 block w-full px-3 py-2.5 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             >
               <option value="ALL">전체</option>
               <option value="CELL_LEADER">셀장</option>
@@ -234,7 +242,9 @@ const NoticeForm: React.FC<NoticeFormProps> = ({
               <option value="CELL">특정 셀</option>
             </select>
             {formErrors.target && (
-              <p className="mt-1 text-sm text-red-600">{formErrors.target}</p>
+              <p className="mt-1 text-xs sm:text-sm text-red-600">
+                {formErrors.target}
+              </p>
             )}
           </div>
 
@@ -251,7 +261,7 @@ const NoticeForm: React.FC<NoticeFormProps> = ({
                 name="targetCellId"
                 value={(formData as CreateNoticeRequest).targetCellId || ""}
                 onChange={handleChange}
-                className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="mt-1 block w-full px-3 py-2.5 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
               >
                 <option value="">셀을 선택하세요</option>
                 {cells.map((cell) => (
@@ -261,7 +271,7 @@ const NoticeForm: React.FC<NoticeFormProps> = ({
                 ))}
               </select>
               {formErrors.targetCellId && (
-                <p className="mt-1 text-sm text-red-600">
+                <p className="mt-1 text-xs sm:text-sm text-red-600">
                   {formErrors.targetCellId}
                 </p>
               )}
@@ -269,33 +279,38 @@ const NoticeForm: React.FC<NoticeFormProps> = ({
           )}
         </div>
 
-        <label htmlFor="pinned" className="flex items-center cursor-pointer">
-          <span className="mr-3 text-sm font-medium text-gray-900">
-            상단 고정
-          </span>
-          <div className="relative">
-            <input
-              id="pinned"
-              name="pinned"
-              type="checkbox"
-              className="sr-only"
-              checked={formData.pinned || false}
-              onChange={handleChange}
-            />
-            <div
-              className={`block w-14 h-8 rounded-full ${
-                formData.pinned ? "bg-indigo-600" : "bg-gray-600"
-              }`}
-            ></div>
-            <div
-              className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${
-                formData.pinned ? "translate-x-6" : ""
-              }`}
-            ></div>
-          </div>
-        </label>
+        {/* ✅ 상단 고정 스위치 – 카드 안, 좌우 정렬 */}
+        <div className="flex justify-between items-center">
+          <span className="text-sm font-medium text-gray-700">상단 고정</span>
+          <label
+            htmlFor="pinned"
+            className="flex items-center cursor-pointer select-none"
+          >
+            <div className="relative">
+              <input
+                id="pinned"
+                name="pinned"
+                type="checkbox"
+                className="sr-only"
+                checked={formData.pinned || false}
+                onChange={handleChange}
+              />
+              <div
+                className={`block w-11 h-6 rounded-full transition-colors ${
+                  formData.pinned ? "bg-indigo-600" : "bg-gray-400"
+                }`}
+              />
+              <div
+                className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full shadow-sm transition-transform ${
+                  formData.pinned ? "translate-x-5" : ""
+                }`}
+              />
+            </div>
+          </label>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* 게시 기간 설정 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6">
           <div>
             <label
               htmlFor="publishAt"
@@ -311,7 +326,7 @@ const NoticeForm: React.FC<NoticeFormProps> = ({
                 (formData as CreateNoticeRequest).publishAt
               )}
               onChange={handleChange}
-              className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              className="mt-1 block w-full px-3 py-2.5 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
 
@@ -330,23 +345,24 @@ const NoticeForm: React.FC<NoticeFormProps> = ({
                 (formData as CreateNoticeRequest).expireAt
               )}
               onChange={handleChange}
-              className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              className="mt-1 block w-full px-3 py-2.5 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
         </div>
 
-        <div className="flex justify-end pt-4 space-x-2">
+        {/* 버튼 영역 */}
+        <div className="pt-3 sm:pt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="px-4 py-2 font-medium tracking-wide text-gray-800 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none"
+            className="w-full sm:w-auto px-4 py-2.5 text-sm font-medium text-gray-800 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 disabled:opacity-60"
             disabled={loading}
           >
             취소
           </button>
           <button
             type="submit"
-            className="px-4 py-2 font-medium tracking-wide text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="w-full sm:w-auto px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
             disabled={loading}
           >
             {loading ? "저장 중..." : isEditing ? "수정 완료" : "추가"}

@@ -21,8 +21,6 @@ interface MemberAttendanceForm extends ProcessAttendanceRequest {
 // 가장 최근 일요일을 yyyy-MM-dd (로컬 기준) 문자열로 반환
 const getMostRecentSundayString = (): string => {
   const now = new Date();
-
-  // 오늘 기준으로 가장 최근 일요일 날짜 구하기
   const dayOfWeek = now.getDay(); // 0(일) ~ 6(토)
   const sunday = new Date(
     now.getFullYear(),
@@ -50,7 +48,7 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null); // ✅ 추가
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const handleAttendanceChange = (
     memberId: number,
@@ -199,11 +197,9 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
 
       await attendanceService.processAttendanceWithPrayers(cellId, payload);
 
-      // ✅ 성공 메시지 표시
       setSubmitError(null);
       setSuccessMessage("출석 및 기도제목이 저장되었습니다.");
 
-      // 3초 뒤에 자동으로 숨기기
       setTimeout(() => {
         setSuccessMessage(null);
       }, 3000);
@@ -218,8 +214,12 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
+  const getAttendanceForMember = (memberId: number) =>
+    memberAttendances.find((att) => att.memberId === memberId);
+
   return (
     <form onSubmit={handleFormSubmit} className="space-y-6">
+      {/* 알림 영역 */}
       {successMessage && (
         <div className="p-3 text-sm font-medium text-green-700 bg-green-100 border border-green-400 rounded-md">
           {successMessage}
@@ -232,6 +232,7 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
         </div>
       )}
 
+      {/* 날짜 선택 영역 - 반응형 너비 조정 */}
       <div className="p-4 bg-gray-50 rounded-lg">
         <label
           htmlFor="attendanceDate"
@@ -239,15 +240,17 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
         >
           날짜 선택
         </label>
-        <input
-          id="attendanceDate"
-          type="date"
-          required
-          value={selectedDate}
-          onChange={handleDateChange}
-          className="mt-1 block w-full md:w-1/3 rounded-md border-gray-300 shadow-sm"
-          disabled={loading}
-        />
+        <div className="mt-1">
+          <input
+            id="attendanceDate"
+            type="date"
+            required
+            value={selectedDate}
+            onChange={handleDateChange}
+            className="block w-full sm:max-w-xs rounded-md border-gray-300 shadow-sm"
+            disabled={loading}
+          />
+        </div>
         <p className="mt-1 text-xs text-gray-500">
           일요일만 선택할 수 있습니다.
         </p>
@@ -257,33 +260,126 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
 
       {!loading && members.length > 0 && (
         <>
-          <div className="p-3 mb-2 text-xs md:text-sm text-gray-600 bg-blue-50 border border-blue-100 rounded-md">
-            출석 체크는 필수이고, 기도제목은 선택입니다. 오늘은 출석만 먼저
-            저장하시고, 여유가 되실 때 기도제목을 적으셔도 괜찮습니다.
-          </div>
-          <div className="flex items-center justify-start space-x-2 mb-4">
-            <span className="text-sm font-medium text-gray-700">
-              일괄 변경:
-            </span>
-            <button
-              type="button"
-              onClick={() => handleBulkChange("PRESENT")}
-              className="px-3 py-1 text-sm border border-green-500 text-green-600 rounded-md hover:bg-green-100 disabled:opacity-50"
-              disabled={loading}
-            >
-              모두 출석
-            </button>
-            <button
-              type="button"
-              onClick={() => handleBulkChange("ABSENT")}
-              className="px-3 py-1 text-sm border border-red-500 text-red-600 rounded-md hover:bg-red-100 disabled:opacity-50"
-              disabled={loading}
-            >
-              모두 결석
-            </button>
+          {/* 안내 문구 + 일괄 변경 */}
+          <div className="space-y-3">
+            <div className="p-3 text-xs sm:text-sm text-gray-600 bg-blue-50 border border-blue-100 rounded-md">
+              출석 체크는 필수이고, 기도제목은 선택입니다. <br></br>
+              주일 출석 체크는 반드시 진행해 주세요.
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-gray-700">
+                일괄 변경:
+              </span>
+              <button
+                type="button"
+                onClick={() => handleBulkChange("PRESENT")}
+                className="px-3 py-1 text-xs sm:text-sm border border-green-500 text-green-600 rounded-md hover:bg-green-100 disabled:opacity-50"
+                disabled={loading}
+              >
+                모두 출석
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBulkChange("ABSENT")}
+                className="px-3 py-1 text-xs sm:text-sm border border-red-500 text-red-600 rounded-md hover:bg-red-100 disabled:opacity-50"
+                disabled={loading}
+              >
+                모두 결석
+              </button>
+            </div>
           </div>
 
-          <div className="bg-white shadow-md rounded-lg overflow-x-auto">
+          {/* 🔹 모바일: 카드 리스트 */}
+          <div className="mt-3 space-y-3 md:hidden">
+            {members.map((member) => {
+              const attendance = getAttendanceForMember(member.id);
+              if (!attendance) return null;
+
+              return (
+                <div
+                  key={member.id}
+                  className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 space-y-2"
+                >
+                  {/* 이름 */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-gray-800">
+                      {member.name}
+                    </span>
+                    <span className="text-[10px] text-gray-400">
+                      출석 및 기도제목
+                    </span>
+                  </div>
+
+                  {/* 출석 상태 버튼 */}
+                  <div className="flex flex-wrap gap-1.5 items-center">
+                    {(["PRESENT", "ABSENT"] as AttendanceStatus[]).map(
+                      (status) => (
+                        <StatusButton
+                          key={status}
+                          status={status}
+                          currentStatus={attendance.status}
+                          onClick={(s) =>
+                            handleAttendanceChange(member.id, "status", s)
+                          }
+                          disabled={loading}
+                          small
+                        />
+                      )
+                    )}
+                  </div>
+
+                  {/* 기도제목 */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-gray-600">
+                      기도제목
+                    </label>
+                    <textarea
+                      placeholder="기도제목을 입력하세요..."
+                      value={attendance.prayerContent || ""}
+                      onChange={(e) =>
+                        handleAttendanceChange(
+                          member.id,
+                          "prayerContent",
+                          e.target.value
+                        )
+                      }
+                      className="block w-full text-xs p-2 rounded-md border-gray-300 shadow-sm 
+                        focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 
+                        resize-y max-h-40"
+                      rows={2}
+                      disabled={loading}
+                    />
+                  </div>
+
+                  {/* 메모 */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-gray-600">
+                      메모
+                    </label>
+                    <textarea
+                      placeholder="메모..."
+                      value={attendance.memo || ""}
+                      onChange={(e) =>
+                        handleAttendanceChange(
+                          member.id,
+                          "memo",
+                          e.target.value
+                        )
+                      }
+                      className="block w-full text-xs p-2 rounded-md border-gray-300 shadow-sm 
+                        focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 
+                        resize-y max-h-32"
+                      rows={1}
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 🔹 데스크탑: 기존 테이블 유지 */}
+          <div className="hidden md:block bg-white shadow-md rounded-lg overflow-x-auto mt-3">
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead className="bg-gray-50">
                 <tr>
@@ -304,9 +400,7 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
 
               <tbody className="bg-white divide-y divide-gray-200">
                 {members.map((member) => {
-                  const attendance = memberAttendances.find(
-                    (att) => att.memberId === member.id
-                  );
+                  const attendance = getAttendanceForMember(member.id);
                   if (!attendance) return null;
 
                   return (
@@ -318,7 +412,7 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
 
                       {/* 출석 상태 */}
                       <td className="w-[18%] px-4 py-4 whitespace-nowrap align-top">
-                        <div className="flex items-center space-x-2">
+                        <div className="flex flex-wrap gap-2 items-center">
                           {(["PRESENT", "ABSENT"] as AttendanceStatus[]).map(
                             (status) => (
                               <StatusButton
@@ -329,6 +423,7 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
                                   handleAttendanceChange(member.id, "status", s)
                                 }
                                 disabled={loading}
+                                small
                               />
                             )
                           )}
@@ -348,15 +443,11 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
                             )
                           }
                           className="mt-1 block w-full text-sm p-2 rounded-md border-gray-300 shadow-sm 
-                  focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 
-                  resize-y max-h-40"
+                          focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 
+                          resize-y max-h-40"
                           rows={2}
                           disabled={loading}
                         />
-                        <p className="mt-1 text-[11px] text-gray-400">
-                          기도제목은 오늘 다 적지 않아도 됩니다. 떠오르는 내용만
-                          간단히 적어 두셔도 괜찮아요.
-                        </p>
                       </td>
 
                       {/* 메모 */}
@@ -372,8 +463,8 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
                             )
                           }
                           className="mt-1 block w-full text-sm p-2 rounded-md border-gray-300 shadow-sm 
-                  focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 
-                  resize-y max-h-32"
+                          focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 
+                          resize-y max-h-32"
                           rows={1}
                           disabled={loading}
                         />
@@ -385,10 +476,11 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
             </table>
           </div>
 
-          <div className="flex justify-end pt-4">
+          {/* 저장 버튼 - 모바일에서는 가운데, 데스크톱에서는 오른쪽 */}
+          <div className="flex justify-center md:justify-end pt-4">
             <button
               type="submit"
-              className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 disabled:bg-indigo-300"
+              className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 disabled:bg-indigo-300 text-sm"
               disabled={loading || memberAttendances.length === 0}
             >
               {loading ? "저장 중..." : "출석 및 기도제목 저장"}
@@ -398,7 +490,7 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
       )}
 
       {!loading && members.length === 0 && !submitError && (
-        <div className="text-center p-8 bg-white rounded-lg shadow-sm">
+        <div className="text-center p-8 bg-white rounded-lg shadow-sm text-sm text-gray-600">
           해당 셀에 활동중인 멤버가 없습니다.
         </div>
       )}
@@ -409,7 +501,7 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
         onCancel={() => setIsModalOpen(false)}
         title="출석 및 기도제목 저장 확인"
       >
-        <p>
+        <p className="text-sm">
           {selectedDate} 날짜의 출석 정보와 기도제목을 함께 저장하시겠습니까?
         </p>
       </ConfirmationModal>

@@ -9,7 +9,6 @@ import type {
   GetAttendancesParams,
   AttendanceDto,
   AttendanceStatus,
-  CellDto,
   MemberDto,
   Page,
   ProcessAttendanceRequest,
@@ -52,6 +51,13 @@ const formatDateKorean = (dateStr: string) => {
   const [y, m, d] = dateStr.split("-").map((v) => Number(v));
   if (!y || !m || !d) return dateStr;
   return `${y}년 ${m}월 ${d}일`;
+};
+
+const pad = (n: number) => n.toString().padStart(2, "0");
+
+// month: 1~12, 결과는 해당 달의 마지막 날(28/29/30/31)
+const lastDayOfMonth = (year: number, month: number) => {
+  return new Date(year, month, 0).getDate();
 };
 
 const formatDateGroupLabel = (
@@ -134,10 +140,10 @@ const AttendanceStats: React.FC<{
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div className="bg-white p-4 rounded-lg shadow-sm flex items-center justify-center">
-          <p className="text-gray-600">통계 불러오는 중...</p>
+          <p className="text-gray-600 text-sm">통계 불러오는 중...</p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm flex items-center justify-center">
-          <p className="text-gray-600">통계 불러오는 중...</p>
+          <p className="text-gray-600 text-sm">통계 불러오는 중...</p>
         </div>
       </div>
     );
@@ -235,7 +241,7 @@ const AttendanceTrend: React.FC<AttendanceTrendProps> = ({
 
   return (
     <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
-      <div className="flex justify-between items-center mb-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
         <h2 className="text-lg font-semibold text-gray-800">{title}</h2>
       </div>
 
@@ -250,7 +256,7 @@ const AttendanceTrend: React.FC<AttendanceTrendProps> = ({
                   )} ~ ${formatDateKorean(dateRange.endDate)}`
                 : "기간이 설정되지 않았습니다."}
             </p>
-            <p className="mt-1.5 font-medium text-gray-800">
+            <p className="mt-1.5 font-medium text-gray-800 text-sm">
               {summary.startRate.toFixed(1)}% → {summary.endRate.toFixed(1)}%{" "}
               <span className="ml-2 text-xs text-blue-600">
                 ({formatDiff(summary.diff)})
@@ -265,7 +271,7 @@ const AttendanceTrend: React.FC<AttendanceTrendProps> = ({
 
           <div className="bg-gray-50 rounded-md px-3 py-2">
             <p className="text-gray-500 text-xs">최고 출석률</p>
-            <p className="font-medium text-gray-800">
+            <p className="font-medium text-gray-800 text-sm">
               {summary.max.attendanceRate.toFixed(1)}%{" "}
               <span className="ml-1 text-xs text-gray-600">
                 ({formatDateGroupLabel(selectedGroupBy, summary.max.dateGroup)})
@@ -275,7 +281,7 @@ const AttendanceTrend: React.FC<AttendanceTrendProps> = ({
 
           <div className="bg-gray-50 rounded-md px-3 py-2">
             <p className="text-gray-500 text-xs">최저 출석률</p>
-            <p className="font-medium text-gray-800">
+            <p className="font-medium text-gray-800 text-sm">
               {summary.min.attendanceRate.toFixed(1)}%{" "}
               <span className="ml-1 text-xs text-gray-600">
                 ({formatDateGroupLabel(selectedGroupBy, summary.min.dateGroup)})
@@ -288,7 +294,7 @@ const AttendanceTrend: React.FC<AttendanceTrendProps> = ({
       <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
         {slicedData.map((item) => (
           <div key={item.dateGroup} className="space-y-1">
-            <div className="flex justify-between text-xs text-gray-600">
+            <div className="flex justify-between text-[11px] sm:text-xs text-gray-600">
               <span>
                 {formatDateGroupLabel(selectedGroupBy, item.dateGroup)}
               </span>
@@ -344,7 +350,7 @@ const StatusCell: React.FC<{
   }
 
   return (
-    <div className="flex space-x-1">
+    <div className="flex flex-wrap gap-1">
       {(["PRESENT", "ABSENT"] as AttendanceStatus[]).map((status) => (
         <button
           key={status}
@@ -386,11 +392,12 @@ const EditableMemoCell: React.FC<{
       value={memo}
       onChange={(e) => handleChange(e.target.value)}
       readOnly={disabled}
-      className={`w-full px-2 py-1 border border-transparent rounded-md bg-transparent ${
+      className={`w-full px-2 py-1 border border-transparent rounded-md bg-transparent text-xs sm:text-sm ${
         disabled
           ? "text-gray-400 cursor-not-allowed"
           : "hover:border-gray-300 focus:border-indigo-500 focus:bg-white"
       }`}
+      placeholder={disabled ? "" : "메모를 입력하세요"}
     />
   );
 };
@@ -448,6 +455,7 @@ const AdminAttendancesPage: React.FC = () => {
   >("year");
 
   const [currentPage, setCurrentPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: "date",
     direction: "descending",
@@ -460,14 +468,9 @@ const AdminAttendancesPage: React.FC = () => {
   const isExecutive = useMemo(() => user?.role === "EXECUTIVE", [user]);
   const isCellLeader = useMemo(() => user?.role === "CELL_LEADER", [user]);
 
-  // ---- 유효 조회 기간 계산 (공지페이지와 동일한 개념) ----
+  // ---- 유효 조회 기간 계산 ----
   const effectiveDateRange = useMemo(() => {
-    const pad = (n: number) => n.toString().padStart(2, "0");
-    const lastDayOfMonth = (year: number, month: number) => {
-      // month: 1~12
-      return new Date(year, month, 0).getDate();
-    };
-
+    // 1) 기간 직접 입력 모드
     if (filterType === "range") {
       if (filters.startDate && filters.endDate) {
         return {
@@ -478,7 +481,7 @@ const AdminAttendancesPage: React.FC = () => {
       return null;
     }
 
-    // 단위 기반
+    // 2) 학기 선택 모드 (semesterId 우선)
     if (filters.semesterId && semesters.length > 0) {
       const semester = semesters.find((s) => s.id === filters.semesterId);
       if (semester) {
@@ -489,10 +492,10 @@ const AdminAttendancesPage: React.FC = () => {
       }
     }
 
+    // 3) 연/반기/분기/월 단위
     const year = typeof filters.year === "number" ? filters.year : undefined;
     if (!year) return null;
 
-    // 월 단위
     if (filters.month) {
       const m = filters.month as number;
       const last = lastDayOfMonth(year, m);
@@ -502,7 +505,6 @@ const AdminAttendancesPage: React.FC = () => {
       };
     }
 
-    // 분기 단위
     if (filters.quarter) {
       const q = filters.quarter as number;
       const startMonth = (q - 1) * 3 + 1;
@@ -514,20 +516,19 @@ const AdminAttendancesPage: React.FC = () => {
       };
     }
 
-    // 반기 단위
     if (filters.half) {
       const h = filters.half as number;
       if (h === 1) {
         const last = lastDayOfMonth(year, 6);
         return {
           startDate: `${year}-01-01`,
-          endDate: `${year}-06-${pad(last)}`, // 6월 말일
+          endDate: `${year}-06-${pad(last)}`,
         };
-      } else if (h === 2) {
+      } else {
         const last = lastDayOfMonth(year, 12);
         return {
           startDate: `${year}-07-01`,
-          endDate: `${year}-12-${pad(last)}`, // 12월 말일 (31일)
+          endDate: `${year}-12-${pad(last)}`,
         };
       }
     }
@@ -540,7 +541,6 @@ const AdminAttendancesPage: React.FC = () => {
     };
   }, [filterType, filters, semesters]);
 
-  // 트렌드용 날짜 범위 (필터 없으면 전체)
   const dateRangeForTrend = useMemo(() => {
     if (effectiveDateRange) return effectiveDateRange;
     return {
@@ -575,14 +575,15 @@ const AdminAttendancesPage: React.FC = () => {
       const sortKeyMap = {
         memberName: "member.name",
         cellName: "member.cell.name",
-      };
+      } as Record<string, string>;
+
       const backendSortKey =
-        (sortKeyMap as any)[sortConfig.key] || sortConfig.key;
+        sortKeyMap[sortConfig.key as string] || (sortConfig.key as string);
 
       const params = {
         ...getCleanedParams(),
         page: currentPage,
-        size: 20,
+        size: pageSize,
         sort: `${backendSortKey},${
           sortConfig.direction === "ascending" ? "asc" : "desc"
         }`,
@@ -599,9 +600,8 @@ const AdminAttendancesPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, sortConfig, getCleanedParams]);
+  }, [currentPage, pageSize, sortConfig, getCleanedParams]);
 
-  // 날짜 범위 길이에 따라 groupBy 자동 조정
   useEffect(() => {
     if (
       !dateRangeForTrend ||
@@ -637,8 +637,8 @@ const AdminAttendancesPage: React.FC = () => {
       const params = {
         ...dateRangeForTrend,
         status: filters.status as AttendanceStatus | undefined,
-        memberId: filters.member?.value,
-        cellId: filters.cell?.value,
+        memberId: normalizeNumberInput(filters.member?.value),
+        cellId: normalizeNumberInput(filters.cell?.value),
         groupBy: selectedGroupBy,
       };
 
@@ -692,7 +692,7 @@ const AdminAttendancesPage: React.FC = () => {
     }
   }, []);
 
-  // 1) 출석 / 통계 / 멤버 목록: 필터 바뀔 때마다 업데이트
+  // 초기 로딩: 권한 확인 + 출석/통계/멤버
   useEffect(() => {
     if (user && ["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
       fetchAttendances();
@@ -711,7 +711,7 @@ const AdminAttendancesPage: React.FC = () => {
     }
   }, [user, fetchAttendances, fetchOverallStats]);
 
-  // 2) 연도/학기 마스터 데이터: 유저가 들어왔을 때 한 번만(또는 role 변경 시)
+  // 학기/연도 목록
   useEffect(() => {
     if (user && ["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
       fetchAvailableYears();
@@ -719,6 +719,7 @@ const AdminAttendancesPage: React.FC = () => {
     }
   }, [user, fetchAvailableYears, fetchSemesters]);
 
+  // 출석률 추이
   useEffect(() => {
     if (!isExecutive) {
       setTrendData([]);
@@ -732,6 +733,11 @@ const AdminAttendancesPage: React.FC = () => {
 
   const handleFilterChange = (key: keyof Filters, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
+    setCurrentPage(0);
+  };
+
+  const handlePageSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setPageSize(Number(e.target.value));
     setCurrentPage(0);
   };
 
@@ -780,7 +786,11 @@ const AdminAttendancesPage: React.FC = () => {
 
     try {
       await attendanceService.processAttendances(payload);
-      fetchAttendances();
+      await fetchAttendances();
+      await fetchOverallStats();
+      if (isExecutive) {
+        await fetchTrendData();
+      }
       setEditMode(false);
     } catch (err) {
       setError("변경사항 저장에 실패했습니다.");
@@ -812,7 +822,10 @@ const AdminAttendancesPage: React.FC = () => {
       startDate: "",
       endDate: "",
       member: null,
-      cell: null,
+      cell:
+        user.role === "CELL_LEADER" && user.cellId && user.cellName
+          ? { value: user.cellId, label: user.cellName }
+          : null,
       status: "",
       year: cy,
       month: "" as number | "",
@@ -823,6 +836,7 @@ const AdminAttendancesPage: React.FC = () => {
     setFilterType("unit");
     setUnitType("year");
     setCurrentPage(0);
+    setPageSize(10);
   };
 
   const statusOptions = useMemo(() => {
@@ -835,13 +849,16 @@ const AdminAttendancesPage: React.FC = () => {
     ];
   }, []);
 
-  const [allCells, setAllCells] = useState<CellDto[]>([]);
+  const [allCells, setAllCells] = useState<{ id: number; name: string }[]>([]);
 
   useEffect(() => {
     if (isExecutive) {
       cellService
         .getAllCells({ size: 1000 })
-        .then((data) => setAllCells(data.content));
+        .then((data) => setAllCells(data.content))
+        .catch((err) =>
+          console.error("Failed to fetch cells for filter:", err)
+        );
     }
   }, [isExecutive]);
 
@@ -942,14 +959,14 @@ const AdminAttendancesPage: React.FC = () => {
         };
       }
 
-      // 학기 모드: 다른 단위 초기화
+      // semester
       return {
         ...prev,
         year: "",
         month: "",
         quarter: "",
         half: "",
-        semesterId: prev.semesterId || "",
+        semesterId: prev.semesterId || ("" as number | ""),
       };
     });
 
@@ -980,7 +997,8 @@ const AdminAttendancesPage: React.FC = () => {
   const handleSemesterClick = (semesterId: number) => {
     setFilters((prev) => ({
       ...prev,
-      semesterId,
+      semesterId:
+        prev.semesterId === semesterId ? ("" as number | "") : semesterId,
       year: "",
       month: "",
       quarter: "",
@@ -993,7 +1011,7 @@ const AdminAttendancesPage: React.FC = () => {
     switch (unitType) {
       case "month":
         return (
-          <div className="grid grid-cols-6 gap-2">
+          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
             {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
               <button
                 key={m}
@@ -1010,13 +1028,13 @@ const AdminAttendancesPage: React.FC = () => {
         );
       case "quarter":
         return (
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {Array.from({ length: 4 }, (_, i) => i + 1).map((q) => (
               <button
                 key={q}
                 type="button"
                 onClick={() => handleUnitValueClick("quarter", q)}
-                className={`px-2 py-1 border rounded-full text-sm ${
+                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.quarter === q ? "bg-blue-500 text-white" : "bg-white"
                 }`}
               >
@@ -1033,7 +1051,7 @@ const AdminAttendancesPage: React.FC = () => {
                 key={h}
                 type="button"
                 onClick={() => handleUnitValueClick("half", h)}
-                className={`px-2 py-1 border rounded-full text-sm ${
+                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.half === h ? "bg-blue-500 text-white" : "bg-white"
                 }`}
               >
@@ -1059,7 +1077,7 @@ const AdminAttendancesPage: React.FC = () => {
                 key={s.id}
                 type="button"
                 onClick={() => handleSemesterClick(s.id)}
-                className={`px-2 py-1 border rounded-full text-sm ${
+                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.semesterId === s.id
                     ? "bg-blue-500 text-white"
                     : "bg-white"
@@ -1077,7 +1095,11 @@ const AdminAttendancesPage: React.FC = () => {
   };
 
   if (!user || !["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
-    return <p className="mt-4 text-red-600">접근 권한이 없습니다.</p>;
+    return (
+      <p className="mt-4 text-center text-sm text-red-600">
+        접근 권한이 없습니다.
+      </p>
+    );
   }
 
   const hasEdits = editedAttendances.size > 0;
@@ -1106,18 +1128,20 @@ const AdminAttendancesPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
       {/* 헤더 */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">출석 관리</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            출석 관리
+          </h1>
           <p className="mt-1 text-sm text-gray-600">
             기간·셀·멤버별 출석 기록을 조회하고, 출석/결석 상태와 메모를 한 번에
             수정할 수 있습니다.
           </p>
         </div>
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center space-x-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2">
+          <div className="flex items-center justify-between sm:justify-end gap-2">
             <span className="text-xs text-gray-600">출석 상태 수정</span>
             <button
               type="button"
@@ -1135,7 +1159,7 @@ const AdminAttendancesPage: React.FC = () => {
             type="button"
             onClick={handleSaveChanges}
             disabled={isSaving || !hasEdits}
-            className="bg-green-600 text-white px-6 py-2 rounded-md text-sm font-semibold hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto bg-green-600 text-white px-4 sm:px-6 py-2 rounded-md text-sm font-semibold hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {isSaving
               ? "저장 중..."
@@ -1150,17 +1174,16 @@ const AdminAttendancesPage: React.FC = () => {
       {/* 출석률 추이 영역 (임원만) */}
       {isExecutive && (
         <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
-          <div className="flex justify-between items-center mb-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
             <h2 className="text-lg font-semibold text-gray-800">출석률 추이</h2>
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2 justify-start sm:justify-end">
               {groupByOptions.map((option) => (
                 <button
                   key={option.value}
                   onClick={() => {
                     setSelectedGroupBy(option.value);
-                    fetchTrendData();
                   }}
-                  className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${
                     selectedGroupBy === option.value
                       ? "bg-blue-600 text-white"
                       : "bg-gray-200 text-gray-700 hover:bg-gray-300"
@@ -1171,13 +1194,16 @@ const AdminAttendancesPage: React.FC = () => {
               ))}
             </div>
           </div>
+
           {trendLoading && (
-            <p className="text-center text-gray-600 mb-4">
+            <p className="text-center text-gray-600 mb-4 text-sm">
               출석률 추이 로딩 중...
             </p>
           )}
           {trendError && (
-            <p className="text-center text-red-600 mb-4">{trendError}</p>
+            <p className="text-center text-red-600 mb-4 text-sm">
+              {trendError}
+            </p>
           )}
           {!trendLoading && !trendError && trendData.length > 0 && (
             <AttendanceTrend
@@ -1191,11 +1217,11 @@ const AdminAttendancesPage: React.FC = () => {
             !trendError &&
             trendData.length === 0 &&
             (effectiveDateRange ? (
-              <p className="text-center text-gray-500 mb-4">
+              <p className="text-center text-gray-500 mb-4 text-sm">
                 선택된 필터 조건에 해당하는 출석률 추이 데이터가 없습니다.
               </p>
             ) : (
-              <p className="text-center text-gray-500 mb-4">
+              <p className="text-center text-gray-500 mb-4 text-sm">
                 출석률 추이를 보려면 기간을 설정하거나 전체 기간을 사용할 수
                 있습니다.
               </p>
@@ -1205,16 +1231,16 @@ const AdminAttendancesPage: React.FC = () => {
 
       {/* 필터 영역 */}
       <div className="p-4 bg-gray-50 rounded-lg mb-6 shadow-sm space-y-4">
-        {/* === 기간 필터 상단 (공지페이지 패턴) === */}
-        <div className="flex items-center space-x-4">
-          <h3 className="text-lg font-semibold">
+        {/* 기간 필터 상단 */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="text-base sm:text-lg font-semibold">
             조회 기간 설정 (출석일 기준)
           </h3>
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => setFilterType("unit")}
-              className={`px-3 py-1 text-sm rounded-full ${
+              className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
                 filterType === "unit"
                   ? "bg-blue-500 text-white"
                   : "bg-white border"
@@ -1225,7 +1251,7 @@ const AdminAttendancesPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setFilterType("range")}
-              className={`px-3 py-1 text-sm rounded-full ${
+              className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
                 filterType === "range"
                   ? "bg-blue-500 text-white"
                   : "bg-white border"
@@ -1249,7 +1275,7 @@ const AdminAttendancesPage: React.FC = () => {
                 onChange={(e) =>
                   handleFilterChange("startDate", e.target.value)
                 }
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3"
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
               />
             </div>
             <div>
@@ -1260,7 +1286,7 @@ const AdminAttendancesPage: React.FC = () => {
                 type="date"
                 value={filters.endDate}
                 onChange={(e) => handleFilterChange("endDate", e.target.value)}
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3"
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
               />
             </div>
           </div>
@@ -1280,7 +1306,7 @@ const AdminAttendancesPage: React.FC = () => {
                       e.target.value ? Number(e.target.value) : ""
                     )
                   }
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3"
+                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
                   disabled={unitType === "semester"}
                 >
                   {yearOptions.map((opt) => (
@@ -1299,11 +1325,11 @@ const AdminAttendancesPage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700">
                   조회 단위
                 </label>
-                <div className="flex items-center space-x-2 mt-1">
+                <div className="flex flex-wrap items-center gap-2 mt-1">
                   <button
                     type="button"
                     onClick={() => handleUnitTypeClick("year")}
-                    className={`px-3 py-1 text-sm rounded-full ${
+                    className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
                       unitType === "year"
                         ? "bg-blue-500 text-white"
                         : "bg-white border"
@@ -1314,7 +1340,7 @@ const AdminAttendancesPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleUnitTypeClick("half")}
-                    className={`px-3 py-1 text-sm rounded-full ${
+                    className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
                       unitType === "half"
                         ? "bg-blue-500 text-white"
                         : "bg-white border"
@@ -1325,7 +1351,7 @@ const AdminAttendancesPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleUnitTypeClick("quarter")}
-                    className={`px-3 py-1 text-sm rounded-full ${
+                    className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
                       unitType === "quarter"
                         ? "bg-blue-500 text-white"
                         : "bg-white border"
@@ -1336,7 +1362,7 @@ const AdminAttendancesPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleUnitTypeClick("month")}
-                    className={`px-3 py-1 text-sm rounded-full ${
+                    className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
                       unitType === "month"
                         ? "bg-blue-500 text-white"
                         : "bg-white border"
@@ -1344,14 +1370,13 @@ const AdminAttendancesPage: React.FC = () => {
                   >
                     월간
                   </button>
-                  {/* 🔽 학기 버튼만 스타일을 확실히 다르게 */}
                   <button
                     type="button"
                     onClick={() =>
                       hasActiveSemesters && handleUnitTypeClick("semester")
                     }
                     disabled={!hasActiveSemesters}
-                    className={`px-3 py-1 text-sm rounded-full border ${
+                    className={`px-3 py-1 text-xs sm:text-sm rounded-full border ${
                       hasActiveSemesters
                         ? unitType === "semester"
                           ? "bg-blue-500 text-white border-blue-500"
@@ -1363,7 +1388,6 @@ const AdminAttendancesPage: React.FC = () => {
                   </button>
                 </div>
 
-                {/* 🔽 버튼 바로 아래 안내문 한 줄 추가 (활성 학기 없을 때만) */}
                 {!hasActiveSemesters && (
                   <p className="mt-1 text-xs text-red-500">
                     활성화된 학기가 없어 학기 단위 조회를 사용할 수 없습니다.
@@ -1397,7 +1421,7 @@ const AdminAttendancesPage: React.FC = () => {
               />
             ) : (
               <div className="mt-1 flex items-center h-[42px] px-3 w-full bg-gray-100 border border-gray-300 rounded-md">
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-gray-700 truncate">
                   {user?.cellName || "내 셀"}
                 </span>
               </div>
@@ -1442,67 +1466,66 @@ const AdminAttendancesPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="mt-4 flex justify-between items-center">
-          <button
-            type="button"
-            onClick={resetFilters}
-            className="text-sm text-gray-600 hover:text-gray-900"
-          >
-            필터 초기화
-          </button>
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="text-sm text-gray-600 hover:text-gray-900 text-left"
+            >
+              필터 초기화
+            </button>
+            <div className="flex items-center">
+              <label htmlFor="pageSize" className="sr-only">
+                페이지당 항목 수
+              </label>
+              <select
+                id="pageSize"
+                name="pageSize"
+                value={pageSize}
+                onChange={handlePageSizeChange}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-xs py-1.5 pl-2 pr-7"
+              >
+                <option value={10}>10개씩</option>
+                <option value={20}>20개씩</option>
+                <option value={50}>50개씩</option>
+                <option value={100}>100개씩</option>
+              </select>
+            </div>
+          </div>
           <button
             type="button"
             onClick={handleSearch}
             disabled={loading}
-            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:bg-blue-300"
+            className="w-full sm:w-auto bg-blue-600 text-white px-4 sm:px-6 py-2 rounded-md text-sm font-semibold hover:bg-blue-700 disabled:bg-blue-300"
           >
             {loading ? "조회 중..." : "조회"}
           </button>
         </div>
       </div>
 
-      {error && <p className="mb-4 text-red-600 text-center">{error}</p>}
+      {error && (
+        <p className="mb-4 text-center text-sm text-red-600">{error}</p>
+      )}
 
-      {/* 출석 목록 테이블 */}
-      <div className="bg-white shadow-md rounded-lg overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th
-                onClick={() => requestSort("memberName")}
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-              >
-                멤버 {getSortIndicator("memberName")}
-              </th>
-              <th
-                onClick={() => requestSort("cellName")}
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-              >
-                셀 {getSortIndicator("cellName")}
-              </th>
-              <th
-                onClick={() => requestSort("date")}
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-              >
-                날짜 {getSortIndicator("date")}
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                출석 상태
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">
-                메모
-              </th>
-            </tr>
-          </thead>
+      {/* 출석 목록 - 모바일 카드 + 데스크탑 테이블 */}
+      {loading && (
+        <div className="flex items-center justify-center min-h-[30vh]">
+          <p className="text-sm text-gray-500">
+            출석 기록을 불러오는 중입니다...
+          </p>
+        </div>
+      )}
 
-          <tbody className="bg-white divide-y divide-gray-200">
-            {loading ? (
-              <tr>
-                <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
-                  로딩 중...
-                </td>
-              </tr>
-            ) : attendancePage && attendancePage.content.length > 0 ? (
+      {!loading && attendancePage && (
+        <>
+          {/* 📱 모바일: 카드 리스트 (md 미만) */}
+          <div className="space-y-3 md:hidden mb-4">
+            {attendancePage.content.length === 0 ? (
+              <div className="bg-white rounded-lg shadow border border-gray-100 p-4 text-center text-xs sm:text-sm text-gray-500">
+                해당 조건에 맞는 출석 기록이 없습니다.
+              </div>
+            ) : (
               attendancePage.content.map((attendance) => {
                 const edited = editedAttendances.get(attendance.id);
 
@@ -1522,20 +1545,35 @@ const AdminAttendancesPage: React.FC = () => {
                   : attendance.member.name;
 
                 return (
-                  <tr
+                  <div
                     key={attendance.id}
-                    className={rowEdited ? "bg-yellow-50" : "bg-white"}
+                    className={`bg-white rounded-lg shadow border border-gray-100 p-4 text-xs space-y-2 ${
+                      rowEdited ? "ring-2 ring-yellow-300" : ""
+                    }`}
                   >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {displayName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {attendance.cell?.name || "*소속 셀 없음"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {attendance.date}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {/* 상단: 이름 / 셀 / 날짜 */}
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-gray-900">
+                          {displayName}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-gray-500">
+                          셀:{" "}
+                          <span className="font-medium">
+                            {attendance.cell?.name || "*소속 셀 없음"}
+                          </span>
+                        </p>
+                      </div>
+                      <span className="px-2 py-1 inline-flex text-[11px] leading-5 font-semibold rounded-full bg-gray-100 text-gray-700 whitespace-nowrap">
+                        {attendance.date}
+                      </span>
+                    </div>
+
+                    {/* 출석 상태 버튼 */}
+                    <div className="mt-2">
+                      <p className="text-[11px] text-gray-500 mb-1">
+                        출석 상태
+                      </p>
                       <StatusCell
                         attendance={attendance}
                         editedStatus={edited?.status as AttendanceStatus}
@@ -1548,8 +1586,11 @@ const AdminAttendancesPage: React.FC = () => {
                         }
                         disabled={!editMode}
                       />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    </div>
+
+                    {/* 메모 입력 */}
+                    <div className="mt-2">
+                      <p className="text-[11px] text-gray-500 mb-1">메모</p>
                       <EditableMemoCell
                         memo={displayMemo}
                         onChange={(memo) =>
@@ -1557,40 +1598,148 @@ const AdminAttendancesPage: React.FC = () => {
                         }
                         disabled={!editMode}
                       />
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 );
               })
-            ) : (
-              <tr>
-                <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
-                  해당 조건에 맞는 출석 기록이 없습니다.
-                </td>
-              </tr>
             )}
-          </tbody>
-        </table>
-      </div>
+          </div>
 
-      {attendancePage && attendancePage.totalPages > 1 && (
-        <Pagination
-          currentPage={attendancePage.number}
-          totalPages={attendancePage.totalPages}
-          totalElements={attendancePage.totalElements}
-          onPageChange={setCurrentPage}
-        />
+          {/* 🖥 데스크탑: 테이블 (md 이상) */}
+          <div className="hidden md:block bg-white shadow-md rounded-lg overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th
+                    onClick={() => requestSort("memberName")}
+                    className="px-3 sm:px-4 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
+                  >
+                    멤버 {getSortIndicator("memberName")}
+                  </th>
+                  <th
+                    onClick={() => requestSort("cellName")}
+                    className="px-3 sm:px-4 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
+                  >
+                    셀 {getSortIndicator("cellName")}
+                  </th>
+                  <th
+                    onClick={() => requestSort("date")}
+                    className="px-3 sm:px-4 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
+                  >
+                    날짜 {getSortIndicator("date")}
+                  </th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    출석 상태
+                  </th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3 sm:w-1/4">
+                    메모
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody className="bg-white divide-y divide-gray-200">
+                {attendancePage.content.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-3 sm:px-4 py-4 text-center text-gray-500 text-sm"
+                    >
+                      해당 조건에 맞는 출석 기록이 없습니다.
+                    </td>
+                  </tr>
+                ) : (
+                  attendancePage.content.map((attendance) => {
+                    const edited = editedAttendances.get(attendance.id);
+
+                    const displayMemo =
+                      edited?.memo !== undefined
+                        ? edited.memo
+                        : attendance.memo || "";
+
+                    const rowEdited = Boolean(edited);
+
+                    const memberFullInfo = allMembers.find(
+                      (m) => m.id === attendance.member.id
+                    );
+
+                    const displayName = memberFullInfo
+                      ? formatDisplayName(memberFullInfo, allMembers)
+                      : attendance.member.name;
+
+                    return (
+                      <tr
+                        key={attendance.id}
+                        className={rowEdited ? "bg-yellow-50" : "bg-white"}
+                      >
+                        <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">
+                          {displayName}
+                        </td>
+                        <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500">
+                          {attendance.cell?.name || "*소속 셀 없음"}
+                        </td>
+                        <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500">
+                          {attendance.date}
+                        </td>
+                        <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm">
+                          <StatusCell
+                            attendance={attendance}
+                            editedStatus={edited?.status as AttendanceStatus}
+                            onChange={(status) =>
+                              handleAttendanceChange(
+                                attendance.id,
+                                "status",
+                                status
+                              )
+                            }
+                            disabled={!editMode}
+                          />
+                        </td>
+                        <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-500 whitespace-normal">
+                          <EditableMemoCell
+                            memo={displayMemo}
+                            onChange={(memo) =>
+                              handleAttendanceChange(
+                                attendance.id,
+                                "memo",
+                                memo
+                              )
+                            }
+                            disabled={!editMode}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 페이지네이션 */}
+          {attendancePage.totalPages > 1 && (
+            <div className="mt-4">
+              <Pagination
+                currentPage={attendancePage.number}
+                totalPages={attendancePage.totalPages}
+                totalElements={attendancePage.totalElements}
+                onPageChange={setCurrentPage}
+              />
+            </div>
+          )}
+        </>
       )}
 
+      {/* 하단 저장 배너는 그대로 유지 */}
       {editMode && hasEdits && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white shadow-lg rounded-full px-6 py-2 flex items-center space-x-4 border z-50">
-          <span className="text-sm text-gray-700">
+        <div className="fixed bottom-4 inset-x-0 mx-auto max-w-xl bg-white shadow-lg rounded-full px-4 sm:px-6 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border z-50">
+          <span className="text-xs sm:text-sm text-gray-700 text-center sm:text-left">
             저장되지 않은 출석 변경 {editedAttendances.size}건이 있습니다.
           </span>
           <button
             type="button"
             onClick={handleSaveChanges}
             disabled={isSaving}
-            className="bg-green-600 text-white px-4 py-1.5 rounded-full text-sm hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="bg-green-600 text-white px-4 py-1.5 rounded-full text-xs sm:text-sm hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {isSaving ? "저장 중..." : "변경사항 저장"}
           </button>

@@ -51,16 +51,12 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
 
   // -------------------------------------------------
   // 파라미터 구성
-  //  - 학기 선택 시: 해당 학기의 startDate / endDate 우선 사용
-  //  - range 모드: startDate / endDate 그대로 사용
-  //  - unit 모드: year / month / quarter / half 사용
-  //  - 셀장은 year를 항상 currentYear로 강제
   // -------------------------------------------------
   const getCleanedParams = useCallback(() => {
     let params: any = {};
     const typeForParam: "unit" | "range" = isCellLeader ? "unit" : filterType;
 
-    // 1) 학기 선택이 되어 있다면: 학기 기간 기준으로 조회
+    // 1) 학기 선택 시 학기 기간 우선
     if (filters.semesterId && semesters.length > 0) {
       const semester = semesters.find((s) => s.id === filters.semesterId);
       if (semester) {
@@ -124,8 +120,7 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
   }, [fetchMemberStats]);
 
   // -------------------------------------------------
-  // 사용 가능한 연도 목록 조회 (실제 데이터 기준)
-  //  - 셀장은 availableYears 상관없이 현재 연도만 사용
+  // 사용 가능한 연도 목록 조회
   // -------------------------------------------------
   useEffect(() => {
     const fetchAvailableYears = async () => {
@@ -138,12 +133,11 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
       }
     };
 
-    // EXECUTIVE / 다른 역할일 때만 의미가 큼
     fetchAvailableYears();
   }, []);
 
   // -------------------------------------------------
-  // 학기 목록 조회 (활성 학기 기준)
+  // 학기 목록 조회 (활성 학기)
   // -------------------------------------------------
   useEffect(() => {
     const fetchSemesters = async () => {
@@ -217,12 +211,11 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
         next.half = "";
         next.semesterId = "";
       } else if (type === "semester") {
-        // 학기 단위: 연도/월/분기/반기는 의미 없음
+        // 학기 단위: 연도/월/분기/반기 초기화
         next.year = "";
         next.month = "";
         next.quarter = "";
         next.half = "";
-        // semesterId는 사용자가 버튼으로 선택
       }
 
       return next;
@@ -257,13 +250,13 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
     switch (unitType) {
       case "month":
         return (
-          <div className="grid grid-cols-6 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
             {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
               <button
                 key={m}
                 type="button"
                 onClick={() => handleUnitValueClick("month", m)}
-                className={`px-2 py-1 border rounded-full text-xs ${
+                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.month === m ? "bg-blue-500 text-white" : "bg-white"
                 }`}
               >
@@ -274,13 +267,13 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
         );
       case "quarter":
         return (
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {Array.from({ length: 4 }, (_, i) => i + 1).map((q) => (
               <button
                 key={q}
                 type="button"
                 onClick={() => handleUnitValueClick("quarter", q)}
-                className={`px-2 py-1 border rounded-full text-sm ${
+                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.quarter === q ? "bg-blue-500 text-white" : "bg-white"
                 }`}
               >
@@ -297,7 +290,7 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
                 key={h}
                 type="button"
                 onClick={() => handleUnitValueClick("half", h)}
-                className={`px-2 py-1 border rounded-full text-sm ${
+                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.half === h ? "bg-blue-500 text-white" : "bg-white"
                 }`}
               >
@@ -323,9 +316,9 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
                 key={s.id}
                 type="button"
                 onClick={() => handleSemesterClick(s.id)}
-                className={`px-2 py-1 border rounded-full text-sm ${
+                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.semesterId === s.id
-                    ? "bg-blue-500 text-white"
+                    ? "bg-blue-500 text-white border-blue-500"
                     : "bg-white"
                 }`}
               >
@@ -350,11 +343,11 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
 
       {/* 필터 영역 */}
       <div className="p-4 bg-gray-50 rounded-lg space-y-4">
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-wrap items-center gap-3">
           <h3 className="text-lg font-semibold">조회 기간 설정</h3>
           {/* 셀장은 기간/단위 토글 숨김, 항상 단위 조회만 사용 */}
           {!isCellLeader && (
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setFilterType("unit")}
@@ -382,7 +375,7 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
         </div>
 
         {effectiveFilterType === "range" && !isCellLeader ? (
-          // 셀장에게는 이 블록이 렌더되지 않음
+          // 임원용 기간 직접 선택
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">
@@ -410,7 +403,7 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
             </div>
           </div>
         ) : (
-          // 셀장은 항상 이쪽(단위 기반)만 사용
+          // 셀장 포함, 단위 기반 조회
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -426,7 +419,6 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
                     )
                   }
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3"
-                  // ✅ 학기 모드이거나 셀장인 경우 연도 선택 비활성화
                   disabled={isCellLeader || unitType === "semester"}
                 >
                   {yearOptions.map((opt) => (
@@ -523,60 +515,108 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
         )}
       </div>
 
-      {/* 통계 테이블 */}
+      {/* 통계 영역 */}
       {loading && (
         <div className="text-center p-8">통계 정보를 불러오는 중...</div>
       )}
+
       {!loading && (
-        <div className="bg-white shadow-md rounded-lg overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  이름
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  출석률
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  출석
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  결석
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  전체
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {stats.map((s) => (
-                <tr key={s.targetId}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+        <>
+          {/* ✅ 모바일: 카드형 리스트 */}
+          <div className="sm:hidden space-y-3">
+            {stats.map((s) => (
+              <div
+                key={s.targetId}
+                className="bg-white rounded-lg shadow-sm p-4 flex justify-between items-start"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">
                     {s.targetName}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {s.attendanceRate.toFixed(1)}%
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
-                    {s.presentCount}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
-                    {s.absentCount}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {s.totalDays}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {stats.length === 0 && (
-            <div className="text-center p-8">
-              해당 조건의 통계 정보가 없습니다.
-            </div>
-          )}
-        </div>
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    출석 {s.presentCount}회 · 결석 {s.absentCount}회 · 전체{" "}
+                    {s.totalDays}회
+                  </p>
+                  {/* 간단한 텍스트 게이지 느낌 */}
+                  <div className="mt-2">
+                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-2 bg-green-400"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.max(0, s.attendanceRate)
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-600">
+                      출석률 {s.attendanceRate.toFixed(1)}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {stats.length === 0 && (
+              <div className="text-center p-8 text-sm text-gray-500 bg-white rounded-lg shadow-sm">
+                해당 조건의 통계 정보가 없습니다.
+              </div>
+            )}
+          </div>
+
+          {/* ✅ 데스크톱: 테이블 유지 */}
+          <div className="hidden sm:block bg-white shadow-md rounded-lg overflow-x-auto">
+            {stats.length > 0 ? (
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      이름
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      출석률
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      출석
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      결석
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      전체
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {stats.map((s) => (
+                    <tr key={s.targetId}>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                        {s.targetName}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-gray-900">
+                        {s.attendanceRate.toFixed(1)}%
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-green-600">
+                        {s.presentCount}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-red-600">
+                        {s.absentCount}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-gray-500">
+                        {s.totalDays}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="text-center p-8 text-sm text-gray-500">
+                해당 조건의 통계 정보가 없습니다.
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

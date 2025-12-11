@@ -34,6 +34,9 @@ import ExecOnlyRoute from "./components/ExecOnlyRoute";
 import AdminSemestersPage from "./pages/AdminSemestersPage";
 import AdminIncompleteChecksReportPage from "./pages/AdminIncompleteChecksReportPage";
 import BirthdaysPage from "./pages/BirthdaysPage";
+import MemberPrayersPage from "./pages/MemberPrayersPage";
+import CellPrayersPage from "./pages/CellPrayersPage";
+import AdminPrayerSummaryPage from "./pages/AdminPrayerSummaryPage";
 
 function App() {
   return (
@@ -47,12 +50,10 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
             {/* 공통 접근 가능 라우트 */}
-            <Route path="/" element={<DashboardPage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/my-profile" element={<MyProfilePage />} />
             <Route path="/my-cell" element={<MyCellPage />} />
             <Route path="/birthdays" element={<BirthdaysPage />} />
-
             {/* ✅ 임원(EXECUTIVE) 전용 라우트 그룹 */}
             <Route element={<ExecOnlyRoute />}>
               {/* 사용자 관리 */}
@@ -83,7 +84,7 @@ function App() {
               {/* ✅ 학기 관리 */}
               <Route path="/admin/semesters" element={<AdminSemestersPage />} />
 
-              {/* ✅ 출석 관리 (임원만) */}
+              {/* ✅ 출석 리포트 */}
               <Route
                 path="/admin/attendances"
                 element={<AdminAttendancesPage />}
@@ -96,14 +97,25 @@ function App() {
                 path="/admin/incomplete-checks-report"
                 element={<AdminIncompleteChecksReportPage />}
               />
-            </Route>
+              {/* ✅ 기도제목 전체 리스트 (기존 그대로 유지) */}
+              <Route path="/admin/prayers" element={<AdminPrayersPage />} />
 
-            {/* ✅ 임원 + 셀장 공통으로 둘지, 모두에게 열지 정책에 따라 남겨둔 부분 */}
+              {/* ✅ 기도제목 요약 페이지 (새로 추가) */}
+              <Route
+                path="/admin/prayers/summary/members"
+                element={<AdminPrayerSummaryPage initialMode="members" />}
+              />
+              <Route
+                path="/admin/prayers/summary/cells"
+                element={<AdminPrayerSummaryPage initialMode="cells" />}
+              />
+            </Route>
+            {/* ✅ 임원 + 셀장 공통 */}
             <Route
               path="/admin/attendance-alerts"
               element={<AttendanceAlertsPage />}
             />
-            {/* ✅ 기도제목 관리 (임원 + 셀장) */}
+            // 기도제목 관리
             <Route path="/admin/prayers" element={<AdminPrayersPage />} />
             <Route path="/admin/prayers/add" element={<AddPrayerPage />} />
             <Route path="/admin/prayers/:id" element={<PrayerDetailPage />} />
@@ -111,7 +123,25 @@ function App() {
               path="/admin/prayers/:id/edit"
               element={<EditPrayerPage />}
             />
-            
+            {/* ✅ 멤버/셀 요약 탭을 별도 경로로 추가 */}
+            <Route
+              path="/admin/prayers/summary/members"
+              element={<AdminPrayersPage />}
+            />
+            <Route
+              path="/admin/prayers/summary/cells"
+              element={<AdminPrayersPage />}
+            />
+            {/* 멤버별 / 셀별 기도제목 상세 페이지 */}
+            <Route
+              path="/admin/prayers/members/:memberId"
+              element={<MemberPrayersPage />}
+            />
+            <Route
+              path="/admin/prayers/cells/:cellId"
+              element={<CellPrayersPage />}
+            />
+            {/* 공지사항 */}
             <Route path="/admin/notices" element={<AdminNoticesPage />} />
             <Route path="/admin/notices/add" element={<AddNoticePage />} />
             <Route
@@ -122,8 +152,6 @@ function App() {
               path="/admin/notices/:id/edit"
               element={<EditNoticePage />}
             />
-
-            {/* 기타 보호된 라우트 추가 위치 */}
           </Route>
         </Route>
       </Routes>

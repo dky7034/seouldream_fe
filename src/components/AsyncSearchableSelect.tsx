@@ -7,12 +7,12 @@ export interface SelectOption {
 }
 
 interface AsyncSearchableSelectProps {
-  value: SelectOption | null;
-  onChange: (value: SelectOption | null) => void;
+  value: SelectOption | SelectOption[] | null;
+  onChange: (value: SelectOption | SelectOption[] | null) => void;
   loadOptions: (inputValue: string) => Promise<SelectOption[]>;
   placeholder?: string;
   isClearable?: boolean;
-  isMulti?: boolean; // For multi-select capability
+  isMulti?: boolean;
   disabled?: boolean;
   noOptionsMessage?: (obj: { inputValue: string }) => string | null;
 }
@@ -33,7 +33,7 @@ const AsyncSearchableSelect: React.FC<AsyncSearchableSelectProps> = ({
       defaultOptions
       loadOptions={loadOptions}
       value={value}
-      onChange={(option) => onChange(option as SelectOption | null)}
+      onChange={(option) => onChange(option as any)}
       placeholder={placeholder}
       isClearable={isClearable}
       isMulti={isMulti}

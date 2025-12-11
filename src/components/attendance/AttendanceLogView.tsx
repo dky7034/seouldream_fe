@@ -53,7 +53,6 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
     memberId: null,
     startDate: "",
     endDate: "",
-    // ✅ 기본값은 현재 연도, 셀장은 이 값이 고정적으로 쓰임
     year: currentYear,
     month: "",
     quarter: "",
@@ -204,6 +203,9 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
     currentYear,
   ]);
 
+  // -------------------------------------------------
+  // useEffect 모음
+  // -------------------------------------------------
   useEffect(() => {
     fetchCellMembers();
   }, [fetchCellMembers]);
@@ -359,13 +361,13 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
     switch (unitType) {
       case "month":
         return (
-          <div className="grid grid-cols-6 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
             {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
               <button
                 key={m}
                 type="button"
                 onClick={() => handleUnitValueClick("month", m)}
-                className={`px-2 py-1 border rounded-full text-xs ${
+                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.month === m ? "bg-blue-500 text-white" : "bg-white"
                 }`}
               >
@@ -376,13 +378,13 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
         );
       case "quarter":
         return (
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {Array.from({ length: 4 }, (_, i) => i + 1).map((q) => (
               <button
                 key={q}
                 type="button"
                 onClick={() => handleUnitValueClick("quarter", q)}
-                className={`px-2 py-1 border rounded-full text-sm ${
+                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.quarter === q ? "bg-blue-500 text-white" : "bg-white"
                 }`}
               >
@@ -399,7 +401,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
                 key={h}
                 type="button"
                 onClick={() => handleUnitValueClick("half", h)}
-                className={`px-2 py-1 border rounded-full text-sm ${
+                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.half === h ? "bg-blue-500 text-white" : "bg-white"
                 }`}
               >
@@ -433,7 +435,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
                 key={s.id}
                 type="button"
                 onClick={() => handleSemesterClick(s.id)}
-                className={`px-3 py-1 border rounded-full text-sm ${
+                className={`px-3 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.semesterId === s.id
                     ? "bg-blue-500 text-white border-blue-500"
                     : "bg-white"
@@ -507,6 +509,129 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
     }
   };
 
+  // -------------------------------------------------
+  // 리스트 렌더링 (데스크톱 / 모바일 분리)
+  // -------------------------------------------------
+  const renderDesktopTable = () => {
+    if (!attendancePage) return null;
+
+    return (
+      <div className="bg-white shadow-md rounded-lg overflow-x-auto mt-4 hidden md:block">
+        <table className="min-w-full divide-y divide-gray-200 text-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              <th
+                onClick={() => handleSort("member.name")}
+                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+              >
+                이름{renderSortIndicator("member.name")}
+              </th>
+              <th
+                onClick={() => handleSort("date")}
+                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+              >
+                날짜{renderSortIndicator("date")}
+              </th>
+              <th
+                onClick={() => handleSort("status")}
+                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+              >
+                상태{renderSortIndicator("status")}
+              </th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                메모
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {attendancePage.content.map((att) => (
+              <tr key={att.id}>
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-gray-800">
+                  {att.member.name}
+                </td>
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-gray-900">
+                  {att.date}
+                </td>
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                  <span
+                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      att.status === "PRESENT"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {translateAttendanceStatus(att.status)}
+                  </span>
+                </td>
+                <td className="px-4 sm:px-6 py-4 text-gray-500">
+                  {att.memo || "-"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {attendancePage.content.length === 0 && (
+          <div className="text-center p-8 text-sm text-gray-500">
+            해당 조건의 출석 기록이 없습니다.
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderMobileList = () => {
+    if (!attendancePage) return null;
+
+    return (
+      <div className="mt-4 space-y-3 md:hidden">
+        {attendancePage.content.length === 0 && (
+          <div className="text-center p-6 text-sm text-gray-500 bg-white rounded-lg shadow-sm">
+            해당 조건의 출석 기록이 없습니다.
+          </div>
+        )}
+
+        {attendancePage.content.map((att) => (
+          <div
+            key={att.id}
+            className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex flex-col gap-2"
+          >
+            {/* 상단: 이름 + 상태 */}
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold text-gray-900">
+                  {att.member.name}
+                </span>
+                <span className="text-[11px] text-gray-500 mt-0.5">
+                  {att.date}
+                </span>
+              </div>
+              <span
+                className={`px-2 py-0.5 text-[11px] font-semibold rounded-full ${
+                  att.status === "PRESENT"
+                    ? "bg-green-100 text-green-800"
+                    : "bg-red-100 text-red-800"
+                }`}
+              >
+                {translateAttendanceStatus(att.status)}
+              </span>
+            </div>
+
+            {/* 메모 */}
+            <div className="border-t border-gray-100 pt-2">
+              <p className="text-[11px] font-medium text-gray-500 mb-1">메모</p>
+              <p className="text-xs text-gray-700 whitespace-pre-line max-h-24 overflow-y-auto">
+                {att.memo && att.memo.trim().length > 0 ? att.memo : "–"}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // -------------------------------------------------
+  // 렌더링
+  // -------------------------------------------------
   return (
     <div className="space-y-6">
       {error && (
@@ -517,12 +642,12 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
 
       {/* 필터 영역 */}
       <div className="p-4 bg-gray-50 rounded-lg space-y-4">
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-wrap items-center gap-3">
           <h3 className="text-lg font-semibold">조회 기간 설정</h3>
 
           {/* 셀장은 기간/단위 토글 숨김, 항상 단위 조회만 사용 */}
           {!isCellLeader && (
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setFilterType("unit")}
@@ -533,6 +658,17 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
                 }`}
               >
                 단위로 조회
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterType("range")}
+                className={`px-3 py-1 text-sm rounded-full ${
+                  filterType === "range"
+                    ? "bg-blue-500 text-white"
+                    : "bg-white border"
+                }`}
+              >
+                기간으로 조회
               </button>
             </div>
           )}
@@ -582,7 +718,6 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
                     )
                   }
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3"
-                  // ✅ 학기 모드이거나 셀장인 경우 연도 선택 비활성화
                   disabled={isCellLeader || unitType === "semester"}
                 >
                   {yearOptions.map((opt) => (
@@ -602,7 +737,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
                   조회 단위
                 </label>
                 <div>
-                  <div className="flex items-center space-x-2 mt-1">
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
                     <button
                       type="button"
                       onClick={() => handleUnitTypeClick("year")}
@@ -679,6 +814,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
         )}
 
         <hr />
+
         {/* 멤버/상태 필터 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -743,66 +879,9 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
             </div>
           )}
 
-          <div className="bg-white shadow-md rounded-lg overflow-x-auto mt-4">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th
-                    onClick={() => handleSort("member.name")}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  >
-                    이름{renderSortIndicator("member.name")}
-                  </th>
-                  <th
-                    onClick={() => handleSort("date")}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  >
-                    날짜{renderSortIndicator("date")}
-                  </th>
-                  <th
-                    onClick={() => handleSort("status")}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  >
-                    상태{renderSortIndicator("status")}
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    메모
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {attendancePage.content.map((att) => (
-                  <tr key={att.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">
-                      {att.member.name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {att.date}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          att.status === "PRESENT"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {translateAttendanceStatus(att.status)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {att.memo || "-"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {attendancePage.content.length === 0 && (
-              <div className="text-center p-8">
-                해당 조건의 출석 기록이 없습니다.
-              </div>
-            )}
-          </div>
+          {/* 데스크톱: 테이블, 모바일: 카드 리스트 */}
+          {renderDesktopTable()}
+          {renderMobileList()}
 
           <Pagination
             currentPage={attendancePage.number}

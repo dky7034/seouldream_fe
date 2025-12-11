@@ -60,4 +60,13 @@ export const teamService = {
       throw error;
     }
   },
+
+  addMembersToTeam: async (teamId: number, memberIds: number[]): Promise<void> => {
+    try {
+      await api.post(`/teams/${teamId}/members`, memberIds);
+    } catch (error: any) {
+      console.error(`Failed to add members to team ${teamId}:`, error.response?.data || error.message);
+      throw error;
+    }
+  },
 };

@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 
 export interface Option {
-  // ✅ 숫자 / 문자열 / null 모두 허용
   value: number | string | null;
   label: string;
 }
@@ -9,9 +8,7 @@ export interface Option {
 interface SimpleSearchableSelectProps {
   options: Option[];
   placeholder?: string;
-  // ✅ 외부에서 숫자/문자열/null/undefined 모두 줄 수 있도록 확장
   value: number | string | null | undefined;
-  // ✅ onChange 도 동일하게 확장
   onChange: (value: number | string | null | undefined) => void;
   isDisabled?: boolean;
   isClearable?: boolean;
@@ -29,7 +26,6 @@ const SimpleSearchableSelect: React.FC<SimpleSearchableSelectProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const selectRef = useRef<HTMLDivElement>(null);
 
-  // ✅ value 타입이 number|string|null|undefined 이므로 그대로 비교해도 됨
   const selectedOption = options.find((opt) => opt.value === value);
 
   const filteredOptions = options.filter((option) =>
@@ -53,7 +49,6 @@ const SimpleSearchableSelect: React.FC<SimpleSearchableSelectProps> = ({
   }, []);
 
   const handleSelect = (option: Option) => {
-    // ✅ option.value 가 number | string | null 이므로 그대로 전달
     onChange(option.value);
     setIsOpen(false);
     setSearchTerm("");
@@ -61,21 +56,21 @@ const SimpleSearchableSelect: React.FC<SimpleSearchableSelectProps> = ({
 
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
-    // ✅ 호출하는 쪽에서 undefined 를 “선택 해제/전체”로 처리하도록
     onChange(undefined);
     setIsOpen(false);
   };
 
   return (
-    <div className="relative" ref={selectRef}>
+    <div className="relative w-full text-xs sm:text-sm" ref={selectRef}>
+      {/* 선택 박스 */}
       <div
-        className={`w-full bg-white border border-gray-300 rounded-md shadow-sm pl-3 pr-10 py-2 text-left sm:text-sm
+        className={`w-full bg-white border border-gray-300 rounded-md shadow-sm pl-3 pr-10 py-2.5 sm:py-2 text-left
           ${
             isDisabled
               ? "pointer-events-none opacity-50"
               : "cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
           }`}
-        onClick={() => !isDisabled && setIsOpen(!isOpen)}
+        onClick={() => !isDisabled && setIsOpen((prev) => !prev)}
       >
         <span className="block truncate">
           {selectedOption ? (
@@ -107,6 +102,7 @@ const SimpleSearchableSelect: React.FC<SimpleSearchableSelectProps> = ({
           </span>
         )}
 
+        {/* 드롭다운 아이콘 */}
         <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
           <svg
             className="h-5 w-5 text-gray-400"
@@ -124,23 +120,27 @@ const SimpleSearchableSelect: React.FC<SimpleSearchableSelectProps> = ({
         </span>
       </div>
 
+      {/* 드롭다운 영역 */}
       {isOpen && (
-        <div className="absolute mt-1 w-full rounded-md bg-white shadow-lg z-10">
-          <div className="p-2">
+        <div className="absolute mt-1 w-full rounded-md bg-white shadow-lg z-10 border border-gray-200">
+          {/* 검색창 - sticky로 고정 */}
+          <div className="p-2 border-b border-gray-100 sticky top-0 bg-white z-10">
             <input
               type="text"
               placeholder="Search..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-xs sm:text-sm"
               value={searchTerm}
+              autoFocus
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <ul className="max-h-60 overflow-auto">
+
+          {/* 옵션 리스트 */}
+          <ul className="max-h-56 sm:max-h-60 overflow-auto overscroll-contain">
             {filteredOptions.map((option) => (
               <li
-                // ✅ value 가 null 일 수도 있으니 key 는 문자열로 변환
                 key={String(option.value)}
-                className="text-gray-900 cursor-default select-none relative py-2 pl-3 pr-9 hover:bg-indigo-600 hover:text-white"
+                className="text-xs sm:text-sm text-gray-900 cursor-default select-none relative py-2.5 px-3 sm:py-2 sm:pl-3 sm:pr-9 hover:bg-indigo-600 hover:text-white"
                 onClick={() => handleSelect(option)}
               >
                 <span className="font-normal block truncate">
@@ -165,8 +165,9 @@ const SimpleSearchableSelect: React.FC<SimpleSearchableSelectProps> = ({
                 )}
               </li>
             ))}
+
             {filteredOptions.length === 0 && (
-              <li className="text-gray-500 cursor-default select-none relative py-2 pl-3 pr-9">
+              <li className="text-xs sm:text-sm text-gray-500 cursor-default select-none relative py-2.5 px-3">
                 검색 결과가 없습니다.
               </li>
             )}

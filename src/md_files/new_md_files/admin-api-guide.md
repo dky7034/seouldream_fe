@@ -90,3 +90,97 @@
     "path": "/api/admin/members/1/reset-password"
   }
   ```
+
+---
+## 기도제목 요약 (Prayer Summaries)
+
+관리자 및 셀리더가 기도제목을 멤버별 또는 셀별로 그룹화하여 요약된 통계를 조회하는 API입니다.
+
+### 1. 멤버별 기도제목 요약 조회
+
+- **Endpoint:** `GET /api/admin/prayers/summary/members`
+- **권한:** `EXECUTIVE`, `CELL_LEADER`
+- **설명:** 다양한 조건으로 필터링된 기도제목을 멤버 기준으로 그룹화하여, 각 멤버의 기도제목 총 개수와 마지막 기도 등록일을 페이지네이션 형태로 반환합니다.
+    - **`CELL_LEADER`의 경우:** 요청 파라미터와 관계없이 자신의 셀에 속한 데이터로 자동 필터링됩니다.
+
+#### 쿼리 파라미터:
+-   **기간 필터링 (우선순위 순):**
+    -   `semesterId` (Long, Optional): 특정 학기 ID로 조회 (가장 높은 우선순위)
+    -   `year`, `month`, `quarter`, `half`: 연, 월, 분기, 반기별 조회
+    -   `startDate`, `endDate` (LocalDate, Optional): 임의의 기간으로 조회
+    -   *참고: 모든 기간 관련 파라미터가 없으면 **현재 활성화된 학기**를 기본 기간으로 사용합니다.*
+-   **기타 필터링:**
+    -   `cellId` (Long, Optional): 특정 셀 ID로 필터링 (`EXECUTIVE` 전용)
+    -   `memberId` (Long, Optional): 특정 멤버 ID로 필터링
+    -   `createdById` (Long, Optional): 특정 작성자(User) ID로 필터링
+    -   `isDeleted` (Boolean, Optional): 삭제된 기도제목 포함 여부 (기본값: `false` - 미포함)
+-   **페이지네이션 및 정렬:**
+    -   `page` (int, Optional): 페이지 번호 (기본값: `0`)
+    -   `size` (int, Optional): 페이지 크기 (기본값: `10`)
+    -   `sort` (String, Optional): 정렬 기준. 사용 가능한 필드: `memberName`, `cellName`, `totalCount`, `latestCreatedAt` (기본값: `totalCount,desc`)
+
+#### 응답 (`Page<PrayerMemberSummaryDto>`):
+
+**`PrayerMemberSummaryDto` 구조:**
+- `memberId` (Long): 멤버 ID
+- `memberName` (String): 멤버 이름
+- `cellId` (Long, Nullable): 소속된 셀 ID
+- `cellName` (String, Nullable): 소속된 셀 이름
+- `totalCount` (Long): 해당 멤버의 기도제목 총 개수
+- `latestCreatedAt` (LocalDateTime): 해당 멤버의 마지막 기도 등록일
+
+**Response Body 예시:**
+```json
+{
+  "content": [
+    {
+      "memberId": 101,
+      "memberName": "강동균",
+      "cellId": 11,
+      "cellName": "믿음셀",
+      "totalCount": 15,
+      "latestCreatedAt": "2025-11-20T10:30:00"
+    }
+  ],
+  "pageable": { ... },
+  "totalElements": 1,
+  ...
+}
+```
+
+### 2. 셀별 기도제목 요약 조회
+
+- **Endpoint:** `GET /api/admin/prayers/summary/cells`
+- **권한:** `EXECUTIVE`, `CELL_LEADER`
+- **설명:** `멤버별 기도제목 요약 조회`와 동일한 필터 로직을 사용하되, 셀 기준으로 그룹화하여 반환합니다.
+
+#### 쿼리 파라미터:
+- 위 `멤버별 기도제목 요약 조회`와 동일한 필터, 페이지네이션 파라미터를 사용합니다.
+
+#### 정렬:
+- `sort` (String, Optional): 정렬 기준. 사용 가능한 필드: `cellName`, `totalCount`, `latestCreatedAt` (기본값: `totalCount,desc`)
+
+#### 응답 (`Page<PrayerCellSummaryDto>`):
+
+**`PrayerCellSummaryDto` 구조:**
+- `cellId` (Long): 셀 ID
+- `cellName` (String): 셀 이름
+- `totalCount` (Long): 해당 셀의 기도제목 총 개수
+- `latestCreatedAt` (LocalDateTime): 해당 셀의 마지막 기도 등록일
+
+**Response Body 예시:**
+```json
+{
+  "content": [
+    {
+      "cellId": 11,
+      "cellName": "믿음셀",
+      "totalCount": 23,
+      "latestCreatedAt": "2025-11-20T10:30:00"
+    }
+  ],
+  "pageable": { ... },
+  "totalElements": 1,
+  ...
+}
+```

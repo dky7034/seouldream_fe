@@ -118,78 +118,55 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({ user }) => {
     );
   };
 
-  if (error) {
-    return <p className="mt-4 text-red-600">{error}</p>;
-  }
-
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-semibold text-gray-800">셀원 목록</h2>
+      {/* 헤더 영역 */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <h2 className="text-2xl font-semibold text-gray-800">셀원 목록</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            현재 셀에 속한 멤버 정보를 확인할 수 있습니다.
+          </p>
+        </div>
+      </div>
 
-      {loading && <p>로딩 중...</p>}
+      {error && (
+        <p className="text-center mt-4 text-sm text-red-600">{error}</p>
+      )}
 
-      {!loading && (
-        <div className="bg-white shadow-md rounded-lg overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th
-                  onClick={() => requestSort("name")}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                >
-                  이름
-                  {renderSortIndicator("name")}
-                </th>
-                <th
-                  onClick={() => requestSort("role")}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                >
-                  역할
-                  {renderSortIndicator("role")}
-                </th>
-                <th
-                  onClick={() => requestSort("birthDate")}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                >
-                  생년월일
-                  {renderSortIndicator("birthDate")}
-                </th>
-                <th
-                  onClick={() => requestSort("joinYear")}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                >
-                  등록연도
-                  {renderSortIndicator("joinYear")}
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  상태
-                </th>
-                <th className="relative px-6 py-3">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {sortedMembers.map((member) => (
-                <tr
+      {loading && !error && (
+        <p className="text-center mt-4 text-sm text-gray-500">로딩 중...</p>
+      )}
+
+      {!loading && !error && (
+        <>
+          {/* ✅ 모바일: 카드형 리스트 */}
+          <div className="sm:hidden space-y-3">
+            {sortedMembers.map((member) => {
+              const age =
+                member.birthDate && calculateAge(member.birthDate || "");
+              const isMe = user.memberId === member.id;
+
+              return (
+                <div
                   key={member.id}
-                  className={!member.active ? "bg-gray-100 text-gray-500" : ""}
+                  onClick={() => navigate(`/admin/users/${member.id}`)}
+                  className={`w-full text-left bg-white rounded-lg shadow-sm px-4 py-3 border ${
+                    !member.active ? "opacity-70 bg-gray-50" : ""
+                  }`}
                 >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => navigate(`/admin/users/${member.id}`)}
-                      className={`font-semibold ${
-                        !member.active
-                          ? "text-gray-500"
-                          : "text-indigo-600 hover:text-indigo-900"
-                      }`}
-                    >
+                  {/* 상단: 이름 + 역할 뱃지 */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-semibold text-gray-900 text-sm">
                       {formatDisplayName(member, sortedMembers)}
-                    </button>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {isMe && (
+                        <span className="ml-2 text-[11px] text-indigo-600 font-medium">
+                          나
+                        </span>
+                      )}
+                    </div>
                     <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      className={`px-2 inline-flex text-[11px] leading-5 font-semibold rounded-full ${
                         member.role === "EXECUTIVE"
                           ? "bg-red-100 text-red-800"
                           : member.role === "CELL_LEADER"
@@ -199,53 +176,185 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({ user }) => {
                     >
                       {translateRole(member.role)}
                     </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {member.birthDate}{" "}
-                    {member.birthDate &&
-                      `(만 ${calculateAge(member.birthDate)}세)`}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {member.joinYear}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        member.active
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-200 text-gray-800"
-                      }`}
-                    >
-                      {member.active ? "활성" : "비활성"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    {user.memberId === member.id && (
-                      <button
-                        onClick={() =>
-                          navigate(`/admin/users/${member.id}/edit`)
-                        }
-                        className="text-indigo-600 hover:text-indigo-900 mr-4"
+                  </div>
+
+                  {/* 중간: 생년월일 / 나이 / 등록연도 */}
+                  <div className="mt-2 text-xs text-gray-600 space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">생년월일</span>
+                      <span>
+                        {member.birthDate
+                          ? `${member.birthDate}${
+                              age != null ? ` (만 ${age}세)` : ""
+                            }`
+                          : "-"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">등록연도</span>
+                      <span>{member.joinYear ?? "-"}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500">상태</span>
+                      <span
+                        className={`px-2 inline-flex text-[11px] leading-5 font-semibold rounded-full ${
+                          member.active
+                            ? "bg-green-100 text-green-800"
+                            : "bg-gray-200 text-gray-800"
+                        }`}
                       >
-                        수정
+                        {member.active ? "활성" : "비활성"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 하단: 내 정보인 경우만 수정 버튼 노출 */}
+                  {isMe && (
+                    <div className="mt-3 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/my-profile`);
+                        }}
+                        className="text-[11px] px-3 py-1 rounded-md border border-indigo-500 text-indigo-600 hover:bg-indigo-50"
+                      >
+                        내 정보 수정
                       </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {sortedMembers.length === 0 && (
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {sortedMembers.length === 0 && (
+              <div className="px-4 py-6 text-center text-sm text-gray-500 bg-white rounded-lg shadow-sm">
+                셀에 등록된 멤버가 없습니다.
+              </div>
+            )}
+          </div>
+
+          {/* ✅ 데스크톱: 기존 테이블 그대로 유지 */}
+          <div className="hidden sm:block bg-white shadow-md rounded-lg overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
+              <thead className="bg-gray-50">
                 <tr>
-                  <td
-                    colSpan={6}
-                    className="px-6 py-4 text-center text-sm text-gray-500"
+                  <th
+                    onClick={() => requestSort("name")}
+                    className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                   >
-                    셀에 등록된 멤버가 없습니다.
-                  </td>
+                    이름
+                    {renderSortIndicator("name")}
+                  </th>
+                  <th
+                    onClick={() => requestSort("role")}
+                    className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                  >
+                    역할
+                    {renderSortIndicator("role")}
+                  </th>
+                  <th
+                    onClick={() => requestSort("birthDate")}
+                    className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                  >
+                    생년월일
+                    {renderSortIndicator("birthDate")}
+                  </th>
+                  <th
+                    onClick={() => requestSort("joinYear")}
+                    className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                  >
+                    등록연도
+                    {renderSortIndicator("joinYear")}
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    상태
+                  </th>
+                  <th className="relative px-4 sm:px-6 py-3">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {sortedMembers.map((member) => (
+                  <tr
+                    key={member.id}
+                    className={
+                      !member.active ? "bg-gray-100 text-gray-500" : ""
+                    }
+                  >
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <button
+                        onClick={() => navigate(`/admin/users/${member.id}`)}
+                        className={`font-semibold ${
+                          !member.active
+                            ? "text-gray-500 cursor-default"
+                            : "text-indigo-600 hover:text-indigo-900"
+                        }`}
+                      >
+                        {formatDisplayName(member, sortedMembers)}
+                      </button>
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
+                      <span
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          member.role === "EXECUTIVE"
+                            ? "bg-red-100 text-red-800"
+                            : member.role === "CELL_LEADER"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-green-100 text-green-800"
+                        }`}
+                      >
+                        {translateRole(member.role)}
+                      </span>
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
+                      {member.birthDate}{" "}
+                      {member.birthDate &&
+                        `(만 ${calculateAge(member.birthDate)}세)`}
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
+                      {member.joinYear}
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
+                      <span
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          member.active
+                            ? "bg-green-100 text-green-800"
+                            : "bg-gray-200 text-gray-800"
+                        }`}
+                      >
+                        {member.active ? "활성" : "비활성"}
+                      </span>
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      {user.memberId === member.id && (
+                        <button
+                          onClick={() =>
+                            navigate(`/admin/users/${member.id}/edit`)
+                          }
+                          className="text-indigo-600 hover:text-indigo-900 mr-2 sm:mr-4"
+                        >
+                          수정
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {sortedMembers.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="px-6 py-4 text-center text-sm text-gray-500"
+                    >
+                      셀에 등록된 멤버가 없습니다.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

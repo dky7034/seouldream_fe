@@ -3,36 +3,54 @@ import { useNavigate, useParams } from "react-router-dom";
 import { teamService } from "../services/teamService";
 import type { TeamDto, UpdateTeamRequest } from "../types";
 import { useAuth } from "../hooks/useAuth";
-import TeamForm from "../components/TeamForm"; // Import the new TeamForm component
+import TeamForm from "../components/TeamForm";
 
 const EditTeamPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [loading, setLoading] = useState<boolean>(true);
+
+  const [isFetching, setIsFetching] = useState<boolean>(true);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [editingTeam, setEditingTeam] = useState<TeamDto | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user || user.role !== "EXECUTIVE") {
-      setError("팀 정보를 수정할 권한이 없습니다.");
-      setLoading(false);
-      return;
-    }
+    // user 로딩 중이면 일단 대기
+    if (!user) return;
 
     const fetchTeam = async () => {
+      // 권한 체크
+      if (user.role !== "EXECUTIVE") {
+        setError("팀 정보를 수정할 권한이 없습니다.");
+        setIsFetching(false);
+        return;
+      }
+
+      // ID 유효성 체크
+      if (!id) {
+        setError("유효하지 않은 팀 ID 입니다.");
+        setIsFetching(false);
+        return;
+      }
+
+      const teamId = Number(id);
+      if (Number.isNaN(teamId)) {
+        setError("유효하지 않은 팀 ID 입니다.");
+        setIsFetching(false);
+        return;
+      }
+
       try {
-        setLoading(true);
-        if (id) {
-          const teamData = await teamService.getTeamById(Number(id));
-          setEditingTeam(teamData);
-        }
+        setIsFetching(true);
+        const teamData = await teamService.getTeamById(teamId);
+        setEditingTeam(teamData);
       } catch (err) {
-        setError("팀 정보를 불러오는 데 실패했습니다.");
         console.error(err);
+        setError("팀 정보를 불러오는 데 실패했습니다.");
       } finally {
-        setLoading(false);
+        setIsFetching(false);
       }
     };
 
@@ -40,27 +58,40 @@ const EditTeamPage: React.FC = () => {
   }, [id, user]);
 
   const handleSubmit = async (formData: UpdateTeamRequest) => {
-    setLoading(true);
-    setSubmitError(null);
     if (!editingTeam) {
       setSubmitError("수정할 팀 정보를 찾을 수 없습니다.");
-      setLoading(false);
       return;
     }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
 
     try {
       await teamService.updateTeam(editingTeam.id, formData);
       navigate("/admin/teams");
     } catch (err: any) {
-      setSubmitError(err.response?.data?.message || "팀 수정에 실패했습니다.");
       console.error("팀 수정 오류:", err);
+      setSubmitError(err?.response?.data?.message || "팀 수정에 실패했습니다.");
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  if (loading) {
-    return <p className="mt-4 text-gray-600">로딩 중...</p>;
+  // auth 로딩 중
+  if (!user) {
+    return (
+      <p className="mt-4 text-gray-600">
+        로딩 중입니다. 잠시만 기다려 주세요...
+      </p>
+    );
+  }
+
+  if (isFetching) {
+    return (
+      <p className="mt-4 text-gray-600">
+        로딩 중입니다. 잠시만 기다려 주세요...
+      </p>
+    );
   }
 
   if (error) {
@@ -71,8 +102,6 @@ const EditTeamPage: React.FC = () => {
     return <p className="mt-4 text-red-600">팀 정보를 찾을 수 없습니다.</p>;
   }
 
-  // Pass the full team DTO as initialData.
-  // The TeamForm component will handle the fields.
   const initialFormData: UpdateTeamRequest = {
     name: editingTeam.name,
     code: editingTeam.code,
@@ -84,7 +113,7 @@ const EditTeamPage: React.FC = () => {
     <TeamForm
       initialData={initialFormData}
       onSubmit={handleSubmit}
-      loading={loading}
+      loading={isSubmitting}
       submitError={submitError}
       isEditing={true}
     />

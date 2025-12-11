@@ -4,7 +4,7 @@ import { memberService } from "../services/memberService";
 import { prayerService } from "../services/prayerService";
 import { teamService } from "../services/teamService";
 import { attendanceService } from "../services/attendanceService";
-import adminService from "../services/adminService"; // Import adminService
+import adminService from "../services/adminService";
 import type {
   MemberDto,
   PrayerDto,
@@ -14,9 +14,9 @@ import type {
 import { useAuth } from "../hooks/useAuth";
 import { translateRole } from "../utils/roleUtils";
 import MultiSelect from "../components/MultiSelect";
-import ConfirmModal from "../components/ConfirmModal"; // Import ConfirmModal
+import ConfirmModal from "../components/ConfirmModal";
 
-// --- Sub-components for Member Details ---
+// --- 공통 카드 레이아웃 ---
 
 const InfoCard: React.FC<{
   title: string;
@@ -53,6 +53,8 @@ const InfoDl: React.FC<{ items: { dt: string; dd: React.ReactNode }[] }> = ({
   </dl>
 );
 
+// --- 서브 카드들 ---
+
 const BasicInfoCard: React.FC<{
   member: MemberDto;
   isCurrentUser: boolean;
@@ -74,7 +76,7 @@ const BasicInfoCard: React.FC<{
     <InfoDl
       items={[
         { dt: "이름", dd: member.name },
-        { dt: "아이디", dd: member.username }, // Added username here
+        { dt: "아이디", dd: member.username },
         { dt: "이메일", dd: member.email },
         { dt: "연락처", dd: member.phone },
         { dt: "생년월일", dd: `${member.birthDate} (${member.age}세)` },
@@ -168,6 +170,7 @@ const PrayersCard: React.FC<{ prayers: PrayerDto[] }> = ({ prayers }) => (
   </InfoCard>
 );
 
+// 이 페이지에서는 totalSummary만 쓰므로 groupBy는 고정(DAY) 처리
 const AttendanceSummaryCard: React.FC<{
   summary: MemberAttendanceSummaryDto | null;
   memberId: number;
@@ -175,8 +178,6 @@ const AttendanceSummaryCard: React.FC<{
   endDate: string;
   onStartDateChange: (date: string) => void;
   onEndDateChange: (date: string) => void;
-  groupBy: "MONTH" | "DAY";
-  onGroupByChange: (groupBy: "MONTH" | "DAY") => void;
 }> = ({
   summary,
   memberId,
@@ -184,8 +185,6 @@ const AttendanceSummaryCard: React.FC<{
   endDate,
   onStartDateChange,
   onEndDateChange,
-  // groupBy,
-  // onGroupByChange,
 }) => {
   const totalSummary = summary?.totalSummary;
 
@@ -211,7 +210,7 @@ const AttendanceSummaryCard: React.FC<{
               type="date"
               value={startDate}
               onChange={(e) => onStartDateChange(e.target.value)}
-              className="mt-1 p-2 w-full border rounded-md"
+              className="mt-1 p-2 w-full border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
           <div>
@@ -222,7 +221,7 @@ const AttendanceSummaryCard: React.FC<{
               type="date"
               value={endDate}
               onChange={(e) => onEndDateChange(e.target.value)}
-              className="mt-1 p-2 w-full border rounded-md"
+              className="mt-1 p-2 w-full border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
         </div>
@@ -258,7 +257,6 @@ const AttendanceSummaryCard: React.FC<{
   );
 };
 
-// --- Admin Actions Card ---
 const AdminActionsCard: React.FC<{
   onResetPassword: () => void;
   isResetting: boolean;
@@ -279,7 +277,8 @@ const AdminActionsCard: React.FC<{
   </InfoCard>
 );
 
-// --- Modals ---
+// --- 모달들 ---
+
 const TeamManagementModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
@@ -292,7 +291,9 @@ const TeamManagementModal: React.FC<{
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (isOpen) setSelectedTeamIds(memberTeams.map((t) => t.id));
+    if (isOpen) {
+      setSelectedTeamIds(memberTeams.map((t) => t.id));
+    }
   }, [isOpen, memberTeams]);
 
   if (!isOpen) return null;
@@ -372,7 +373,7 @@ const TempPasswordModal: React.FC<{
   );
 };
 
-// --- Main Page Component ---
+// --- 메인 페이지 ---
 
 const MemberDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -389,18 +390,19 @@ const MemberDetailPage: React.FC = () => {
   const [memberTeams, setMemberTeams] = useState<TeamDto[]>([]);
   const [allTeams, setAllTeams] = useState<TeamDto[]>([]);
 
-  // Modals state
+  // 모달 상태
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [showConfirmResetModal, setShowConfirmResetModal] = useState(false);
   const [showTempPasswordModal, setShowTempPasswordModal] = useState(false);
 
-  // Password Reset State
+  // 비밀번호 초기화 상태
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [resetPasswordError, setResetPasswordError] = useState<string | null>(
     null
   );
   const [temporaryPassword, setTemporaryPassword] = useState<string>("");
 
+  // 출석 요약 기간
   const [summaryStartDate, setSummaryStartDate] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() - 3);
@@ -409,41 +411,58 @@ const MemberDetailPage: React.FC = () => {
   const [summaryEndDate, setSummaryEndDate] = useState(
     () => new Date().toISOString().split("T")[0]
   );
-  const [summaryGroupBy, setSummaryGroupBy] = useState<"MONTH" | "DAY">(
-    "MONTH"
-  );
 
-  const memberIdNum = useMemo(() => (id ? Number(id) : null), [id]);
+  const memberIdNum = useMemo(() => {
+    if (!id) return null;
+    const num = Number(id);
+    return Number.isNaN(num) ? null : num;
+  }, [id]);
 
   const fetchMemberDetails = useCallback(async () => {
-    if (!memberIdNum || !user) return;
+    setError(null);
+
+    if (!memberIdNum) {
+      setError("유효하지 않은 멤버 ID 입니다.");
+      setLoading(false);
+      return;
+    }
+
+    if (!user) {
+      setError("로그인이 필요합니다.");
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     try {
       const [memberData, prayerData, memberTeamsData, allTeamsPage] =
         await Promise.all([
           memberService.getMemberById(memberIdNum),
-          prayerService.getPrayers({ memberId: memberIdNum }), // Changed from createdById to memberId
+          prayerService.getPrayers({ memberId: memberIdNum }),
           memberService.getMemberTeams(memberIdNum),
           user.role === "EXECUTIVE"
             ? teamService.getAllTeams({})
             : Promise.resolve([]),
         ]);
 
+      // 권한 체크
       if (
         user.role !== "EXECUTIVE" &&
         user.role !== "CELL_LEADER" &&
         user.memberId !== memberData.id
-      )
+      ) {
         throw new Error("권한이 없습니다.");
-      if (user.role === "CELL_LEADER" && user.cellId !== memberData.cell?.id)
+      }
+      if (user.role === "CELL_LEADER" && user.cellId !== memberData.cell?.id) {
         throw new Error("자신이 속한 셀의 멤버 정보만 조회할 수 있습니다.");
+      }
 
       setMember(memberData);
       setPrayers(prayerData.content);
       setMemberTeams(memberTeamsData);
-      setAllTeams("content" in allTeamsPage ? allTeamsPage.content : []);
+      setAllTeams(Array.isArray(allTeamsPage) ? [] : allTeamsPage.content);
     } catch (err: any) {
+      console.error(err);
       setError(err.message || "멤버 정보를 불러오는 데 실패했습니다.");
     } finally {
       setLoading(false);
@@ -458,14 +477,14 @@ const MemberDetailPage: React.FC = () => {
         {
           startDate: summaryStartDate,
           endDate: summaryEndDate,
-          groupBy: summaryGroupBy,
+          groupBy: "DAY", // 요약용이므로 고정
         }
       );
       setAttendanceSummary(summaryData);
     } catch (err) {
       console.error("Failed to fetch attendance summary:", err);
     }
-  }, [memberIdNum, summaryStartDate, summaryEndDate, summaryGroupBy]);
+  }, [memberIdNum, summaryStartDate, summaryEndDate]);
 
   useEffect(() => {
     fetchMemberDetails();
@@ -522,6 +541,7 @@ const MemberDetailPage: React.FC = () => {
       setTemporaryPassword(response.temporaryPassword);
       setShowTempPasswordModal(true);
     } catch (error: any) {
+      console.error("resetPassword error:", error);
       setResetPasswordError(
         error.response?.data?.message || "비밀번호 초기화에 실패했습니다."
       );
@@ -530,34 +550,39 @@ const MemberDetailPage: React.FC = () => {
     }
   };
 
-  if (loading) return <p className="mt-4 text-gray-600">로딩 중...</p>;
+  if (loading)
+    return (
+      <p className="mt-4 text-gray-600">
+        로딩 중입니다. 잠시만 기다려 주세요...
+      </p>
+    );
   if (error) return <p className="mt-4 text-red-600">{error}</p>;
   if (!member)
     return <p className="mt-4 text-red-600">멤버 정보를 찾을 수 없습니다.</p>;
 
   const canEdit =
     user && (user.role === "EXECUTIVE" || user.memberId === member.id);
-
   const isAdmin = user?.role === "EXECUTIVE";
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">
+      {/* 상단 타이틀 + 버튼 (반응형) */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
           {member.name} 상세 정보
         </h1>
-        <div>
+        <div className="flex gap-2 justify-end">
           {canEdit && (
             <button
               onClick={() => navigate(`/admin/users/${id}/edit`)}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-md mr-2"
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700"
             >
               수정
             </button>
           )}
           <button
             onClick={() => navigate(-1)}
-            className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md"
+            className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-300"
           >
             뒤로 가기
           </button>
@@ -570,7 +595,9 @@ const MemberDetailPage: React.FC = () => {
         </div>
       )}
 
+      {/* 메인 그리드 (반응형) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* 왼쪽: 기본정보 + 출석요약 */}
         <div className="lg:col-span-2 space-y-6">
           <BasicInfoCard
             member={member}
@@ -584,16 +611,16 @@ const MemberDetailPage: React.FC = () => {
             endDate={summaryEndDate}
             onStartDateChange={setSummaryStartDate}
             onEndDateChange={setSummaryEndDate}
-            groupBy={summaryGroupBy}
-            onGroupByChange={setSummaryGroupBy}
           />
         </div>
+
+        {/* 오른쪽: 교회정보, 팀, 관리자도구, 기도제목 */}
         <div className="space-y-6">
           <ChurchInfoCard member={member} />
           <TeamsCard
             memberTeams={memberTeams}
             onManageClick={() => setIsTeamModalOpen(true)}
-            canManage={user?.role === "EXECUTIVE"}
+            canManage={isAdmin}
           />
           {isAdmin && (
             <AdminActionsCard
@@ -605,6 +632,7 @@ const MemberDetailPage: React.FC = () => {
         </div>
       </div>
 
+      {/* 모달들 */}
       <TeamManagementModal
         isOpen={isTeamModalOpen}
         onClose={() => setIsTeamModalOpen(false)}

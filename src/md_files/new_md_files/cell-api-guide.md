@@ -9,12 +9,10 @@
 **아래 두 규칙은 이 문서에 포함된 출석 통계 조회 등, 날짜 및 데이터 조회가 포함된 모든 API에 일관되게 적용됩니다.**
 
 ### 1. 날짜 조회 기본 규칙 (Default Date Filtering)
-
 - **별도의 날짜 관련 파라미터가 없는 경우**, API는 **현재 활성화된 학기**의 기간을 기본값으로 조회합니다.
 - `startDate` & `endDate` 또는 `year` 등의 파라미터를 명시하면 해당 기간의 데이터를 조회할 수 있으며, 과거 연도 데이터 조회도 가능합니다.
 
 ### 2. 셀 범위 보안 (Cell Scope Security)
-
 - **셀리더(CELL_LEADER)** 역할의 사용자는, API 호출 시 **자신이 속한 셀의 데이터만** 조회, 생성, 수정, 삭제할 수 있습니다.
 - `cellId` 또는 `memberId` 파라미터로 다른 셀의 정보를 명시적으로 요청하더라도, 서버에서 이를 차단하고 권한 오류를 반환합니다.
 
@@ -23,25 +21,24 @@
 ## 1. 데이터 모델 (DTO)
 
 ### CreateCellRequest
-
 새로운 셀을 생성할 때 사용하는 요청 객체입니다.
 
 - `name` (String, NotBlank): 셀 이름 (예: "기쁨셀")
 - `leaderId` (Long, Nullable): 셀 리더(순장)의 멤버 ID
 - `viceLeaderId` (Long, Nullable): 셀 부리더(부순장)의 멤버 ID
 - `description` (String, Nullable): 셀에 대한 설명
+- `memberIds` (List<Long>, Nullable): 셀에 소속시킬 멤버들의 ID 목록. `leaderId`나 `viceLeaderId`가 여기에 포함되어 있어도 중복 처리되므로 괜찮습니다.
 
 **Example:**
-
 ```json
 {
   "name": "사랑셀",
-  "leaderId": 15
+  "leaderId": 15,
+  "memberIds": [15, 22, 31, 45]
 }
 ```
 
 ### UpdateCellRequest
-
 기존 셀의 정보를 수정할 때 사용하는 요청 객체입니다. 수정하고 싶은 필드만 포함하여 보낼 수 있습니다.
 
 - `name` (String, Nullable): 새로운 셀 이름
@@ -51,7 +48,6 @@
 - `active` (Boolean, Nullable): 셀 활성화 상태
 
 **Example:**
-
 ```json
 {
   "leaderId": 21,
@@ -60,7 +56,6 @@
 ```
 
 ### CellDto
-
 셀 정보를 나타내는 기본 응답 객체입니다.
 
 - `id` (Long): 셀의 고유 ID
@@ -77,14 +72,12 @@
 - `updatedAt` (LocalDateTime): 마지막 수정 시각
 
 #### MemberInfo
-
 - `id` (Long): 멤버 고유 ID
 - `name` (String): 멤버 이름
 - `gender` (String): 멤버 성별 ("MALE" 또는 "FEMALE")
 - `birthDate` (LocalDate): 생년월일
 
 **Example:**
-
 ```json
 {
   "id": 5,
@@ -121,7 +114,6 @@
 ```
 
 ### CellAttendanceSummaryDto
-
 특정 셀의 출석 현황 요약 정보입니다. 기간별 상세 통계 (`periodSummaries`)와 함께 전체 기간에 대한 총 요약 정보 (`totalSummary`)를 포함합니다.
 
 - `cellId` (Long): 셀의 고유 ID
@@ -130,7 +122,6 @@
 - `totalSummary` (TotalSummaryDto): 조회 기간 전체에 대한 출석 총 요약 정보.
 
 #### TotalSummaryDto (CellAttendanceSummaryDto 내부)
-
 - `totalPresent` (Long): 총 출석 수
 - `totalAbsent` (Long): 총 결석 수
 - `totalMembers` (Long): 기간 내 활성 상태였던 셀 멤버 수
@@ -138,7 +129,6 @@
 - `attendanceRate` (Double): 전체 기간 출석률 (%). 계산식: `(totalPresent / (totalPresent + totalAbsent)) * 100`.
 
 **Example:**
-
 ```json
 {
   "cellId": 1,
@@ -163,7 +153,6 @@
 ```
 
 ### SimpleAttendanceRateDto
-
 특정 셀이나 멤버의 간단한 출석률 정보를 반환하는 DTO입니다.
 
 - `targetId` (Long, Nullable): 대상의 ID (셀 또는 멤버)
@@ -175,14 +164,24 @@
 - `startDate` (LocalDate): 조회 시작일
 - `endDate` (LocalDate): 조회 종료일
 
-### ProcessAttendanceWithPrayersRequest
+### CellMemberAttendanceSummaryDto
+특정 셀에 속한 개별 멤버의 출석 요약 정보를 나타내는 DTO입니다.
 
+- `memberId` (Long): 멤버 ID
+- `memberName` (String): 멤버 이름
+- `gender` (String): 성별 (`"MALE"` / `"FEMALE"`)
+- `birthDate` (LocalDate): 생년월일
+- `joinYear` (Integer): 가입 연도
+- `active` (boolean): 멤버 활성 상태
+- `lastAttendanceDate` (LocalDate, Nullable): 가장 최근에 '출석(PRESENT)'으로 기록된 날짜. 출석 기록이 전혀 없으면 `null`입니다.
+- `consecutiveAbsences` (int): 가장 최근 출석일부터 현재까지 연속으로 '결석(ABSENT)'한 횟수.
+
+### ProcessAttendanceWithPrayersRequest
 출석 정보와 기도제목을 함께 저장하기 위한 통합 요청 객체입니다.
 
 - `items` (List<AttendanceAndPrayerItem>): 처리할 출석 및 기도제목 항목 목록
 
 #### AttendanceAndPrayerItem
-
 각 멤버의 출석 및 기도제목 정보를 담는 객체입니다.
 
 - `memberId` (Long, NotNull): 멤버 ID
@@ -215,7 +214,6 @@
 - **Authorization:** 로그인된 사용자
 
 #### Query Parameters
-
 - **필터링:**
   - `name` (String, Optional): 셀 이름 (부분 일치 검색)
   - `active` (Boolean, Optional): 활성 상태 (`true` 또는 `false`)
@@ -236,14 +234,12 @@
     - **사용 가능 필드명:** `id`, `name`, `createdAt`, `memberCount` 등
 
 ##### 예시 URL
-
 - **멤버 수 내림차순 정렬:**
   `GET http://localhost:8080/api/cells?sort=memberCount,desc`
 - **2024년 2분기에 생성된 셀 조회:**
   `GET http://localhost:8080/api/cells?year=2024&quarter=2`
 
 ##### Success Response: `200 OK`
-
 - **Body:** `Page<CellDto>`
 
 ```json
@@ -253,7 +249,7 @@
     {
       "id": 5,
       "name": "사랑셀",
-      "memberCount": 12
+      "memberCount": 12,
       // ...
     }
   ],
@@ -264,11 +260,11 @@
       "sorted": true,
       "unsorted": false,
       "empty": false
-    }
+    },
     // ...
   },
   "totalPages": 2,
-  "totalElements": 35
+  "totalElements": 35,
   // ...
 }
 ```
@@ -302,7 +298,7 @@
 
 ### 5. 셀 삭제
 
-특정 셀을 삭제합니다. 삭제 시, 해당 셀에 소속되어 있던 모든 멤버들은 자동으로 '소속 셀 없음' 상태가 됩니다. 만약 멤버 중 셀 리더가 있었다면, 역할이 일반 '멤버'로 변경됩니다.
+특정 셀을 삭제합니다. 삭제 시, 해당 셀에 소속되어 있던 모든 멤버들은 자동으로 '소속 없음' 상태가 됩니다. 만약 멤버 중 셀 리더가 있었다면, 역할이 일반 '멤버'로 변경됩니다.
 
 - **Method:** `DELETE`
 - **URL:** `/api/cells/{id}`
@@ -340,7 +336,7 @@
     - `month` (Integer, Optional): 특정 월로 필터링 (1~12)
     - `quarter` (Integer, Optional): 특정 분기로 필터링 (1~4)
     - `half` (Integer, Optional): 특정 반기로 필터링 (1~2)
-  - _참고: 기간 관련 파라미터가 없으면 **현재 활성화된 학기**를 기본 기간으로 사용합니다._
+  - *참고: 기간 관련 파라미터가 없으면 **현재 활성화된 학기**를 기본 기간으로 사용합니다.*
 - **Success Response:** `200 OK`
   - **Body:** `SimpleAttendanceRateDto`
 
@@ -361,11 +357,60 @@
     - `month` (Integer, Optional): 특정 월로 필터링 (1~12)
     - `quarter` (Integer, Optional): 특정 분기로 필터링 (1~4)
     - `half` (Integer, Optional): 특정 반기로 필터링 (1~2)
-  - _참고: 기간 관련 파라미터가 없으면 **현재 활성화된 학기**를 기본 기간으로 사용합니다._
+  - *참고: 기간 관련 파라미터가 없으면 **현재 활성화된 학기**를 기본 기간으로 사용합니다.*
 - **Success Response:** `200 OK`
   - **Body:** `List<SimpleAttendanceRateDto>` - 각 멤버의 출석 통계 DTO가 담긴 배열
 
-### 9. 특정 셀의 데이터가 있는 연도 목록 조회
+### 9. 특정 셀 멤버별 상세 출석 요약 조회 (NEW)
+
+특정 셀에 속한 모든 활성 멤버 각각의 상세 출석 요약 정보(최근 출석일, 연속 결석 횟수 등)를 조회합니다.
+
+- **Method:** `GET`
+- **URL:** `/api/cells/{cellId}/members/attendance-summary`
+- **Authorization:** `ROLE_EXECUTIVE` 또는 해당 셀의 리더 (`@customSecurityEvaluator.isCellLeaderOfCell`)
+- **Path Variable:**
+  - `cellId` (Long): 요약 정보를 조회할 셀의 고유 ID
+- **Query Parameters:** 없음
+- **Success Response:** `200 OK`
+  - **Body:** `List<CellMemberAttendanceSummaryDto>`
+
+#### 응답 예시 (JSON)
+```json
+[
+  {
+    "memberId": 15,
+    "memberName": "박순장",
+    "gender": "MALE",
+    "birthDate": "1992-05-10",
+    "joinYear": 2020,
+    "active": true,
+    "lastAttendanceDate": "2025-11-30",
+    "consecutiveAbsences": 0
+  },
+  {
+    "memberId": 32,
+    "memberName": "이순원",
+    "gender": "FEMALE",
+    "birthDate": "1995-11-20",
+    "joinYear": 2022,
+    "active": true,
+    "lastAttendanceDate": "2025-11-16",
+    "consecutiveAbsences": 2
+  },
+  {
+    "memberId": 45,
+    "memberName": "김신입",
+    "gender": "MALE",
+    "birthDate": "2001-03-01",
+    "joinYear": 2025,
+    "active": true,
+    "lastAttendanceDate": null,
+    "consecutiveAbsences": 4
+  }
+]
+```
+
+### 10. 특정 셀의 데이터가 있는 연도 목록 조회
 
 특정 셀의 출석 데이터가 한 건이라도 존재하는 모든 연도를 중복 없이, 내림차순으로 정렬하여 반환합니다.
 
@@ -378,7 +423,7 @@
 - **Success Response:** `200 OK`
   - **Body:** `[2025, 2024]` 과 같은 숫자 배열
 
-### 10. 셀장 대시보드 요약 정보 조회
+### 11. 셀장 대시보드 요약 정보 조회
 
 셀장 대시보드에 필요한 핵심 지표들(출석 인원, 총 인원, 출석률, 미완료 출석 체크 주수)을 한 번에 조회합니다.
 
@@ -395,12 +440,11 @@
     - `month` (Integer, Optional): 특정 월로 필터링 (1~12). `year` 파라미터와 함께 사용해야 합니다.
     - `quarter` (Integer, Optional): 특정 분기로 필터링 (1~4). `year` 파라미터와 함께 사용해야 합니다.
     - `half` (Integer, Optional): 특정 반기로 필터링 (1~2). `year` 파라미터와 함께 사용해야 합니다.
-  - _참고: 기간 관련 파라미터가 없으면 **현재 활성화된 학기**를 기본 기간으로 사용합니다._
+  - *참고: 기간 관련 파라미터가 없으면 **현재 활성화된 학기**를 기본 기간으로 사용합니다.*
 - **Success Response:** `200 OK`
   - **Body:** `CellLeaderDashboardDto`
 
 #### 응답 예시 (JSON)
-
 ```json
 {
   "presentRecords": 85,
@@ -410,7 +454,7 @@
 }
 ```
 
-### 11. 출석 및 기도제목 통합 저장
+### 12. 출석 및 기도제목 통합 저장
 
 특정 셀의 멤버들에 대한 출석 정보와 기도제목을 단일 요청으로 함께 저장합니다.
 
@@ -421,14 +465,13 @@
   - `cellId` (Long): 출석 및 기도제목을 저장할 셀의 고유 ID
 - **Request Body:** `ProcessAttendanceWithPrayersRequest`
 - **Success Response:** `204 No Content`
-  - _성공 시 본문 없음_
+  - *성공 시 본문 없음*
 - **Error Response:**
   - `400 Bad Request`: 요청 데이터 유효성 검증 실패 (예: 멤버가 해당 셀에 속하지 않음, 날짜 규칙 위반 등)
   - `403 Forbidden`: 권한 없음 (예: 셀장이 자신의 셀이 아닌 다른 셀에 저장 시도)
   - `404 Not Found`: 셀을 찾을 수 없음
 
 **Example Request Body:**
-
 ```json
 {
   "items": [

@@ -40,6 +40,7 @@
 - `role` (String): 사용자 권한 (예: `USER`, `LEADER`, `EXECUTIVE`)
 - `name` (String): 사용자 이름
 - `cellId` (Long, Nullable): 사용자가 셀 리더 또는 셀원일 경우 소속된 셀의 ID
+- `cellName` (String, Nullable): 사용자가 셀에 소속되어 있을 경우, 해당 셀의 이름
 - `memberId` (Long, Nullable): 로그인한 사용자의 Member 엔티티 ID (Member가 없는 User는 null)
 
 **Example:**
@@ -52,6 +53,7 @@
   "role": "LEADER",
   "name": "김리더",
   "cellId": 12,
+  "cellName": "믿음셀",
   "memberId": 501
 }
 ```

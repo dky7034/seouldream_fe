@@ -262,7 +262,6 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
       const next = { ...prev };
 
       if (unit === "year") {
-        // ✅ 셀장이라도 여기서는 state만 바꾸는 용도지만, 실질 쿼리는 currentYear로 고정됨
         next.year = value;
         next.month = "";
         next.quarter = "";
@@ -304,12 +303,12 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
     switch (unitType) {
       case "month":
         return (
-          <div className="grid grid-cols-6 gap-2">
+          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
             {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
               <button
                 key={m}
                 onClick={() => handleUnitValueChange("month", m)}
-                className={`px-2 py-1 border rounded-full text-xs ${
+                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.month === m ? "bg-blue-500 text-white" : "bg-white"
                 }`}
               >
@@ -320,12 +319,12 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
         );
       case "quarter":
         return (
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {Array.from({ length: 4 }, (_, i) => i + 1).map((q) => (
               <button
                 key={q}
                 onClick={() => handleUnitValueChange("quarter", q)}
-                className={`px-2 py-1 border rounded-full text-sm ${
+                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.quarter === q ? "bg-blue-500 text-white" : "bg-white"
                 }`}
               >
@@ -341,7 +340,7 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
               <button
                 key={h}
                 onClick={() => handleUnitValueChange("half", h)}
-                className={`px-2 py-1 border rounded-full text-sm ${
+                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.half === h ? "bg-blue-500 text-white" : "bg-white"
                 }`}
               >
@@ -356,7 +355,7 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
             {semestersError && (
               <p className="text-xs text-red-500">{semestersError}</p>
             )}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {semesters.map((sem) => (
                 <button
                   key={sem.id}
@@ -399,24 +398,34 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
         message="정말로 이 기도제목을 삭제하시겠습니까?"
       />
 
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold text-gray-800">기도제목</h2>
-        <button
-          onClick={() => navigate("/admin/prayers/add")}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-        >
-          + 새 기도제목
-        </button>
+      {/* 헤더 */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-semibold text-gray-800">
+            {user.cellName ? `${user.cellName} 셀 기도제목` : "내 셀 기도제목"}
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            내 셀원들의 기도제목을 기간별로 조회하고 관리할 수 있습니다.
+          </p>
+        </div>
+        <div className="flex justify-end">
+          <button
+            onClick={() => navigate("/admin/prayers/add")}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 text-sm"
+          >
+            + 새 기도제목
+          </button>
+        </div>
       </div>
 
       {/* 필터 영역 */}
       <div className="p-4 bg-gray-50 rounded-lg mb-6 space-y-4">
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 gap-2">
           <h3 className="text-lg font-semibold">조회 기간 설정</h3>
 
           {/* ✅ 셀장은 기간/단위 토글 숨김, 항상 단위 기반 조회만 사용 */}
           {!isCellLeader && (
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => setFilterType("unit")}
                 className={`px-3 py-1 text-sm rounded-full ${
@@ -505,7 +514,7 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
                 <label className="block text-sm font-medium text-gray-700">
                   조회 단위
                 </label>
-                <div className="flex items-center space-x-2 mt-1">
+                <div className="flex flex-wrap items-center gap-2 mt-1">
                   {/* 연간 */}
                   <button
                     onClick={() =>
@@ -594,11 +603,91 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
       </div>
 
       {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
-      {loading && <p>로딩 중...</p>}
+      {loading && (
+        <p className="text-center text-sm text-gray-500">로딩 중...</p>
+      )}
 
       {!loading && prayerPage && (
         <>
-          <div className="bg-white shadow-md rounded-lg overflow-x-auto">
+          {/* ✅ 모바일: 카드형 리스트 */}
+          <div className="sm:hidden space-y-3">
+            {prayerPage.content.map((prayer) => {
+              const createdDate = new Date(
+                prayer.createdAt
+              ).toLocaleDateString();
+
+              return (
+                <div
+                  key={prayer.id}
+                  className={`bg-white rounded-lg shadow-sm px-4 py-3 border ${
+                    prayer.isDeleted ? "opacity-70 bg-gray-50" : ""
+                  }`}
+                >
+                  {/* 상단: 멤버 이름 + 작성일 */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-semibold text-gray-900 text-sm">
+                      {prayer.member.name}
+                    </div>
+                    <div className="text-[11px] text-gray-500">
+                      {createdDate}
+                    </div>
+                  </div>
+
+                  {/* 내용 */}
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/admin/prayers/${prayer.id}`)}
+                    className="mt-2 text-left w-full"
+                  >
+                    <p className="text-sm text-gray-800 line-clamp-2">
+                      {prayer.content}
+                    </p>
+                  </button>
+
+                  {/* 작성자 / 삭제 여부 */}
+                  <div className="mt-2 flex items-center justify-between text-[11px] text-gray-600">
+                    <span>작성자: {prayer.createdBy.name}</span>
+                    {prayer.isDeleted && (
+                      <span className="px-2 py-[1px] rounded-full bg-gray-200 text-gray-700">
+                        삭제됨
+                      </span>
+                    )}
+                  </div>
+
+                  {/* 하단 버튼 */}
+                  <div className="mt-3 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(`/admin/prayers/${prayer.id}/edit`)
+                      }
+                      className="px-3 py-1 text-[11px] rounded-md border border-indigo-500 text-indigo-600 hover:bg-indigo-50"
+                    >
+                      수정
+                    </button>
+                    {!prayer.isDeleted && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(prayer.id)}
+                        className="px-3 py-1 text-[11px] rounded-md border border-red-500 text-red-600 hover:bg-red-50"
+                      >
+                        삭제
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {prayerPage.content.length === 0 && (
+              <div className="px-4 py-6 text-center text-sm text-gray-500 bg-white rounded-lg shadow-sm">
+                해당 조건에 맞는 기도제목이 없습니다.
+              </div>
+            )}
+          </div>
+
+          {/* ✅ 데스크톱: 기존 테이블 유지 */}
+          <div className="hidden sm:block bg-white shadow-md rounded-lg overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -686,6 +775,7 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
               </tbody>
             </table>
           </div>
+
           <Pagination
             currentPage={prayerPage.number}
             totalPages={prayerPage.totalPages}
