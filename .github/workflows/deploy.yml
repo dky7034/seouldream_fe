@@ -1,8 +1,8 @@
-name: Frontend CD
+name: Frontend CD (Self-hosted)
 
 on:
   push:
-    branches: [ "main" ] # 배포 트리거가 될 브랜치 (main 또는 develop으로 수정 가능)
+    branches: ["main"]
 
 jobs:
   build:
@@ -14,8 +14,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -30,8 +30,9 @@ jobs:
           path: dist
 
   deploy:
+    # 여기가 중요합니다! self-hosted로 변경되었는지 꼭 확인하세요.
+    runs-on: self-hosted
     needs: build
-    runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -39,14 +40,16 @@ jobs:
           name: dist-files
           path: dist
 
-      - name: Deploy to Server (SCP)
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          port: 22
-          source: "dist/*"
-          target: "/home/ubuntu/seouldream_be-develop/frontend_build" # Docker가 마운트하고 있는 실제 프로젝트 폴더 경로
-          strip_components: 1 # dist 폴더 껍데기를 벗기고 내용물만 전송
-          overwrite: true
+      - name: Deploy to Nginx Directory
+        run: |
+          # 1. 폴더가 없으면 생성 (경로는 백엔드랑 똑같은 seouldream_be 안의 frontend_build 입니다)
+          # 이유: docker-compose가 저 폴더를 마운트하고 있으니까요!
+          mkdir -p /home/ubuntu/seouldream_be/frontend_build
+
+          # 2. 기존 파일 싹 지우고 (깨끗하게)
+          rm -rf /home/ubuntu/seouldream_be/frontend_build/*
+
+          # 3. 새 빌드 파일 복사
+          cp -r dist/* /home/ubuntu/seouldream_be/frontend_build/
+
+          echo "Frontend deployed successfully!"
