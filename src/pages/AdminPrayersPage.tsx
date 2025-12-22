@@ -22,6 +22,7 @@ import ConfirmModal from "../components/ConfirmModal";
 import SimpleSearchableSelect from "../components/SimpleSearchableSelect";
 import Pagination from "../components/Pagination";
 import { semesterService } from "../services/semesterService";
+import KoreanCalendarPicker from "../components/KoreanCalendarPicker"; // ✅ 달력 컴포넌트 임포트
 
 // 뷰 모드: 개별 리스트 / 멤버 요약 / 셀 요약
 type ViewMode = "prayerList" | "memberSummary" | "cellSummary";
@@ -123,6 +124,7 @@ const AdminPrayersPage: React.FC = () => {
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
 
+  // 초기값은 빈 문자열로 설정되어 있음
   const [filters, setFilters] = useState({
     visibility: "all",
     cell: "all",
@@ -131,7 +133,7 @@ const AdminPrayersPage: React.FC = () => {
     showDeleted: false,
     startDate: "",
     endDate: "",
-    year: currentYear as number | "", // ✅ 기본값: 올해
+    year: currentYear as number | "",
     month: "" as number | "",
     quarter: "" as number | "",
     half: "" as number | "",
@@ -149,11 +151,9 @@ const AdminPrayersPage: React.FC = () => {
   const canManage = isExecutive || isCellLeader;
   const hasActiveSemesters = semesters.length > 0;
 
-  // 선택 옵션 (실제 구현에선 서비스로 가져와도 됨)
   const memberOptions: { value: number; label: string }[] = [];
   const cellOptions: { value: number; label: string }[] = [];
 
-  // ===== 학기 목록 로딩 (활성 학기만) =====
   const fetchSemesters = useCallback(async () => {
     try {
       const data = await semesterService.getAllSemesters(true);
@@ -164,7 +164,6 @@ const AdminPrayersPage: React.FC = () => {
     }
   }, []);
 
-  // ===== 연도 목록 로딩 =====
   const fetchAvailableYears = useCallback(async () => {
     try {
       const years = await prayerService.getAvailableYears();
@@ -175,7 +174,6 @@ const AdminPrayersPage: React.FC = () => {
     }
   }, []);
 
-  // ===== 공통 파라미터 빌더 =====
   const buildBaseParams = useCallback((): GetPrayersParams => {
     const sortField = sortKeyMap[sortConfig.key];
 
@@ -188,7 +186,6 @@ const AdminPrayersPage: React.FC = () => {
       isDeleted: filters.showDeleted,
     };
 
-    // 기간 필터
     if (filterType === "range") {
       params = {
         ...params,
@@ -196,9 +193,7 @@ const AdminPrayersPage: React.FC = () => {
         endDate: filters.endDate || undefined,
       };
     } else {
-      // 단위 모드
       if (filters.semesterId && semesters.length > 0) {
-        // ✅ 학기 선택 시: 학기의 startDate/endDate 그대로 사용
         const semester = semesters.find((s) => s.id === filters.semesterId);
         if (semester) {
           params = {
@@ -208,7 +203,6 @@ const AdminPrayersPage: React.FC = () => {
           };
         }
       } else {
-        // 연/반기/분기/월 기준 단위 필터
         params = {
           ...params,
           year: normalizeNumberInput(filters.year),
@@ -219,7 +213,6 @@ const AdminPrayersPage: React.FC = () => {
       }
     }
 
-    // 권한에 따른 필터
     if (isExecutive) {
       if (filters.cell !== "all") params.cellId = Number(filters.cell);
       if (filters.member !== "all") params.memberId = Number(filters.member);
@@ -247,7 +240,6 @@ const AdminPrayersPage: React.FC = () => {
     user,
   ]);
 
-  // ===== 실제 데이터 페치 (viewMode에 따라 분기) =====
   const fetchData = useCallback(async () => {
     if (!user) {
       setLoading(false);
@@ -259,7 +251,6 @@ const AdminPrayersPage: React.FC = () => {
       setError("기도제목 관리 페이지에 접근할 권한이 없습니다.");
       return;
     }
-    // 요약 뷰는 EXECUTIVE만
     if (
       !isExecutive &&
       (viewMode === "memberSummary" || viewMode === "cellSummary")
@@ -298,12 +289,10 @@ const AdminPrayersPage: React.FC = () => {
     }
   }, [user, canManage, isExecutive, isCellLeader, buildBaseParams, viewMode]);
 
-  // 1) viewMode/필터/페이지 변경 시 데이터 조회
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // 2) 선택 옵션(연도/학기 등) 로딩
   useEffect(() => {
     if (user) {
       fetchAvailableYears();
@@ -311,7 +300,6 @@ const AdminPrayersPage: React.FC = () => {
     }
   }, [user, fetchAvailableYears, fetchSemesters]);
 
-  // ===== 연도 옵션 =====
   const yearOptions = useMemo(() => {
     if (availableYears.length === 0) {
       const cy = currentYear;
@@ -327,7 +315,6 @@ const AdminPrayersPage: React.FC = () => {
     return [{ value: "", label: "전체 연도" }, ...options];
   }, [availableYears, currentYear]);
 
-  // ===== 정렬 관련 =====
   const requestSort = (key: SortKey) => {
     setSortConfig((prev) => {
       const nextDirection: SortConfig["direction"] =
@@ -340,7 +327,6 @@ const AdminPrayersPage: React.FC = () => {
         direction: nextDirection,
       };
 
-      // 정렬 바뀌면 페이지 0으로 초기화 + URL 쿼리 반영
       setCurrentPage(0);
       const nextParams = new URLSearchParams(searchParams);
       nextParams.set("sortKey", nextConfig.key);
@@ -357,7 +343,6 @@ const AdminPrayersPage: React.FC = () => {
     return sortConfig.direction === "ascending" ? " ▲" : " ▼";
   };
 
-  // ===== 페이지 변경 =====
   const handlePageChange = (page: number) => {
     const safePage = page < 0 ? 0 : page;
     setCurrentPage(safePage);
@@ -369,7 +354,6 @@ const AdminPrayersPage: React.FC = () => {
     setSearchParams(nextParams);
   };
 
-  // ===== 삭제 처리 =====
   const handleDelete = (prayerId: number) => {
     setPrayerToDelete(prayerId);
     setIsModalOpen(true);
@@ -393,8 +377,6 @@ const AdminPrayersPage: React.FC = () => {
     setFilters((prev) => ({ ...prev, [field]: value }));
     setCurrentPage(0);
 
-    // 필터 변경 시 page는 0으로 초기화하지만
-    // 필터를 전부 URL에 올리는 건 아직 아니므로 page만 쿼리에 반영
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set("page", "0");
     nextParams.set("sortKey", sortConfig.key);
@@ -402,7 +384,6 @@ const AdminPrayersPage: React.FC = () => {
     setSearchParams(nextParams);
   };
 
-  // ===== 단위 버튼 클릭 =====
   const handleUnitTypeClick = (type: UnitType) => {
     setUnitType(type);
 
@@ -435,7 +416,6 @@ const AdminPrayersPage: React.FC = () => {
         next.half = "";
         next.semesterId = "";
       } else if (type === "semester") {
-        // ✅ 학기 모드: 연/월/분기/반기 초기화, 학기만 사용
         next.year = "";
         next.month = "";
         next.quarter = "";
@@ -488,7 +468,6 @@ const AdminPrayersPage: React.FC = () => {
     setSearchParams(nextParams);
   };
 
-  // ===== 기간 표시 =====
   const formatShortDate = (dateStr: string) => {
     if (!dateStr) return "";
     const [, month, day] = dateStr.split("-");
@@ -614,7 +593,6 @@ const AdminPrayersPage: React.FC = () => {
     }
   };
 
-  // 동명이인 정책: 현재는 이름만
   const getDisplayNameForMember = (
     memberLike:
       | { id: number; name: string; birthDate?: string }
@@ -626,7 +604,6 @@ const AdminPrayersPage: React.FC = () => {
     return memberLike.name;
   };
 
-  // 로그인 안 된 경우
   if (!user) {
     return (
       <div className="bg-gray-50 min-h-screen flex justify-center items-center px-4">
@@ -754,29 +731,23 @@ const AdminPrayersPage: React.FC = () => {
           {filterType === "range" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   기간 시작
                 </label>
-                <input
-                  type="date"
+                {/* ✅ KoreanCalendarPicker 적용 */}
+                <KoreanCalendarPicker
                   value={filters.startDate}
-                  onChange={(e) =>
-                    handleFilterChange("startDate", e.target.value)
-                  }
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
+                  onChange={(date) => handleFilterChange("startDate", date)}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   기간 종료
                 </label>
-                <input
-                  type="date"
+                {/* ✅ KoreanCalendarPicker 적용 */}
+                <KoreanCalendarPicker
                   value={filters.endDate}
-                  onChange={(e) =>
-                    handleFilterChange("endDate", e.target.value)
-                  }
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
+                  onChange={(date) => handleFilterChange("endDate", date)}
                 />
               </div>
             </div>

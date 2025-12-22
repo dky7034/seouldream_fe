@@ -1,3 +1,4 @@
+// src/pages/AddUserPage.tsx
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { memberService } from "../services/memberService";
@@ -8,7 +9,7 @@ import { useAuth } from "../hooks/useAuth";
 import SimpleSearchableSelect from "../components/SimpleSearchableSelect";
 import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
 
-// ✅ Custom hook for debouncing (타입 명시)
+// ✅ Custom hook for debouncing
 const useDebounce = (value: string, delay: number): string => {
   const [debouncedValue, setDebouncedValue] = useState(value);
   useEffect(() => {
@@ -20,7 +21,7 @@ const useDebounce = (value: string, delay: number): string => {
   return debouncedValue;
 };
 
-// ✅ username 자동 생성 (uuid 우선, fallback 제공)
+// ✅ username 자동 생성
 const generateUsername = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return `u_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
@@ -32,37 +33,28 @@ const generateUsername = () => {
 
 const DEFAULT_PASSWORD = "password";
 
-// ✅ 로컬 기준 YYYY-MM-DD
-const toLocalYYYYMMDD = (date: Date) => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-};
-
 const AddUserPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
 
-  const today = useMemo(() => toLocalYYYYMMDD(new Date()), []);
+  // ✅ [변경 1] 오늘 날짜 계산 로직 제거 (초기값으로 안 씀)
 
   const [formData, setFormData] = useState<CreateMemberRequest>({
     name: "",
-    username: generateUsername(), // ✅ 자동 생성
-    password: DEFAULT_PASSWORD, // ✅ 고정
-    email: "", // ✅ 선택 입력
+    username: generateUsername(),
+    password: DEFAULT_PASSWORD,
+    email: "",
     phone: "",
     gender: "MALE",
-    birthDate: today, // ✅ 초기값부터 오늘로 저장 (UI/데이터 일치)
-    cellId: undefined, // ✅ 셀 미지정 허용
+    birthDate: "", // ✅ [변경 2] 초기값을 빈 문자열로 설정 (사용자 선택 강제)
+    cellId: undefined,
     role: "MEMBER",
     joinYear: new Date().getFullYear(),
     address: "",
     note: "",
   });
 
-  // ✅ 비밀번호 확인도 고정(입력 UI 없음이지만 내부 검증 안전장치)
   const [confirmPassword, setConfirmPassword] =
     useState<string>(DEFAULT_PASSWORD);
 
@@ -71,7 +63,6 @@ const AddUserPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Username availability check state
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(
     null
@@ -86,7 +77,6 @@ const AddUserPage: React.FC = () => {
       return;
     }
 
-    // Set cell from query parameter (선택 적용)
     const queryParams = new URLSearchParams(location.search);
     const cellIdFromQuery = queryParams.get("cellId");
     if (cellIdFromQuery) {
@@ -104,7 +94,6 @@ const AddUserPage: React.FC = () => {
     fetchCells();
   }, [user, navigate, location.search]);
 
-  // ✅ Effect for checking username availability
   useEffect(() => {
     if (!debouncedUsername) {
       setUsernameAvailable(null);
@@ -148,7 +137,6 @@ const AddUserPage: React.FC = () => {
   ) => {
     const { name, value } = e.target;
 
-    // ✅ password는 고정값 유지 방어
     if (name === "password") return;
 
     setFormData((prev) => ({
@@ -184,12 +172,10 @@ const AddUserPage: React.FC = () => {
     if (usernameAvailable === false)
       newErrors.username = "이미 사용 중인 아이디입니다.";
 
-    // ✅ 고정 비밀번호 안전 체크
     if (!formData.password) newErrors.password = "비밀번호는 필수입니다.";
     if (formData.password !== confirmPassword)
       newErrors.confirmPassword = "비밀번호가 일치하지 않습니다.";
 
-    // ✅ 이메일: 비어있으면 OK, 값이 있으면 형식만 검사
     if (formData.email && !/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = "올바른 이메일 형식이 아닙니다.";
     }
@@ -198,12 +184,10 @@ const AddUserPage: React.FC = () => {
     else if (!/^\d+$/.test(formData.phone))
       newErrors.phone = "연락처는 숫자만 입력해 주세요.";
 
-    // ✅ 생년월일은 초기값(today)으로 항상 채워짐. (원하면 여기서도 형식 검증 가능)
+    // ✅ 여기서 birthDate가 비어있으면 에러 처리됨
     if (!formData.birthDate) newErrors.birthDate = "생년월일은 필수입니다.";
 
     if (!formData.joinYear) newErrors.joinYear = "등록연도는 필수입니다.";
-
-    // ✅ 셀장도 셀 미지정 허용: 제한 제거 (프론트에서는 더 이상 막지 않음)
 
     return newErrors;
   };
@@ -212,12 +196,12 @@ const AddUserPage: React.FC = () => {
     e.preventDefault();
     setSubmitError(null);
 
-    // ✅ 제출 직전 고정값 강제(혹시 어디선가 바뀌는 경우 방지)
     const payload: CreateMemberRequest = {
       ...formData,
       username: formData.username || generateUsername(),
       password: DEFAULT_PASSWORD,
-      birthDate: formData.birthDate?.trim() ? formData.birthDate : today,
+      // ✅ [변경 3] fallback 제거 (validateForm에서 빈 값 체크하므로 그대로 전송)
+      birthDate: formData.birthDate,
     };
     setConfirmPassword(DEFAULT_PASSWORD);
 
@@ -240,7 +224,6 @@ const AddUserPage: React.FC = () => {
     }
   };
 
-  // ✅ auth / 권한 가드
   if (!user) {
     return (
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
@@ -267,7 +250,6 @@ const AddUserPage: React.FC = () => {
         </p>
       </div>
 
-      {/* 카드형 폼 */}
       <form
         onSubmit={handleSubmit}
         className="space-y-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6"
@@ -285,7 +267,6 @@ const AddUserPage: React.FC = () => {
           </legend>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* ✅ 아이디(자동) + 재생성 */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700">
                 아이디 <span className="text-red-500">*</span>
@@ -334,12 +315,11 @@ const AddUserPage: React.FC = () => {
               )}
             </div>
 
-            {/* ✅ 비밀번호 안내(입력란 제거) */}
             <div className="md:col-span-2">
               <div className="p-3 text-xs sm:text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-md">
                 비밀번호는 기본값으로{" "}
                 <span className="font-semibold">{DEFAULT_PASSWORD}</span> 로
-                자동 설정됩니다. (필요 시 추후 변경 기능을 추가할 수 있습니다.)
+                자동 설정됩니다.
               </div>
             </div>
           </div>
@@ -352,7 +332,6 @@ const AddUserPage: React.FC = () => {
           </legend>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* 이름 */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 이름 <span className="text-red-500">*</span>
@@ -373,7 +352,6 @@ const AddUserPage: React.FC = () => {
               )}
             </div>
 
-            {/* 이메일 (선택) */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 이메일
@@ -393,7 +371,6 @@ const AddUserPage: React.FC = () => {
               )}
             </div>
 
-            {/* 연락처 */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 연락처 <span className="text-red-500">*</span>
@@ -403,7 +380,7 @@ const AddUserPage: React.FC = () => {
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                placeholder="숫자만 입력해 주세요 (예: 01012345678)"
+                placeholder="숫자만 입력해 주세요"
                 required
                 value={formData.phone}
                 onChange={handleFormChange}
@@ -417,7 +394,6 @@ const AddUserPage: React.FC = () => {
               )}
             </div>
 
-            {/* 주소 */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 주소
@@ -432,7 +408,6 @@ const AddUserPage: React.FC = () => {
               />
             </div>
 
-            {/* 성별 */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 성별
@@ -449,7 +424,7 @@ const AddUserPage: React.FC = () => {
               </select>
             </div>
 
-            {/* 생년월일 (초기값=오늘) */}
+            {/* 생년월일 (초기값 비움) */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 생년월일 <span className="text-red-500">*</span>
@@ -479,7 +454,6 @@ const AddUserPage: React.FC = () => {
           </legend>
 
           <div className="space-y-4">
-            {/* 셀 (선택) */}
             <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-3">
               <label className="block text-sm font-medium text-gray-700 md:w-28">
                 셀
@@ -503,7 +477,6 @@ const AddUserPage: React.FC = () => {
               </div>
             </div>
 
-            {/* 역할 */}
             <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-3">
               <label className="block text-sm font-medium text-gray-700 md:w-28">
                 역할
@@ -523,7 +496,6 @@ const AddUserPage: React.FC = () => {
               </div>
             </div>
 
-            {/* 등록 연도 */}
             <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-3">
               <label className="block text-sm font-medium text-gray-700 md:w-28">
                 등록 연도 <span className="text-red-500">*</span>
@@ -547,7 +519,6 @@ const AddUserPage: React.FC = () => {
             </div>
           </div>
 
-          {/* 메모 */}
           <div className="mt-2">
             <label className="block text-sm font-medium text-gray-700">
               메모

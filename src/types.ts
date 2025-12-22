@@ -1,3 +1,4 @@
+// src/types.ts
 // As per the backend's CreateMemberRequest DTO
 export interface CreateMemberRequest {
   name: string;
@@ -254,8 +255,13 @@ export interface SimpleAttendanceRateDto {
 
 // New interface for overall attendance statistics, matching backend OverallAttendanceStatDto
 export interface OverallAttendanceStatDto {
-  totalRecords: number;
-  attendanceRate: number;
+  totalRecords: number; // 기존
+  attendanceRate: number; // 기존
+
+  // ✅ [NEW] 백엔드에서 추가된 필드들
+  weeklyAverage: number; // 주간 평균 출석
+  zeroAttendanceCount: number; // 장기 결석(0회) 인원
+  attendanceTrend: number; // 전 기간 대비 증감률 (예: 5.0, -2.1)
 }
 
 export interface TotalSummaryDto {
@@ -626,6 +632,30 @@ export interface AttendanceKeyMetricsDto {
   lastYearPeriodAttendanceRate: number;
 }
 
+// ✅ [신규] 인구 통계 차트용 개별 데이터 (년도별)
+export interface DemographicsDistributionDto {
+  birthYear: number;
+  maleCount: number;
+  femaleCount: number;
+}
+
+// ✅ [신규] 인구 통계 전체 DTO
+export interface DashboardDemographicsDto {
+  totalCellCount: number;
+  totalMemberCount: number;
+  cellMemberCount: number;
+  previousSemesterCount: number;
+
+  // 연령대별 요약
+  count10sAndUnder: number;
+  count20s: number;
+  count30s: number;
+  count40sAndOver: number;
+
+  // 차트 데이터 리스트
+  distribution: DemographicsDistributionDto[];
+}
+
 export interface DashboardDto {
   todayBirthdays: BirthdayInfo[];
   weeklyBirthdays: BirthdayInfo[];
@@ -633,6 +663,12 @@ export interface DashboardDto {
   totalTodayBirthdays: number;
   totalWeeklyBirthdays: number;
   totalMonthlyBirthdays: number;
+  // ✅ [기존] 장기 결석자
+  totalLongTermAbsentees: number;
+  // ✅ [신규] 추가된 3종 지표 (건의사항 제외됨)
+  newcomerCount: number; // 이번 주 새가족
+  attendanceChange: number; // 전주 대비 출석 증감 (+/-)
+  unassignedMemberCount: number; // 미배정 성도 (임원용)
   recentPrayers: RecentPrayerInfo[];
   recentNotices: RecentNoticeInfo[];
   weeklyPrayerCount: number;
@@ -643,6 +679,9 @@ export interface DashboardDto {
   cellAttendanceSummaries: CellAttendanceSummaryDto[];
   attendanceKeyMetrics: AttendanceKeyMetricsDto;
   attendanceTrend?: AggregatedTrendDto[];
+
+  // ✅ [추가] 인구 통계 필드 (nullable 가능성 고려하여 ? 처리하거나, 백엔드가 무조건 주면 ? 제거)
+  demographics?: DashboardDemographicsDto;
 }
 
 export interface MyProfileFormErrors {
@@ -811,4 +850,38 @@ export interface UpdateSemesterRequest {
 export interface OptionType {
   value: string;
   label: string;
+}
+
+// 1. 새가족 등록 추이
+export interface NewcomerStatDto {
+  label: string; // "2024-01"
+  count: number; // 등록 수
+  growthRate: number; // 전월 대비 증감률 (%)
+}
+
+// 2. 학기별 요약 (인구 통계용)
+export interface SemesterSummaryDto {
+  semesterName: string;
+  totalCellCount: number;
+  totalMemberCount: number;
+  cellMemberCount: number;
+  unassignedCount: number;
+  ageGroupSummary: {
+    under20s: number;
+    twenties: number;
+    thirties: number;
+    over40s: number;
+  };
+}
+
+// 3. 미배정 성도
+export interface UnassignedMemberDto {
+  id: number;
+  name: string;
+  birthYear?: string;
+  birthDate?: string; // ✅ 이 필드를 추가해주세요! (YYYY-MM-DD 형식)
+  age?: number;
+  phone: string;
+  registeredDate: string;
+  gender: Gender;
 }

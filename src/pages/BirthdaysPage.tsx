@@ -20,6 +20,11 @@ const BirthdaysPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // 동명이인 판별을 위한 전체 멤버 리스트
+  const [allMembersForNameCheck, setAllMembersForNameCheck] = useState<
+    { id: number; name: string; birthDate?: string }[]
+  >([]);
+
   // 🔹 URL → 초기 month 파싱
   const now = new Date();
   const defaultMonth = now.getMonth() + 1;
@@ -81,6 +86,31 @@ const BirthdaysPage: React.FC = () => {
     setSelectedMonth((prev) => (prev === safeMonth ? prev : safeMonth));
   }, [searchParams, defaultMonth]);
 
+  // 전체 멤버 목록 로딩 (동명이인 처리용)
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchAllMembers = async () => {
+      try {
+        const res = await memberService.getAllMembers({
+          page: 0,
+          size: 2000,
+          sort: "id,asc",
+        });
+        setAllMembersForNameCheck(
+          res.content.map((m) => ({
+            id: m.id,
+            name: m.name,
+            birthDate: m.birthDate,
+          }))
+        );
+      } catch (e) {
+        console.error("동명이인 목록 로딩 실패:", e);
+      }
+    };
+    fetchAllMembers();
+  }, [user]);
+
   const loadBirthdays = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -114,6 +144,36 @@ const BirthdaysPage: React.FC = () => {
   useEffect(() => {
     loadBirthdays();
   }, [loadBirthdays]);
+
+  // [추가] 만 나이 계산 헬퍼 함수
+  const calculateAge = (birthDateStr?: string) => {
+    if (!birthDateStr) return null;
+    const birthDate = new Date(birthDateStr);
+    const today = new Date();
+
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+
+    // 생일이 안 지났으면 1살 뺌
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  // [추가] 생년월일 + 나이 렌더링 함수
+  const renderBirthDateWithAge = (birthDateStr?: string) => {
+    if (!birthDateStr) return "-";
+    const age = calculateAge(birthDateStr);
+    return (
+      <span>
+        {birthDateStr}
+        {age !== null && (
+          <span className="text-gray-400 ml-1 text-xs">(만 {age}세)</span>
+        )}
+      </span>
+    );
+  };
 
   const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
 
@@ -227,14 +287,20 @@ const BirthdaysPage: React.FC = () => {
                         to={`/admin/users/${member.id}`}
                         className="text-sm font-semibold text-indigo-600 hover:underline"
                       >
-                        {formatDisplayName(member, content)}
+                        {formatDisplayName(
+                          member,
+                          allMembersForNameCheck.length > 0
+                            ? allMembersForNameCheck
+                            : content
+                        )}
                       </Link>
                       <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
                         {member.cell?.name || "*소속 셀 없음"}
                       </span>
                     </div>
+                    {/* [수정] 나이 표시 적용 */}
                     <div className="text-xs text-gray-500 mt-1">
-                      생년월일: {member.birthDate}
+                      생년월일: {renderBirthDateWithAge(member.birthDate)}
                     </div>
                   </div>
                 ))
@@ -281,11 +347,17 @@ const BirthdaysPage: React.FC = () => {
                                 to={`/admin/users/${member.id}`}
                                 className="text-indigo-600 hover:text-indigo-900"
                               >
-                                {formatDisplayName(member, content)}
+                                {formatDisplayName(
+                                  member,
+                                  allMembersForNameCheck.length > 0
+                                    ? allMembersForNameCheck
+                                    : content
+                                )}
                               </Link>
                             </td>
+                            {/* [수정] 나이 표시 적용 */}
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {member.birthDate}
+                              {renderBirthDateWithAge(member.birthDate)}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               {member.cell?.name || "*소속 셀 없음"}

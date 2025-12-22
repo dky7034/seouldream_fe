@@ -12,6 +12,7 @@ import { formatDisplayName } from "../utils/memberUtils";
 // Components
 import SimpleSearchableSelect from "../components/SimpleSearchableSelect";
 import AttendanceMatrix from "../components/AttendanceMatrix";
+import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
 
 // Types
 import type {
@@ -20,13 +21,18 @@ import type {
   AttendanceStatus,
   MemberDto,
   OverallAttendanceStatDto,
-  // AttendanceSummaryGroupBy,
   SemesterDto,
 } from "../types";
 import type { SelectOption } from "../components/AsyncSearchableSelect";
 
 // Icons
-import { ChartBarIcon, UsersIcon } from "@heroicons/react/24/outline";
+import {
+  ChartBarIcon,
+  UsersIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
+  MinusIcon,
+} from "@heroicons/react/24/outline";
 import { FaTh } from "react-icons/fa";
 
 // ─────────────────────────────────────────────────────────────
@@ -65,45 +71,123 @@ const translateAttendanceStatus = (status: string) => {
 // Sub Components
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * ✅ [수정] 백엔드 API(OverallAttendanceStatDto) 데이터를 직접 바인딩하여 보여주는 컴포넌트
+ * - 주간 평균, 출석률, 장기 결석자 수, 증감률(Trend) 표시
+ */
 const AttendanceStats: React.FC<{
   stats: OverallAttendanceStatDto | null;
   loading: boolean;
 }> = ({ stats, loading }) => {
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div className="bg-white p-4 rounded-lg shadow-sm flex items-center justify-center">
-          <p className="text-gray-600 text-sm">통계 불러오는 중...</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm flex items-center justify-center">
-          <p className="text-gray-600 text-sm">통계 불러오는 중...</p>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 animate-pulse">
+        <div className="bg-white p-4 h-32 rounded-lg shadow-sm border border-gray-100" />
+        <div className="bg-white p-4 h-32 rounded-lg shadow-sm border border-gray-100" />
+        <div className="bg-white p-4 h-32 rounded-lg shadow-sm border border-gray-100" />
       </div>
     );
   }
+
   if (!stats) return null;
+
+  // 증감률 UI 결정 로직
+  const { attendanceTrend = 0 } = stats;
+  let trendColor = "text-gray-500";
+  let TrendIcon = MinusIcon;
+  let trendText = "변동 없음";
+
+  if (attendanceTrend > 0) {
+    trendColor = "text-red-500";
+    TrendIcon = ArrowTrendingUpIcon;
+    trendText = "증가";
+  } else if (attendanceTrend < 0) {
+    trendColor = "text-blue-500";
+    TrendIcon = ArrowTrendingDownIcon;
+    trendText = "감소";
+  }
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-      <div className="bg-white p-4 rounded-lg shadow-sm flex items-center space-x-4">
-        <div className="bg-blue-100 p-3 rounded-full">
-          <UsersIcon className="h-6 w-6 text-blue-600" />
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      {/* 1. 주간 평균 출석 */}
+      <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-100 flex flex-col justify-between">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+              주간 평균 출석
+            </p>
+            <div className="mt-2 flex items-baseline gap-1">
+              <p className="text-3xl font-bold text-gray-900">
+                {stats.weeklyAverage}
+              </p>
+              <span className="text-sm font-medium text-gray-500">명/주</span>
+            </div>
+          </div>
+          <div className="bg-indigo-50 p-2 rounded-lg">
+            <UsersIcon className="h-6 w-6 text-indigo-600" />
+          </div>
         </div>
-        <div>
-          <p className="text-xs font-medium text-gray-500">총 기록</p>
-          <p className="text-2xl font-bold text-gray-900">
-            {stats.totalRecords}
+
+        {/* 증감률 및 설명 */}
+        <div className="mt-4">
+          <div className="flex items-center text-sm mb-1">
+            <TrendIcon className={`h-4 w-4 mr-1 ${trendColor}`} />
+            <span className={`font-medium ${trendColor}`}>
+              {Math.abs(attendanceTrend)}%
+            </span>
+            <span className="text-gray-400 ml-1.5 text-xs">
+              지난 기간 대비 {trendText}
+            </span>
+          </div>
+          <p className="text-xs text-gray-400">
+            실제 예배가 진행된 주차의 평균 인원
           </p>
         </div>
       </div>
-      <div className="bg-white p-4 rounded-lg shadow-sm flex items-center space-x-4">
-        <div className="bg-indigo-100 p-3 rounded-full">
-          <ChartBarIcon className="h-6 w-6 text-indigo-600" />
+
+      {/* 2. 평균 출석률 */}
+      <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-100 flex flex-col justify-between">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+              평균 출석률
+            </p>
+            <div className="mt-2 flex items-baseline gap-1">
+              <p className="text-3xl font-bold text-gray-900">
+                {stats.attendanceRate.toFixed(1)}
+              </p>
+              <span className="text-sm font-medium text-gray-500">%</span>
+            </div>
+          </div>
+          <div className="bg-blue-50 p-2 rounded-lg">
+            <ChartBarIcon className="h-6 w-6 text-blue-600" />
+          </div>
         </div>
-        <div>
-          <p className="text-xs font-medium text-gray-500">출석률</p>
-          <p className="text-2xl font-bold text-gray-900">
-            {stats.attendanceRate.toFixed(1)}%
-          </p>
+        <div className="mt-4 text-xs text-gray-400 leading-relaxed">
+          전체 재적 인원 대비 실제 출석한 비율의 평균입니다.
+        </div>
+      </div>
+
+      {/* 3. 장기 결석자 (0회) */}
+      <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-100 flex flex-col justify-between">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-red-600">
+              장기 결석 (0회)
+            </p>
+            <div className="mt-2 flex items-baseline gap-1">
+              <p className="text-3xl font-bold text-gray-900">
+                {stats.zeroAttendanceCount}
+              </p>
+              <span className="text-sm font-medium text-gray-500">명</span>
+            </div>
+          </div>
+          <div className="bg-red-50 p-2 rounded-lg">
+            <UsersIcon className="h-6 w-6 text-red-500" />
+          </div>
+        </div>
+        <div className="mt-4 text-xs text-gray-400 leading-relaxed">
+          조회 기간 동안 출석 기록이 한 번도 없는 멤버 수입니다.
         </div>
       </div>
     </div>
@@ -111,10 +195,8 @@ const AttendanceStats: React.FC<{
 };
 
 // ─────────────────────────────────────────────────────────────
-// [NEW] AttendanceMatrixView Component
+// AttendanceMatrixView Component (유지)
 // ─────────────────────────────────────────────────────────────
-
-// src/pages/AdminAttendancesPage.tsx 내부의 AttendanceMatrixView 컴포넌트
 
 const AttendanceMatrixView: React.FC<{
   members: MemberDto[];
@@ -124,42 +206,30 @@ const AttendanceMatrixView: React.FC<{
   unitType: UnitType;
   isLoading: boolean;
 }> = ({ members, attendances, startDate, endDate, unitType, isLoading }) => {
-  // 🔴 [핵심 수정 로직] 가입일(createdAt)을 반영한 미체크 계산
+  // 가입일(createdAt)을 반영한 미체크 계산 (매트릭스 뷰 전용 로직)
   const uncheckedCount = useMemo(() => {
-    // 1. 기간 유효성 체크
     if (!startDate || !endDate || members.length === 0) return 0;
 
     const filterStart = new Date(startDate);
     const filterEnd = new Date(endDate);
-
-    // 2. "전체 채워져야 하는 출석체크 칸 수" 계산 (개인별 가입일 고려)
     let totalPossibleChecks = 0;
 
     members.forEach((member) => {
-      // 멤버 가입일 파싱 (createdAt 사용, 없으면 joinYear 1월 1일로 대체, 그마저도 없으면 조회 시작일로)
       let joinDate: Date;
       if (member.createdAt) {
         joinDate = new Date(member.createdAt);
       } else if (member.joinYear) {
         joinDate = new Date(member.joinYear, 0, 1);
       } else {
-        // 가입일 정보가 아예 없으면 그냥 조회 시작일부터 체크해야 한다고 가정 (또는 2000년 등 과거로 설정)
         joinDate = new Date("2000-01-01");
       }
-
-      // 날짜 비교를 위해 시간 초기화 (00:00:00)
       joinDate.setHours(0, 0, 0, 0);
 
-      // 이 멤버의 "유효 체크 시작일" = Max(조회 시작일, 가입일)
-      // 즉, 조회 기간이 1월부터여도 가입이 3월이면 3월부터 카운트
       const effectiveStart = filterStart < joinDate ? joinDate : filterStart;
-
-      // 만약 유효 시작일이 조회 종료일보다 늦으면 (기간 이후 가입자), 카운트 제외
       if (effectiveStart > filterEnd) return;
 
-      // 유효 기간 내 일요일(0) 개수 누적
       const current = new Date(effectiveStart);
-      current.setHours(0, 0, 0, 0); // Loop 돌릴 변수도 시간 초기화
+      current.setHours(0, 0, 0, 0);
 
       while (current <= filterEnd) {
         if (current.getDay() === 0) {
@@ -169,43 +239,40 @@ const AttendanceMatrixView: React.FC<{
       }
     });
 
-    // 3. 실제 기록된 수 (PRESENT, ABSENT)
-    // (참고: 가입일 이전의 데이터가 오입력되어있을 수도 있으나,
-    //  보통은 전체 기록 수를 빼주는 것이 "남은 빈칸" 계산에 적절함)
     const recordedCount = attendances.filter((a) =>
       ["PRESENT", "ABSENT"].includes(a.status)
     ).length;
 
-    // 4. 결과: (개인별 유효 일요일 총합) - (실제 기록된 수)
     return Math.max(0, totalPossibleChecks - recordedCount);
   }, [startDate, endDate, members, attendances]);
 
-  // 2. 통계 계산 (기존 로직 유지)
+  // 매트릭스 뷰용 통계 계산
   const summary = useMemo(() => {
     const present = attendances.filter((a) => a.status === "PRESENT").length;
     const absent = attendances.filter((a) => a.status === "ABSENT").length;
-    const total = present + absent; // 출석률 분모는 (출석+결석) 기준
+    const total = present + absent;
     const rate = total > 0 ? (present / total) * 100 : 0;
 
     return { present, absent, rate, unchecked: uncheckedCount };
   }, [attendances, uncheckedCount]);
 
-  // 3. 매트릭스용 멤버 포맷
   const matrixMembers = useMemo(
     () =>
       members
         .sort((a, b) => a.name.localeCompare(b.name))
-        .map((m) => ({ memberId: m.id, memberName: m.name })),
+        .map((m) => ({
+          memberId: m.id,
+          memberName: formatDisplayName(m, members),
+        })),
     [members]
   );
 
-  // unitType이 'month'가 아니면 범위 모드
   const matrixMode = unitType === "month" ? "month" : "semester";
   const [targetYear, targetMonth] = startDate.split("-").map(Number);
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* 4분할 통계 카드 */}
+      {/* 4분할 통계 카드 (매트릭스 요약용) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
         <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
           <p className="text-xs sm:text-sm font-medium text-indigo-500">
@@ -321,7 +388,6 @@ const AdminAttendancesPage: React.FC = () => {
   // Effects & Logic
   // ─────────────────────────────────────────────────────────────
 
-  // 학기 자동 선택 로직
   useEffect(() => {
     if (semesters.length > 0 && !hasAutoSelectedSemester) {
       const today = new Date();
@@ -359,9 +425,7 @@ const AdminAttendancesPage: React.FC = () => {
     }
   }, [semesters, hasAutoSelectedSemester, currentYear, currentMonth]);
 
-  // 유효 기간 계산 (학기 교집합 포함)
   const effectiveDateRange = useMemo(() => {
-    // 1. 기간 직접 선택
     if (filterType === "range") {
       if (filters.startDate && filters.endDate) {
         return { startDate: filters.startDate, endDate: filters.endDate };
@@ -369,7 +433,6 @@ const AdminAttendancesPage: React.FC = () => {
       return null;
     }
 
-    // 2. 학기 단위
     if (unitType === "semester" && filters.semesterId && semesters.length > 0) {
       const semester = semesters.find((s) => s.id === filters.semesterId);
       if (semester) {
@@ -377,7 +440,6 @@ const AdminAttendancesPage: React.FC = () => {
       }
     }
 
-    // 3. 연간/월간 단위
     const year = typeof filters.year === "number" ? filters.year : undefined;
     if (!year) return null;
 
@@ -396,7 +458,6 @@ const AdminAttendancesPage: React.FC = () => {
       return null;
     }
 
-    // 학기 교집합 처리
     if (semesters.length > 0) {
       const overlappingSemesters = semesters.filter(
         (s) => s.startDate <= rawEnd && s.endDate >= rawStart
@@ -439,7 +500,6 @@ const AdminAttendancesPage: React.FC = () => {
     );
   }, [filters, effectiveDateRange]);
 
-  // Fetch Logic (Always Large Size for Matrix)
   const fetchAttendances = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -493,7 +553,6 @@ const AdminAttendancesPage: React.FC = () => {
     }
   }, []);
 
-  // Initial Loads
   useEffect(() => {
     if (user && ["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
       if (semesters.length > 0 || hasActiveSemesters === false) {
@@ -519,7 +578,6 @@ const AdminAttendancesPage: React.FC = () => {
     }
   }, [user, fetchAvailableYears, fetchSemesters]);
 
-  // Handlers
   const handleFilterChange = (key: keyof Filters, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
@@ -545,7 +603,6 @@ const AdminAttendancesPage: React.FC = () => {
     setUnitType("year");
   };
 
-  // Options
   const statusOptions = useMemo(
     () => [
       { value: "", label: "모든 상태" },
@@ -598,7 +655,6 @@ const AdminAttendancesPage: React.FC = () => {
     ];
   }, [availableYears, currentYear]);
 
-  // Unit Handler
   const handleUnitTypeClick = (type: UnitType) => {
     setUnitType(type);
     setFilters((prev) => {
@@ -692,7 +748,6 @@ const AdminAttendancesPage: React.FC = () => {
     }
   };
 
-  // Target Members
   const targetMembers = useMemo(() => {
     if (filters.member) {
       return allMembers.filter((m) => m.id === filters.member?.value);
@@ -705,10 +760,6 @@ const AdminAttendancesPage: React.FC = () => {
     }
     return allMembers;
   }, [allMembers, filters.member, filters.cell, isCellLeader, user]);
-
-  // ─────────────────────────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────────────────────────
 
   if (!user || !["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
     return (
@@ -732,7 +783,7 @@ const AdminAttendancesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Overall Stats */}
+      {/* ✅ [수정] 프론트엔드 계산 없이 API 통계를 그대로 전달 */}
       <AttendanceStats stats={overallStats} loading={statsLoading} />
 
       {/* Filters */}
@@ -770,27 +821,21 @@ const AdminAttendancesPage: React.FC = () => {
         {filterType === "range" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 기간 시작
               </label>
-              <input
-                type="date"
+              <KoreanCalendarPicker
                 value={filters.startDate}
-                onChange={(e) =>
-                  handleFilterChange("startDate", e.target.value)
-                }
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
+                onChange={(date) => handleFilterChange("startDate", date)}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 기간 종료
               </label>
-              <input
-                type="date"
+              <KoreanCalendarPicker
                 value={filters.endDate}
-                onChange={(e) => handleFilterChange("endDate", e.target.value)}
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
+                onChange={(date) => handleFilterChange("endDate", date)}
               />
             </div>
           </div>

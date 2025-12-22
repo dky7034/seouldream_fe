@@ -3,6 +3,8 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { noticeService } from "../services/noticeService";
 import { semesterService } from "../services/semesterService";
+import { memberService } from "../services/memberService";
+import { formatDisplayName } from "../utils/memberUtils";
 import type {
   GetAllNoticesParams,
   NoticeDto,
@@ -14,6 +16,7 @@ import { MapPinIcon } from "@heroicons/react/24/solid";
 import Pagination from "../components/Pagination";
 import { useDebounce } from "../hooks/useDebounce";
 import { normalizeNumberInput } from "../utils/numberUtils";
+import KoreanCalendarPicker from "../components/KoreanCalendarPicker"; // ✅ 달력 컴포넌트 임포트
 
 // ✅ 정렬 키 타입
 type SortKey = "createdAt";
@@ -27,12 +30,17 @@ const AdminNoticesPage: React.FC = () => {
 
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear(); // ✅ 현재 연도 상수
+  const currentYear = now.getFullYear();
 
   const [noticePage, setNoticePage] = useState<Page<NoticeDto> | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
+
+  // 동명이인 판별을 위한 전체 멤버 리스트
+  const [allMembersForNameCheck, setAllMembersForNameCheck] = useState<
+    { id: number; name: string; birthDate?: string }[]
+  >([]);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [noticeToDelete, setNoticeToDelete] = useState<NoticeDto | null>(null);
@@ -55,7 +63,6 @@ const AdminNoticesPage: React.FC = () => {
     const startDate = searchParams.get("startDate") ?? "";
     const endDate = searchParams.get("endDate") ?? "";
 
-    // ✅ 안전하게 숫자로 변환하는 헬퍼 함수
     const safeNumber = (val: string | null, defaultValue: number | "" = "") => {
       if (!val) return defaultValue;
       const num = Number(val);
@@ -67,14 +74,12 @@ const AdminNoticesPage: React.FC = () => {
       pinned,
       startDate,
       endDate,
-      // ✅ [수정] year 파라미터가 없으면 '현재 연도'를 기본값으로 설정
       year: safeNumber(yearParam, currentYear),
       month: safeNumber(monthParam),
       semesterId: safeNumber(semesterIdParam),
     };
   });
 
-  // ✅ 정렬 상태
   const [sortOrder, setSortOrder] = useState(() => {
     return searchParams.get("sort") || "createdAt,desc";
   });
@@ -89,25 +94,22 @@ const AdminNoticesPage: React.FC = () => {
     return ft === "range" ? "range" : "unit";
   });
 
-  // ✅ [수정] 기본 조회 단위 'year'로 변경
   const [unitType, setUnitType] = useState<UnitType>(() => {
     const ut = searchParams.get("unitType");
     if (ut === "year" || ut === "month" || ut === "semester") {
       return ut;
     }
-    return "year"; // 기존 semester에서 year로 변경
+    return "year";
   });
 
   const debouncedTitleFilter = useDebounce(filters.title, 500);
 
-  // YYYY-MM-DD -> MM/DD
   const formatShortDate = (dateStr: string) => {
     if (!dateStr) return "";
     const [, month, day] = dateStr.split("-");
     return `${month}/${day}`;
   };
 
-  // 기간 요약
   const periodSummary = useMemo(() => {
     if (filterType === "range" && filters.startDate && filters.endDate) {
       return `기간: ${formatShortDate(filters.startDate)} ~ ${formatShortDate(
@@ -136,7 +138,6 @@ const AdminNoticesPage: React.FC = () => {
     return "";
   }, [filterType, unitType, filters, semesters]);
 
-  // ───────────────── URL 쿼리와 상태 동기화 ─────────────────
   const syncSearchParams = useCallback(
     (
       nextFilters = filters,
@@ -172,7 +173,6 @@ const AdminNoticesPage: React.FC = () => {
     [filters, filterType, unitType, sortOrder, currentPage, setSearchParams]
   );
 
-  // 학기 목록 조회
   const fetchSemesters = useCallback(async () => {
     try {
       const data = await semesterService.getAllSemesters(true);
@@ -183,7 +183,6 @@ const AdminNoticesPage: React.FC = () => {
     }
   }, []);
 
-  // 공지 목록 조회
   const fetchNotices = useCallback(async () => {
     if (!user) {
       setLoading(false);
@@ -257,7 +256,6 @@ const AdminNoticesPage: React.FC = () => {
     semesters,
   ]);
 
-  // 연도 목록 조회
   const fetchAvailableYears = useCallback(async () => {
     try {
       const years = await noticeService.getAvailableYears();
@@ -267,6 +265,38 @@ const AdminNoticesPage: React.FC = () => {
       setAvailableYears([]);
     }
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchAllMembers = async () => {
+      try {
+        const page = await memberService.getAllMembers({
+          page: 0,
+          size: 2000,
+          sort: "id,asc",
+        });
+        const list = page.content.map((m) => ({
+          id: m.id,
+          name: m.name,
+          birthDate: m.birthDate,
+        }));
+        setAllMembersForNameCheck(list);
+      } catch (e) {
+        console.error("동명이인 목록 로딩 실패:", e);
+      }
+    };
+    fetchAllMembers();
+  }, [user]);
+
+  const getFormattedName = useCallback(
+    (id?: number, name?: string) => {
+      if (!name) return "알 수 없음";
+      if (!id) return name;
+      const found = allMembersForNameCheck.find((m) => m.id === id);
+      return found ? formatDisplayName(found, allMembersForNameCheck) : name;
+    },
+    [allMembersForNameCheck]
+  );
 
   useEffect(() => {
     fetchNotices();
@@ -279,7 +309,6 @@ const AdminNoticesPage: React.FC = () => {
     }
   }, [user, fetchAvailableYears, fetchSemesters]);
 
-  // 삭제 관련
   const handleDelete = (notice: NoticeDto) => {
     setNoticeToDelete(notice);
     setDeleteError(null);
@@ -307,10 +336,6 @@ const AdminNoticesPage: React.FC = () => {
     setDeleteError(null);
   };
 
-  // ✅ [수정] 초기 접속 시 '연간'이 기본이므로, 기존의 '학기 자동 선택 useEffect'는 삭제함.
-  // (이제 사용자가 직접 학기 버튼을 누를 때만 스마트 학기 로직이 작동)
-
-  // 필터 변경 핸들러
   const handleFilterChange = (field: keyof typeof filters, value: any) => {
     const nextFilters = { ...filters, [field]: value };
     const nextPage = 0;
@@ -319,7 +344,6 @@ const AdminNoticesPage: React.FC = () => {
     syncSearchParams(nextFilters, filterType, unitType, sortOrder, nextPage);
   };
 
-  // ✅ [정책 적용 2 유지] 버튼 클릭 시 학기 자동 계산 로직은 유지
   const handleUnitTypeClick = (type: UnitType) => {
     const cy = new Date().getFullYear();
     const baseYear = filters.year || cy;
@@ -347,7 +371,6 @@ const AdminNoticesPage: React.FC = () => {
         semesterId: filters.semesterId || ("" as const),
       };
 
-      // 학기 버튼 클릭 시 스마트 선택 로직
       if (semesters.length > 0) {
         const now = new Date();
         const currentYearMonth = `${now.getFullYear()}-${String(
@@ -409,7 +432,6 @@ const AdminNoticesPage: React.FC = () => {
     syncSearchParams(nextFilters, filterType, unitType, sortOrder, nextPage);
   };
 
-  // 연도 옵션
   const yearOptions = useMemo(() => {
     const validYears = availableYears
       .filter((year): year is number => typeof year === "number" && year > 1970)
@@ -431,7 +453,6 @@ const AdminNoticesPage: React.FC = () => {
     return [{ value: "", label: "전체 연도" }, ...options];
   }, [availableYears]);
 
-  // 정렬 상태 파싱
   const getSortState = useCallback((): {
     key: SortKey | null;
     direction: "asc" | "desc";
@@ -446,7 +467,6 @@ const AdminNoticesPage: React.FC = () => {
     return { key: null, direction: "desc" };
   }, [sortOrder]);
 
-  // 정렬 요청
   const requestSort = (key: SortKey) => {
     const state = getSortState();
     let nextDirection: "asc" | "desc" = "desc";
@@ -554,7 +574,6 @@ const AdminNoticesPage: React.FC = () => {
           </div>
         )}
 
-        {/* ====== 기간 필터 영역 ====== */}
         <div className="p-4 bg-gray-50 rounded-lg mb-3 sm:mb-4 space-y-4 shadow-sm">
           <div className="flex flex-wrap items-center gap-3 sm:gap-4">
             <h3 className="text-base sm:text-lg font-semibold">
@@ -613,29 +632,23 @@ const AdminNoticesPage: React.FC = () => {
           {filterType === "range" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   기간 시작
                 </label>
-                <input
-                  type="date"
+                {/* ✅ KoreanCalendarPicker 적용 */}
+                <KoreanCalendarPicker
                   value={filters.startDate}
-                  onChange={(e) =>
-                    handleFilterChange("startDate", e.target.value)
-                  }
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
+                  onChange={(date) => handleFilterChange("startDate", date)}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   기간 종료
                 </label>
-                <input
-                  type="date"
+                {/* ✅ KoreanCalendarPicker 적용 */}
+                <KoreanCalendarPicker
                   value={filters.endDate}
-                  onChange={(e) =>
-                    handleFilterChange("endDate", e.target.value)
-                  }
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
+                  onChange={(date) => handleFilterChange("endDate", date)}
                 />
               </div>
             </div>
@@ -870,7 +883,10 @@ const AdminNoticesPage: React.FC = () => {
                           <p className="text-[11px] text-gray-500">
                             작성자{" "}
                             <span className="font-medium text-gray-700">
-                              {notice.createdBy?.name ?? "알 수 없음"}
+                              {getFormattedName(
+                                notice.createdBy?.id,
+                                notice.createdBy?.name
+                              )}
                             </span>
                           </p>
                         </div>
@@ -962,7 +978,10 @@ const AdminNoticesPage: React.FC = () => {
                               {new Date(notice.createdAt).toLocaleDateString()}
                             </td>
                             <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500">
-                              {notice.createdBy?.name ?? "알 수 없음"}
+                              {getFormattedName(
+                                notice.createdBy?.id,
+                                notice.createdBy?.name
+                              )}
                             </td>
                             <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
                               {user?.role === "EXECUTIVE" && (

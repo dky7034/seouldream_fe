@@ -13,6 +13,7 @@ import { normalizeNumberInput } from "../utils/numberUtils";
 import ConfirmModal from "../components/ConfirmModal";
 import Pagination from "../components/Pagination";
 import { semesterService } from "../services/semesterService";
+import { formatDisplayName } from "../utils/memberUtils"; // [추가]
 
 type SortKey = "createdAt" | "memberName" | "creatorName";
 
@@ -27,14 +28,19 @@ const sortKeyMap: Record<SortKey, string> = {
   creatorName: "createdBy.name",
 };
 
+// [수정] Props 인터페이스: allMembers 추가
 interface CellPrayersManagerProps {
   user: User;
+  allMembers: { id: number; name: string; birthDate?: string }[];
 }
 
 // ✅ 반기/분기 제거
 type UnitType = "year" | "month" | "semester";
 
-const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
+const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
+  user,
+  allMembers, // [추가]
+}) => {
   const navigate = useNavigate();
 
   // ✅ 현재 연도/월 상수
@@ -85,6 +91,15 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
   const [prayerToDelete, setPrayerToDelete] = useState<number | null>(null);
 
   const isCellLeader = user.role === "CELL_LEADER";
+
+  // [추가] 이름 포맷팅 헬퍼
+  const getFormattedName = useCallback(
+    (id: number, originalName: string) => {
+      const found = allMembers.find((m) => m.id === id);
+      return found ? formatDisplayName(found, allMembers) : originalName;
+    },
+    [allMembers]
+  );
 
   // ✅ 학기 목록 불러오기
   const loadSemesters = useCallback(async () => {
@@ -396,10 +411,9 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
             {user.cellName ? `${user.cellName} 기도제목` : "내 셀 기도제목"}
           </h2>
           <p className="mt-1 text-sm text-gray-500">
-            내 셀원들의 기도제목을 기간별로 조회하고 관리할 수 있습니다.
+            셀원들의 기도제목을 기간별로 조회하고 관리할 수 있습니다.
           </p>
         </div>
-        {/* 버튼 삭제됨 */}
       </div>
 
       {/* 필터 영역 */}
@@ -465,9 +479,6 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
         ) : (
           // ✅ 단위 기반 조회
           <div className="space-y-4">
-            {/* 셀장인 경우 grid-cols-1로 변경하여 하단 버튼 영역을 꽉 채우고,
-                연도 선택 div를 렌더링하지 않음.
-            */}
             <div
               className={`grid grid-cols-1 ${
                 !isCellLeader ? "sm:grid-cols-2" : ""
@@ -500,9 +511,7 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
                   조회 단위
                 </label>
                 <div className="flex flex-wrap items-center gap-2 mt-1">
-                  {/* ✅ 순서 변경: 월간 -> 학기 -> 연간 */}
-
-                  {/* 월간: 클릭 시 현재 월 선택 */}
+                  {/* 월간 */}
                   <button
                     onClick={() => handleUnitValueChange("month", currentMonth)}
                     className={`px-3 py-1 text-sm rounded-full ${
@@ -514,7 +523,7 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
                     월간
                   </button>
 
-                  {/* 학기: 클릭 시 현재 날짜 기준 학기 자동 선택 */}
+                  {/* 학기 */}
                   <button
                     onClick={handleSemesterButtonClick}
                     className={`px-3 py-1 text-sm rounded-full ${
@@ -550,7 +559,7 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
         <hr />
       </div>
 
-      {/* 이하 기존 리스트/테이블 영역 (동일) */}
+      {/* 리스트/테이블 영역 */}
       {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
       {loading && (
         <p className="text-center text-sm text-gray-500">로딩 중...</p>
@@ -575,7 +584,8 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
                   {/* 상단: 멤버 이름 + 작성일 */}
                   <div className="flex items-center justify-between gap-2">
                     <div className="font-semibold text-gray-900 text-sm">
-                      {prayer.member.name}
+                      {/* [수정] 멤버 이름 동명이인 처리 */}
+                      {getFormattedName(prayer.member.id, prayer.member.name)}
                     </div>
                     <div className="text-[11px] text-gray-500">
                       {createdDate}
@@ -595,7 +605,14 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
 
                   {/* 작성자 / 삭제 여부 */}
                   <div className="mt-2 flex items-center justify-between text-[11px] text-gray-600">
-                    <span>작성자: {prayer.createdBy.name}</span>
+                    {/* [수정] 작성자 이름 동명이인 처리 */}
+                    <span>
+                      작성자:{" "}
+                      {getFormattedName(
+                        prayer.createdBy.id,
+                        prayer.createdBy.name
+                      )}
+                    </span>
                     {prayer.isDeleted && (
                       <span className="px-2 py-[1px] rounded-full bg-gray-200 text-gray-700">
                         삭제됨
@@ -635,7 +652,7 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
             )}
           </div>
 
-          {/* ✅ 데스크톱: 기존 테이블 유지 */}
+          {/* ✅ 데스크톱: 테이블 */}
           <div className="hidden sm:block bg-white shadow-md rounded-lg overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -675,7 +692,8 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
                     }
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      {prayer.member.name}
+                      {/* [수정] 멤버 이름 동명이인 처리 */}
+                      {getFormattedName(prayer.member.id, prayer.member.name)}
                     </td>
                     <td className="px-6 py-4 text-sm max-w-sm truncate">
                       <Link
@@ -686,7 +704,11 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({ user }) => {
                       </Link>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {prayer.createdBy.name}
+                      {/* [수정] 작성자 이름 동명이인 처리 */}
+                      {getFormattedName(
+                        prayer.createdBy.id,
+                        prayer.createdBy.name
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {new Date(prayer.createdAt).toLocaleDateString()}

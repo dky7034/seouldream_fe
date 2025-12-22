@@ -1,6 +1,6 @@
 // src/pages/AdminCellsPage.tsx
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { cellService } from "../services/cellService";
 import { attendanceService } from "../services/attendanceService";
 import type {
@@ -17,25 +17,30 @@ import { memberService } from "../services/memberService";
 import { semesterService } from "../services/semesterService";
 import type { SemesterDto } from "../types";
 
+type SortKey =
+  | "name"
+  | "leaderName"
+  | "viceLeaderName"
+  | "memberCount"
+  | "attendanceRate"
+  | "active"
+  | "maleCount"
+  | "femaleCount";
+
 type SortConfig = {
-  key:
-    | keyof CellDto
-    | "leaderName"
-    | "viceLeaderName"
-    | "memberCount"
-    | "attendanceRate";
+  key: SortKey;
   direction: "ascending" | "descending";
 };
 
 // ✅ 기간 계산용 유틸
 const pad = (n: number) => n.toString().padStart(2, "0");
 
-// month: 1~12, 결과는 해당 달의 마지막 날(28/29/30/31)
+// month: 1~12, 결과는 해당 달의 마지막 날
 const lastDayOfMonth = (year: number, month: number) => {
   return new Date(year, month, 0).getDate();
 };
 
-// ✅ 필터 타입 정의 (semesterId 포함)
+// ✅ 필터 타입 정의
 type Filters = {
   name: string;
   active: "all" | "true" | "false";
@@ -43,17 +48,18 @@ type Filters = {
   endDate: string;
   year: number | "";
   month: number | "";
-  quarter: number | "";
-  half: number | "";
   semesterId: number | "";
 };
 
 const AdminCellsPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [semesters, setSemesters] = useState<SemesterDto[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
 
+  const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const hasActiveSemesters = semesters.length > 0;
+  // ✅ 초기 진입 시 자동 학기 선택 여부
+  const [hasAutoSelectedSemester, setHasAutoSelectedSemester] = useState(false);
 
   const [cellPage, setCellPage] = useState<Page<CellDto> | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -72,6 +78,7 @@ const AdminCellsPage: React.FC = () => {
   const now = new Date();
   const currentYear = now.getFullYear();
 
+  // ✅ 초기 필터 설정
   const [filters, setFilters] = useState<Filters>({
     name: "",
     active: "all",
@@ -79,21 +86,14 @@ const AdminCellsPage: React.FC = () => {
     endDate: "",
     year: currentYear,
     month: "",
-    quarter: "",
-    half: "",
     semesterId: "",
   });
 
-  const [sortConfig, setSortConfig] = useState<SortConfig>({
-    key: "name",
-    direction: "ascending",
-  });
-  const [currentPage, setCurrentPage] = useState(0);
   const [filterType, setFilterType] = useState<"unit" | "range">("unit");
-
-  const [unitType, setUnitType] = useState<
-    "year" | "half" | "quarter" | "month" | "semester"
-  >("year");
+  // ✅ 기본값 'semester'로 변경
+  const [unitType, setUnitType] = useState<"year" | "month" | "semester">(
+    "semester"
+  );
 
   const [attendanceRates, setAttendanceRates] = useState<
     Map<number, SimpleAttendanceRateDto>
@@ -102,7 +102,98 @@ const AdminCellsPage: React.FC = () => {
 
   const debouncedNameFilter = useDebounce(filters.name, 500);
 
-  // ✅ 출석 데이터에서 사용 가능한 연도 목록
+  // 🔹 URL에서 유효한 sortKey 파싱
+  const getValidSortKey = (value: string | null): SortKey => {
+    if (value === "name") return "name";
+    if (value === "leaderName") return "leaderName";
+    if (value === "viceLeaderName") return "viceLeaderName";
+    if (value === "memberCount") return "memberCount";
+    if (value === "attendanceRate") return "attendanceRate";
+    if (value === "active") return "active";
+    if (value === "maleCount") return "maleCount";
+    if (value === "femaleCount") return "femaleCount";
+    return "name";
+  };
+
+  // 🔹 URL에서 초기 정렬/페이지 읽기
+  const [sortConfig, setSortConfig] = useState<SortConfig>(() => {
+    const key = getValidSortKey(searchParams.get("sortKey"));
+    const dirParam = searchParams.get("sortDir");
+    const direction: SortConfig["direction"] =
+      dirParam === "ascending" ? "ascending" : "descending";
+    return { key, direction };
+  });
+
+  const [currentPage, setCurrentPage] = useState(() => {
+    const pageParam = searchParams.get("page");
+    const pageNum = pageParam ? Number(pageParam) : 0;
+    return Number.isNaN(pageNum) || pageNum < 0 ? 0 : pageNum;
+  });
+
+  // 🔹 브라우저 뒤로가기/앞으로가기 동기화
+  useEffect(() => {
+    const key = getValidSortKey(searchParams.get("sortKey"));
+    const dirParam = searchParams.get("sortDir");
+    const direction: SortConfig["direction"] =
+      dirParam === "ascending" ? "ascending" : "descending";
+
+    const pageParam = searchParams.get("page");
+    const pageNum = pageParam ? Number(pageParam) : 0;
+    const safePage = Number.isNaN(pageNum) || pageNum < 0 ? 0 : pageNum;
+
+    setSortConfig((prev) =>
+      prev.key === key && prev.direction === direction
+        ? prev
+        : { key, direction }
+    );
+    setCurrentPage((prev) => (prev === safePage ? prev : safePage));
+  }, [searchParams]);
+
+  // ✅ [수정] 학기 자동 선택 로직 (초기 로딩 시)
+  useEffect(() => {
+    if (semesters.length > 0 && !hasAutoSelectedSemester) {
+      const now = new Date();
+      const currentYearMonth = `${now.getFullYear()}-${String(
+        now.getMonth() + 1
+      ).padStart(2, "0")}`;
+
+      // 1. 현재 '월'이 학기 기간에 포함되는지 확인
+      let targetSemester = semesters.find((s) => {
+        const startYearMonth = s.startDate.substring(0, 7);
+        const endYearMonth = s.endDate.substring(0, 7);
+        return (
+          currentYearMonth >= startYearMonth && currentYearMonth <= endYearMonth
+        );
+      });
+
+      // 2. 없으면 최신 학기 선택
+      if (!targetSemester) {
+        const sorted = [...semesters].sort((a, b) => b.id - a.id);
+        targetSemester = sorted[0];
+      }
+
+      if (targetSemester) {
+        setFilters((prev) => ({
+          ...prev,
+          semesterId: targetSemester!.id,
+          year: "",
+          month: "",
+        }));
+      } else {
+        setUnitType("month");
+        setFilters((prev) => ({
+          ...prev,
+          year: now.getFullYear(),
+          month: now.getMonth() + 1,
+          semesterId: "",
+        }));
+      }
+
+      setHasAutoSelectedSemester(true);
+    }
+  }, [semesters, hasAutoSelectedSemester]);
+
+  // ✅ 데이터 Fetch
   const fetchAvailableYears = useCallback(async () => {
     try {
       const years = await attendanceService.getAvailableYears();
@@ -118,17 +209,16 @@ const AdminCellsPage: React.FC = () => {
       const data = await semesterService.getAllSemesters(true);
       setSemesters(data);
     } catch (err) {
-      console.error("Failed to fetch semesters in AdminCellsPage:", err);
+      console.error("Failed to fetch semesters:", err);
       setSemesters([]);
     }
   }, []);
 
-  // ✅ filters + filterType + semesters 기준으로 최종 dateRange 계산
+  // ✅ DateRange 계산
   const getDateRangeFromFilters = useCallback((): {
     startDate: string;
     endDate: string;
   } | null => {
-    // 1) 기간 직접 입력 모드
     if (filterType === "range") {
       if (!filters.startDate || !filters.endDate) return null;
       return {
@@ -137,7 +227,6 @@ const AdminCellsPage: React.FC = () => {
       };
     }
 
-    // 2) 학기 선택 모드: semesterId가 있으면 항상 학기 우선
     if (filters.semesterId) {
       const semester = semesters.find((s) => s.id === filters.semesterId);
       if (semester) {
@@ -148,16 +237,11 @@ const AdminCellsPage: React.FC = () => {
       }
     }
 
-    // 3) 단위 기반 모드 (연/반기/분기/월)
     const year = typeof filters.year === "number" ? filters.year : undefined;
-    if (!year) {
-      // 연도 선택이 안 되어 있으면 createdAt 필터 없이 전체 조회
-      return null;
-    }
+    if (!year) return null;
 
-    const { month, quarter, half } = filters;
+    const { month } = filters;
 
-    // ✅ 월간
     if (month) {
       const m = month as number;
       const last = lastDayOfMonth(year, m);
@@ -167,37 +251,6 @@ const AdminCellsPage: React.FC = () => {
       };
     }
 
-    // ✅ 분기
-    if (quarter) {
-      const q = quarter as number;
-      const startMonth = (q - 1) * 3 + 1; // 1, 4, 7, 10
-      const endMonth = startMonth + 2; // 3, 6, 9, 12
-      const last = lastDayOfMonth(year, endMonth);
-      return {
-        startDate: `${year}-${pad(startMonth)}-01`,
-        endDate: `${year}-${pad(endMonth)}-${pad(last)}`,
-      };
-    }
-
-    // ✅ 반기
-    if (half) {
-      const h = half as number;
-      if (h === 1) {
-        const last = lastDayOfMonth(year, 6);
-        return {
-          startDate: `${year}-01-01`,
-          endDate: `${year}-06-${pad(last)}`,
-        };
-      } else {
-        const last = lastDayOfMonth(year, 12);
-        return {
-          startDate: `${year}-07-01`,
-          endDate: `${year}-12-${pad(last)}`,
-        };
-      }
-    }
-
-    // ✅ 연간
     const last = lastDayOfMonth(year, 12);
     return {
       startDate: `${year}-01-01`,
@@ -205,7 +258,7 @@ const AdminCellsPage: React.FC = () => {
     };
   }, [filterType, filters, semesters]);
 
-  // ✅ 셀 목록 조회 (createdAt 기준 필터는 startDate/endDate만 사용)
+  // ✅ 셀 목록 조회
   const fetchCells = useCallback(async () => {
     if (!user || user.role !== "EXECUTIVE") return;
 
@@ -217,7 +270,6 @@ const AdminCellsPage: React.FC = () => {
       viceLeaderName: "viceLeader.name",
     };
 
-    // ✅ 출석률 정렬일 때는 백엔드 sort 파라미터를 보내지 않음
     let sortParam: string | undefined = undefined;
     if (sortConfig.key !== "attendanceRate") {
       const backendSortKey =
@@ -229,7 +281,7 @@ const AdminCellsPage: React.FC = () => {
 
     const dateRange = getDateRangeFromFilters();
 
-    let params: GetAllCellsParams = {
+    const params: GetAllCellsParams = {
       page: currentPage,
       size: 10,
       sort: sortParam,
@@ -262,37 +314,28 @@ const AdminCellsPage: React.FC = () => {
     getDateRangeFromFilters,
   ]);
 
-  // 권한 체크만 담당
   useEffect(() => {
-    if (!user) {
-      setError("로그인 후 셀 관리 페이지에 접근할 수 있습니다.");
-      setLoading(false);
-      return;
-    }
-    if (user.role !== "EXECUTIVE") {
-      setError("셀 관리 페이지에 접근할 권한이 없습니다.");
+    if (!user || user.role !== "EXECUTIVE") {
+      if (user) setError("셀 관리 페이지에 접근할 권한이 없습니다.");
+      else setError("로그인 후 셀 관리 페이지에 접근할 수 있습니다.");
       setLoading(false);
       return;
     }
   }, [user]);
 
-  // 셀 목록: 유저/필터/페이지 변화에 반응해서 재조회
   useEffect(() => {
     if (!user || user.role !== "EXECUTIVE") return;
     fetchCells();
   }, [user, fetchCells]);
 
-  // 학기 + 연도 목록: 유저 확정 후 한 번만 로딩
   useEffect(() => {
     if (!user || user.role !== "EXECUTIVE") return;
     fetchAvailableYears();
     fetchSemesters();
   }, [user, fetchAvailableYears, fetchSemesters]);
 
-  // ✅ 동명이인 판별용: 전체 멤버 이름/생년월일 로딩
   useEffect(() => {
     if (!user || user.role !== "EXECUTIVE") return;
-
     const fetchAllMembersForNameCheck = async () => {
       try {
         const page = await memberService.getAllMembers({
@@ -300,24 +343,19 @@ const AdminCellsPage: React.FC = () => {
           size: 1000,
           sort: "id,asc",
         });
-
         const list =
           page?.content?.map((m) => ({
             name: m.name,
             birthDate: m.birthDate,
           })) ?? [];
-
         setAllMembersForNameCheck(list);
       } catch (e) {
-        console.error("동명이인 판별용 멤버 목록 로딩 실패:", e);
         setAllMembersForNameCheck([]);
       }
     };
-
     fetchAllMembersForNameCheck();
   }, [user]);
 
-  // ✅ 셀별 출석률: 셀 리스트와 동일한 dateRange 사용
   useEffect(() => {
     if (!cellPage?.content || cellPage.content.length === 0) {
       setAttendanceRates(new Map());
@@ -365,45 +403,50 @@ const AdminCellsPage: React.FC = () => {
     [availableYears]
   );
 
-  // ✅ 출석률 포함 프론트 정렬용 배열
   const sortedCells = useMemo(() => {
     if (!cellPage) return [];
-
     const rows = [...cellPage.content];
-
     if (sortConfig.key === "attendanceRate") {
       rows.sort((a, b) => {
         const rateA = attendanceRates.get(a.id)?.attendanceRate;
         const rateB = attendanceRates.get(b.id)?.attendanceRate;
-
         const valueA = typeof rateA === "number" ? rateA : -1;
         const valueB = typeof rateB === "number" ? rateB : -1;
-
-        if (sortConfig.direction === "ascending") {
-          return valueA - valueB;
-        } else {
-          return valueB - valueA;
-        }
+        if (sortConfig.direction === "ascending") return valueA - valueB;
+        else return valueB - valueA;
       });
     }
-
     return rows;
   }, [cellPage, sortConfig, attendanceRates]);
 
-  const requestSort = (key: SortConfig["key"]) => {
-    setSortConfig((prev) => ({
-      key,
-      direction:
-        prev.key === key && prev.direction === "ascending"
-          ? "descending"
-          : "ascending",
-    }));
+  const requestSort = (key: SortKey) => {
+    const nextDirection: SortConfig["direction"] =
+      sortConfig.key === key && sortConfig.direction === "ascending"
+        ? "descending"
+        : "ascending";
+    const nextConfig: SortConfig = { key, direction: nextDirection };
+    setSortConfig(nextConfig);
     setCurrentPage(0);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("sortKey", nextConfig.key);
+    nextParams.set("sortDir", nextConfig.direction);
+    nextParams.set("page", "0");
+    setSearchParams(nextParams);
   };
 
-  const getSortIndicator = (key: SortConfig["key"]) => {
+  const getSortIndicator = (key: SortKey) => {
     if (sortConfig.key !== key) return " ↕";
     return sortConfig.direction === "ascending" ? " ▲" : " ▼";
+  };
+
+  const handlePageChange = (page: number) => {
+    const safePage = page < 0 ? 0 : page;
+    setCurrentPage(safePage);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("page", String(safePage));
+    nextParams.set("sortKey", sortConfig.key);
+    nextParams.set("sortDir", sortConfig.direction);
+    setSearchParams(nextParams);
   };
 
   const handleDelete = (cell: CellDto) => {
@@ -432,86 +475,93 @@ const AdminCellsPage: React.FC = () => {
   };
 
   const handleFilterChange = (field: keyof Filters, value: any) => {
-    setFilters((prev) => ({ ...prev, [field]: value }));
+    const nextFilters = { ...filters, [field]: value };
+    setFilters(nextFilters);
     setCurrentPage(0);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("page", "0");
+    setSearchParams(nextParams);
   };
 
   const handleSemesterClick = (id: number) => {
-    setFilters((prev) => ({
-      ...prev,
-      semesterId: prev.semesterId === id ? "" : id,
-    }));
+    const nextFilters: Filters = {
+      ...filters,
+      semesterId: filters.semesterId === id ? "" : id,
+    };
+    setFilters(nextFilters);
     setCurrentPage(0);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("page", "0");
+    setSearchParams(nextParams);
   };
 
-  // ✅ 단위 버튼 클릭 (연/반기/분기/월/학기)
-  const handleUnitTypeClick = (
-    type: "year" | "half" | "quarter" | "month" | "semester"
-  ) => {
+  // ✅ [수정] 단위 타입 클릭 핸들러 (학기 선택 시 자동 학기 매핑 로직 추가)
+  const handleUnitTypeClick = (type: "year" | "month" | "semester") => {
     setUnitType(type);
-    setFilters((prev) => {
-      const next: Filters = { ...prev };
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      const currentMonth = now.getMonth() + 1;
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
 
-      if (type === "year") {
-        if (!next.year) {
-          next.year = currentYear;
+    const next: Filters = { ...filters }; // 타입 명시
+
+    if (type === "year") {
+      if (!next.year) next.year = currentYear;
+      next.month = "";
+      next.semesterId = "";
+    } else if (type === "month") {
+      if (!next.year) next.year = currentYear;
+      next.month = (next.month as number) || currentMonth;
+      next.semesterId = "";
+    } else if (type === "semester") {
+      next.year = "";
+      next.month = "";
+
+      // ✅ 학기 버튼 클릭 시: 현재 월에 맞는 학기를 찾아 자동 선택
+      if (semesters.length > 0) {
+        const currentYearMonth = `${currentYear}-${String(
+          currentMonth
+        ).padStart(2, "0")}`;
+
+        // 1. 현재 월이 포함된 학기 찾기
+        let target = semesters.find((s) => {
+          const start = s.startDate.substring(0, 7);
+          const end = s.endDate.substring(0, 7);
+          return currentYearMonth >= start && currentYearMonth <= end;
+        });
+
+        // 2. 없으면 가장 최신 학기 선택
+        if (!target) {
+          const sorted = [...semesters].sort((a, b) => b.id - a.id);
+          target = sorted[0];
         }
-        next.month = "";
-        next.quarter = "";
-        next.half = "";
-        next.semesterId = "";
-      } else if (type === "half") {
-        if (!next.year) {
-          next.year = currentYear;
+
+        if (target) {
+          next.semesterId = target.id;
         }
-        next.half = (next.half as number) || 1;
-        next.month = "";
-        next.quarter = "";
-        next.semesterId = "";
-      } else if (type === "quarter") {
-        if (!next.year) {
-          next.year = currentYear;
-        }
-        next.quarter = (next.quarter as number) || 1;
-        next.month = "";
-        next.half = "";
-        next.semesterId = "";
-      } else if (type === "month") {
-        if (!next.year) {
-          next.year = currentYear;
-        }
-        next.month = (next.month as number) || currentMonth;
-        next.quarter = "";
-        next.half = "";
-        next.semesterId = "";
-      } else if (type === "semester") {
-        next.year = "";
-        next.month = "";
-        next.quarter = "";
-        next.half = "";
       }
+    }
 
-      return next;
-    });
+    setFilters(next);
     setCurrentPage(0);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("page", "0");
+    setSearchParams(nextParams);
   };
 
-  const handleUnitValueClick = (
-    unit: "month" | "quarter" | "half",
-    value: number
-  ) => {
-    setFilters((prev) => ({
-      ...prev,
-      month: unit === "month" ? value : "",
-      quarter: unit === "quarter" ? value : "",
-      half: unit === "half" ? value : "",
-    }));
+  // ✅ [수정] unit 파라미터 삭제
+  const handleUnitValueClick = (value: number) => {
+    const nextFilters: Filters = {
+      ...filters,
+      month: value,
+    };
+    setFilters(nextFilters);
     setCurrentPage(0);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("page", "0");
+    setSearchParams(nextParams);
   };
 
+  // ✅ [수정] 버튼 렌더링
   const renderUnitButtons = () => {
     switch (unitType) {
       case "month":
@@ -520,7 +570,8 @@ const AdminCellsPage: React.FC = () => {
             {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
               <button
                 key={m}
-                onClick={() => handleUnitValueClick("month", m)}
+                // ✅ [수정] "month" 인자 삭제
+                onClick={() => handleUnitValueClick(m)}
                 className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.month === m ? "bg-blue-500 text-white" : "bg-white"
                 }`}
@@ -530,48 +581,14 @@ const AdminCellsPage: React.FC = () => {
             ))}
           </div>
         );
-      case "quarter":
-        return (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {Array.from({ length: 4 }, (_, i) => i + 1).map((q) => (
-              <button
-                key={q}
-                onClick={() => handleUnitValueClick("quarter", q)}
-                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
-                  filters.quarter === q ? "bg-blue-500 text-white" : "bg-white"
-                }`}
-              >
-                {q}분기
-              </button>
-            ))}
-          </div>
-        );
-      case "half":
-        return (
-          <div className="grid grid-cols-2 gap-2">
-            {Array.from({ length: 2 }, (_, i) => i + 1).map((h) => (
-              <button
-                key={h}
-                onClick={() => handleUnitValueClick("half", h)}
-                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
-                  filters.half === h ? "bg-blue-500 text-white" : "bg-white"
-                }`}
-              >
-                {h === 1 ? "상반기" : "하반기"}
-              </button>
-            ))}
-          </div>
-        );
       case "semester":
         if (semesters.length === 0) {
           return (
             <div className="mt-4 rounded-md bg-yellow-50 p-3 text-xs text-yellow-800">
-              현재 활성 상태인 학기가 없습니다. 공지/출석 화면에서 학기 선택을
-              사용하려면 최소 1개 이상의 학기를 활성화해 주세요.
+              현재 활성 상태인 학기가 없습니다.
             </div>
           );
         }
-
         return (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
             {semesters.map((s) => (
@@ -595,7 +612,6 @@ const AdminCellsPage: React.FC = () => {
     }
   };
 
-  // 권한 없는 경우 빠른 리턴 (레이아웃 포함)
   if (error && (!user || user.role !== "EXECUTIVE")) {
     return (
       <div className="bg-gray-50 min-h-screen">
@@ -617,8 +633,7 @@ const AdminCellsPage: React.FC = () => {
               셀 관리
             </h1>
             <p className="mt-1 text-sm text-gray-600">
-              셀 조직과 셀장 정보를 관리하고, 기간별 출석률을 한눈에 확인하는
-              임원 전용 페이지입니다.
+              셀 조직과 셀장 정보를 관리하고, 기간별 출석률을 확인합니다.
             </p>
           </div>
         </div>
@@ -631,10 +646,9 @@ const AdminCellsPage: React.FC = () => {
 
         {/* 필터 영역 */}
         <div className="p-4 bg-gray-50 rounded-lg mb-6 shadow-sm space-y-4">
-          {/* 상단: 제목 + 단위/기간 토글 */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-base sm:text-lg font-semibold">
-              조회 기간 설정 (셀 생성일 기준)
+              조회 기간 설정
             </h3>
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -661,7 +675,6 @@ const AdminCellsPage: React.FC = () => {
           </div>
 
           {filterType === "range" ? (
-            // ✅ 직접 기간 선택
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">
@@ -691,12 +704,12 @@ const AdminCellsPage: React.FC = () => {
               </div>
             </div>
           ) : (
-            // ✅ 단위 조회 (연/반기/분기/월/학기)
+            // ✅ 단위 조회 (월간 -> 학기 -> 연간 순서)
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    연도
+                    연도 (월간/연간 조회용)
                   </label>
                   <select
                     value={filters.year}
@@ -718,7 +731,7 @@ const AdminCellsPage: React.FC = () => {
                   </select>
                   {unitType === "semester" && (
                     <p className="mt-1 text-[11px] text-gray-500">
-                      학기 단위 조회 시 연도를 선택할 수 없습니다.
+                      학기 단위 조회 시 학기에 설정된 연도가 자동 적용됩니다.
                     </p>
                   )}
                 </div>
@@ -727,39 +740,7 @@ const AdminCellsPage: React.FC = () => {
                     조회 단위
                   </label>
                   <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <button
-                      type="button"
-                      onClick={() => handleUnitTypeClick("year")}
-                      className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
-                        unitType === "year"
-                          ? "bg-blue-500 text-white"
-                          : "bg-white border"
-                      }`}
-                    >
-                      연간
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleUnitTypeClick("half")}
-                      className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
-                        unitType === "half"
-                          ? "bg-blue-500 text-white"
-                          : "bg-white border"
-                      }`}
-                    >
-                      반기
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleUnitTypeClick("quarter")}
-                      className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
-                        unitType === "quarter"
-                          ? "bg-blue-500 text-white"
-                          : "bg-white border"
-                      }`}
-                    >
-                      분기
-                    </button>
+                    {/* 1. 월간 (맨 앞) */}
                     <button
                       type="button"
                       onClick={() => handleUnitTypeClick("month")}
@@ -771,6 +752,8 @@ const AdminCellsPage: React.FC = () => {
                     >
                       월간
                     </button>
+
+                    {/* 2. 학기 (중간) */}
                     <button
                       type="button"
                       onClick={() =>
@@ -787,8 +770,20 @@ const AdminCellsPage: React.FC = () => {
                     >
                       학기
                     </button>
-                  </div>
 
+                    {/* 3. 연간 (맨 뒤) */}
+                    <button
+                      type="button"
+                      onClick={() => handleUnitTypeClick("year")}
+                      className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
+                        unitType === "year"
+                          ? "bg-blue-500 text-white"
+                          : "bg-white border"
+                      }`}
+                    >
+                      연간
+                    </button>
+                  </div>
                   {!hasActiveSemesters && (
                     <p className="mt-1 text-xs text-red-500">
                       활성화된 학기가 없어 학기 단위 조회를 사용할 수 없습니다.
@@ -846,12 +841,114 @@ const AdminCellsPage: React.FC = () => {
         </div>
 
         {loading && (
-          <p className="text-center text-sm text-gray-600 mt-4">로딩 중...</p>
+          <div className="flex items-center justify-center min-h-[30vh]">
+            <p className="text-sm text-gray-600">로딩 중...</p>
+          </div>
         )}
 
         {!loading && cellPage && (
           <>
-            <div className="bg-white shadow-md rounded-lg overflow-x-auto">
+            {/* 🔹 모바일: 카드 리스트 */}
+            <div className="space-y-3 md:hidden mb-4">
+              {sortedCells.length === 0 ? (
+                <div className="bg-white rounded-lg shadow border border-gray-100 p-4 text-center text-xs text-gray-500">
+                  조건에 맞는 셀이 없습니다. 필터를 변경해 보세요.
+                </div>
+              ) : (
+                sortedCells.map((cell) => {
+                  const rateInfo = attendanceRates.get(cell.id);
+                  const attendanceText = rateLoading
+                    ? "계산 중..."
+                    : `${(rateInfo?.attendanceRate ?? 0).toFixed(1)}%`;
+
+                  const leaderName = cell.leader
+                    ? formatDisplayName(
+                        {
+                          name: cell.leader.name,
+                          birthDate: cell.leader.birthDate,
+                        },
+                        allMembersForNameCheck
+                      )
+                    : "미정";
+
+                  return (
+                    <div
+                      key={cell.id}
+                      className={`bg-white rounded-lg shadow border border-gray-100 p-4 text-xs space-y-2 ${
+                        !cell.active ? "bg-gray-100 text-gray-500" : ""
+                      }`}
+                    >
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <button
+                            onClick={() => navigate(`/admin/cells/${cell.id}`)}
+                            className="text-sm font-semibold text-indigo-600 hover:text-indigo-800"
+                          >
+                            {cell.name}
+                          </button>
+                          <p className="mt-1 text-[11px] text-gray-500">
+                            셀장:{" "}
+                            <span className="font-medium text-gray-700">
+                              {leaderName}
+                            </span>
+                          </p>
+                        </div>
+                        <span
+                          className={`px-2 inline-flex text-[11px] leading-5 font-semibold rounded-full ${
+                            cell.active
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {cell.active ? "활성" : "비활성"}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 mt-2">
+                        <div>
+                          <p className="text-[11px] text-gray-500">총 인원</p>
+                          <p className="text-[12px] font-semibold">
+                            {cell.memberCount}명
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-gray-500">남 / 여</p>
+                          <p className="text-[12px] font-semibold">
+                            {cell.maleCount} / {cell.femaleCount}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-gray-500">출석률</p>
+                          <p className="text-[12px] font-semibold">
+                            {attendanceText}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 flex justify-end gap-2">
+                        <button
+                          onClick={() =>
+                            navigate(`/admin/cells/${cell.id}/edit`)
+                          }
+                          className="text-[11px] font-medium text-indigo-600 hover:text-indigo-900"
+                        >
+                          수정
+                        </button>
+                        <button
+                          onClick={() => handleDelete(cell)}
+                          className="text-[11px] font-medium text-red-600 hover:text-red-800"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* 🔹 데스크탑: 테이블 */}
+            <div className="hidden md:block bg-white shadow-md rounded-lg overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
                 <thead className="bg-gray-50">
                   <tr>
@@ -883,21 +980,19 @@ const AdminCellsPage: React.FC = () => {
                       onClick={() => requestSort("maleCount")}
                       className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
                     >
-                      남성{getSortIndicator("maleCount" as SortConfig["key"])}
+                      남성{getSortIndicator("maleCount")}
                     </th>
                     <th
                       onClick={() => requestSort("femaleCount")}
                       className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
                     >
-                      여성
-                      {getSortIndicator("femaleCount" as SortConfig["key"])}
+                      여성{getSortIndicator("femaleCount")}
                     </th>
                     <th
                       onClick={() => requestSort("attendanceRate")}
                       className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
                     >
-                      출석률
-                      {getSortIndicator("attendanceRate" as SortConfig["key"])}
+                      출석률{getSortIndicator("attendanceRate")}
                     </th>
                     <th className="relative px-3 sm:px-6 py-2 sm:py-3">
                       <span className="sr-only">Actions</span>
@@ -996,11 +1091,12 @@ const AdminCellsPage: React.FC = () => {
                 </tbody>
               </table>
             </div>
+
             <Pagination
               currentPage={cellPage.number}
               totalPages={cellPage.totalPages}
               totalElements={cellPage.totalElements}
-              onPageChange={setCurrentPage}
+              onPageChange={handlePageChange}
               itemLabel="개 셀"
             />
           </>
@@ -1017,7 +1113,7 @@ const AdminCellsPage: React.FC = () => {
               </p>
               <p className="text-xs text-gray-500 mb-4">
                 셀을 삭제하면 해당 셀에 소속된 멤버/출석 정보에 영향을 줄 수
-                있습니다. 필요하다면 먼저 셀 구성과 출석 데이터를 확인해 주세요.
+                있습니다.
               </p>
               {deleteError && (
                 <div className="p-3 text-sm font-medium text-red-700 bg-red-100 border border-red-400 rounded-md mb-4">

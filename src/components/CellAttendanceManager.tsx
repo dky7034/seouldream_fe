@@ -1,11 +1,20 @@
-// src/components/attendance/CellAttendanceManager.tsx
+// src/components/CellAttendanceManager.tsx
 import React, { useState } from "react";
 import type { User } from "../types";
 import TakeAttendanceView from "./attendance/TakeAttendanceView";
 import AttendanceLogView from "./attendance/AttendanceLogView";
 import AttendanceStatisticsView from "./attendance/AttendanceStatisticsView";
 
-const CellAttendanceManager: React.FC<{ user: User }> = ({ user }) => {
+// [추가] Props 인터페이스 정의
+interface CellAttendanceManagerProps {
+  user: User;
+  allMembers: { id: number; name: string; birthDate?: string }[];
+}
+
+const CellAttendanceManager: React.FC<CellAttendanceManagerProps> = ({
+  user,
+  allMembers, // [추가]
+}) => {
   const [viewMode, setViewMode] = useState<"check" | "log" | "stats">("check");
 
   const tabs: { id: "check" | "log" | "stats"; label: string }[] = [
@@ -18,20 +27,14 @@ const CellAttendanceManager: React.FC<{ user: User }> = ({ user }) => {
     <div className="space-y-4 sm:space-y-6">
       {/* 탭 영역 */}
       <div className="border-b border-gray-200">
-        {/* [수정 1] overflow-x-auto 제거 -> div로 변경하거나 클래스 삭제 */}
         <div>
-          <nav
-            /* [수정 2] min-w-max, space-x-* 제거하고 w-full 추가 */
-            className="-mb-px flex w-full px-1"
-            aria-label="Tabs"
-          >
+          <nav className="-mb-px flex w-full px-1" aria-label="Tabs">
             {tabs.map((tab) => {
               const isActive = viewMode === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setViewMode(tab.id)}
-                  /* [수정 3] flex-1 (균등분할), text-center (중앙정렬), justify-center 추가 */
                   className={`flex-1 text-center justify-center whitespace-nowrap border-b-2 font-medium 
                     text-xs sm:text-sm
                     py-2 sm:py-3 px-1
@@ -49,11 +52,20 @@ const CellAttendanceManager: React.FC<{ user: User }> = ({ user }) => {
         </div>
       </div>
 
-      {/* 콘텐츠 영역 */}
+      {/* 콘텐츠 영역 - [수정] 하위 뷰에 allMembers 전달 */}
       <div className="mt-4 sm:mt-8">
-        {viewMode === "check" && <TakeAttendanceView user={user} />}
-        {viewMode === "log" && <AttendanceLogView user={user} />}
-        {viewMode === "stats" && <AttendanceStatisticsView user={user} />}
+        {viewMode === "check" && (
+          // @ts-ignore: 하위 컴포넌트 수정 전 임시 처리
+          <TakeAttendanceView user={user} allMembers={allMembers} />
+        )}
+        {viewMode === "log" && (
+          // @ts-ignore: 하위 컴포넌트 수정 전 임시 처리
+          <AttendanceLogView user={user} allMembers={allMembers} />
+        )}
+        {viewMode === "stats" && (
+          // @ts-ignore: 하위 컴포넌트 수정 전 임시 처리
+          <AttendanceStatisticsView user={user} allMembers={allMembers} />
+        )}
       </div>
     </div>
   );

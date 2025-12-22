@@ -57,26 +57,31 @@ const InfoCard: React.FC<{
 }> = ({ title, children, actions, className }) => (
   <div className={`bg-white shadow overflow-hidden sm:rounded-lg ${className}`}>
     <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
-      <h3 className="text-lg leading-6 font-medium text-gray-900">{title}</h3>
+      <h3 className="text-lg leading-6 font-medium text-gray-900 break-keep">
+        {title}
+      </h3>
       {actions}
     </div>
-    <div className="border-t border-gray-200 px-4 py-5 sm:p-0">{children}</div>
+    <div className="border-t border-gray-200">{children}</div>
   </div>
 );
 
+// [수정] 모바일: 상하 배치 / 데스크탑: 좌우 배치 (Grid)
 const InfoDl: React.FC<{ items: { dt: string; dd: React.ReactNode }[] }> = ({
   items,
 }) => (
-  <dl className="sm:divide-y sm:divide-gray-200">
+  <dl className="divide-y divide-gray-200">
     {items.map((item, index) => (
       <div
         key={index}
-        className={`py-3 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 ${
+        className={`px-4 py-3 sm:px-6 flex flex-col sm:grid sm:grid-cols-3 sm:gap-4 ${
           index % 2 === 0 ? "bg-gray-50" : "bg-white"
         }`}
       >
-        <dt className="text-sm font-medium text-gray-500">{item.dt}</dt>
-        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+        <dt className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-0">
+          {item.dt}
+        </dt>
+        <dd className="text-sm text-gray-900 sm:col-span-2 break-keep">
           {item.dd}
         </dd>
       </div>
@@ -96,9 +101,9 @@ const BasicInfoCard: React.FC<{
       isCurrentUser && (
         <button
           onClick={onEditProfile}
-          className="px-3 py-1 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+          className="px-3 py-1 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 whitespace-nowrap"
         >
-          내 프로필 수정
+          수정
         </button>
       )
     }
@@ -159,9 +164,9 @@ const TeamsCard: React.FC<{
       canManage && (
         <button
           onClick={onManageClick}
-          className="text-sm text-indigo-600 hover:text-indigo-800"
+          className="text-sm text-indigo-600 hover:text-indigo-800 whitespace-nowrap"
         >
-          + 팀 관리
+          + 관리
         </button>
       )
     }
@@ -173,7 +178,7 @@ const TeamsCard: React.FC<{
             <Link
               key={t.id}
               to={`/admin/teams/${t.id}`}
-              className="px-2 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full hover:bg-blue-200 transition-colors"
+              className="px-2.5 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full hover:bg-blue-200 transition-colors"
             >
               {t.name}
             </Link>
@@ -189,7 +194,7 @@ const TeamsCard: React.FC<{
 // --- 기도제목 카드 ---
 const PrayersCard: React.FC<{ prayers: PrayerDto[] }> = ({ prayers }) => (
   <InfoCard title={`기도제목 (${prayers.length})`}>
-    <div className="border-t border-gray-200 max-h-96 overflow-y-auto">
+    <div className="max-h-96 overflow-y-auto">
       {prayers.length > 0 ? (
         <ul className="divide-y divide-gray-200">
           {prayers.map((p) => (
@@ -198,7 +203,7 @@ const PrayersCard: React.FC<{ prayers: PrayerDto[] }> = ({ prayers }) => (
               className="px-4 py-4 hover:bg-gray-50 transition-colors"
             >
               <Link to={`/admin/prayers/${p.id}`} className="block">
-                <p className="text-sm text-gray-800 hover:text-indigo-600 font-medium transition-colors">
+                <p className="text-sm text-gray-800 hover:text-indigo-600 font-medium transition-colors break-keep">
                   {p.content}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
@@ -222,14 +227,10 @@ const AttendanceSummaryCard: React.FC<{
   summary: MemberAttendanceSummaryDto | null;
   memberId: number;
   memberName: string;
-
-  // 🔽 날짜 기준 3대장 (우선순위: 셀배정일 > 가입일 > 가입연도)
   cellAssignmentDate?: string;
   memberJoinDate?: string;
   memberJoinYear?: number;
-
   attendances: AttendanceDto[];
-  // 컨트롤 Props
   semesters: SemesterDto[];
   activeSemester: SemesterDto | null;
   onSemesterChange: (id: number) => void;
@@ -261,7 +262,6 @@ const AttendanceSummaryCard: React.FC<{
 }) => {
   const totalSummary = summary?.totalSummary;
 
-  // 학기 내 월 리스트 계산
   const semesterMonths = useMemo(() => {
     if (!activeSemester) return [];
     const s = new Date(activeSemester.startDate);
@@ -276,40 +276,31 @@ const AttendanceSummaryCard: React.FC<{
     return months;
   }, [activeSemester]);
 
-  // 🔴 [핵심 로직] 미체크 카운트 (셀 배정일 우선 정책 + Set 대조)
   const uncheckedCount = useMemo(() => {
     if (!startDate || !endDate) return 0;
-
     const filterStart = new Date(startDate);
     const filterEnd = new Date(endDate);
     filterStart.setHours(0, 0, 0, 0);
     filterEnd.setHours(23, 59, 59, 999);
 
-    // 1. 기준일(Base Date) 결정
     let baseDate: Date;
     if (cellAssignmentDate) {
-      baseDate = new Date(cellAssignmentDate); // 1순위
+      baseDate = new Date(cellAssignmentDate);
     } else if (memberJoinDate) {
-      baseDate = new Date(memberJoinDate); // 2순위
+      baseDate = new Date(memberJoinDate);
     } else if (memberJoinYear) {
-      baseDate = new Date(memberJoinYear, 0, 1); // 3순위
+      baseDate = new Date(memberJoinYear, 0, 1);
     } else {
       baseDate = new Date("2000-01-01");
     }
     baseDate.setHours(0, 0, 0, 0);
 
-    // 2. 유효 시작일 = Max(조회 시작일, 기준일)
-    // (셀 배정/가입 이전 날짜는 계산 제외)
     const effectiveStart = filterStart < baseDate ? baseDate : filterStart;
-
-    // 유효 시작일이 조회 종료일보다 미래라면(아직 셀 배정 안 됨 등) 미체크 0
     if (effectiveStart > filterEnd) return 0;
 
-    // 3. "체크해야 할 일요일" 목록 생성 (Set)
     const targetSundays = new Set<string>();
     const current = new Date(effectiveStart);
 
-    // 시작일 다음 첫 일요일 찾기
     if (current.getDay() !== 0) {
       current.setDate(current.getDate() + (7 - current.getDay()));
     }
@@ -319,16 +310,13 @@ const AttendanceSummaryCard: React.FC<{
       current.setDate(current.getDate() + 7);
     }
 
-    // 4. "실제 기록된 날짜" 목록 생성 (Set)
     const recordedDates = new Set<string>();
     attendances.forEach((att) => {
-      // 출석 또는 결석 상태만 인정
       if ((att.status === "PRESENT" || att.status === "ABSENT") && att.date) {
         recordedDates.add(att.date.substring(0, 10));
       }
     });
 
-    // 5. 차집합 계산 (해야 하는데 안 한 날)
     let missingCount = 0;
     targetSundays.forEach((sunday) => {
       if (!recordedDates.has(sunday)) {
@@ -346,87 +334,90 @@ const AttendanceSummaryCard: React.FC<{
     attendances,
   ]);
 
-  // 날짜 포맷팅 헬퍼
   const formatDate = (dateStr: string) => dateStr.replace(/-/g, ".");
 
   return (
     <InfoCard title="출석 요약 & 현황">
-      <div className="p-4 space-y-6">
+      <div className="p-4 sm:p-6 space-y-6">
         {/* --- 컨트롤 패널 --- */}
-        <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            {/* 학기 선택 */}
-            <div className="flex items-center gap-2">
-              <div className="flex items-center bg-white px-3 py-1.5 rounded-md border border-gray-300 shadow-sm">
-                <FaCalendarAlt className="text-indigo-500 mr-2 text-sm" />
-                <select
-                  value={activeSemester?.id || ""}
-                  onChange={(e) => onSemesterChange(Number(e.target.value))}
-                  className="bg-transparent text-gray-700 font-semibold text-sm focus:outline-none cursor-pointer min-w-[120px]"
-                >
-                  {semesters.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* 보기 모드 버튼 */}
-            <div className="flex gap-1 bg-gray-200 p-1 rounded-lg self-start sm:self-auto">
-              <button
-                onClick={() => onUnitTypeChange("month")}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                  unitType === "month"
-                    ? "bg-white text-indigo-700 shadow ring-1 ring-black/5"
-                    : "text-gray-500 hover:bg-gray-300"
-                }`}
-              >
-                월별 보기
-              </button>
-              <button
-                onClick={() => onUnitTypeChange("semester")}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                  unitType === "semester"
-                    ? "bg-white text-indigo-700 shadow ring-1 ring-black/5"
-                    : "text-gray-500 hover:bg-gray-300"
-                }`}
-              >
-                학기 전체
-              </button>
-            </div>
-          </div>
-
-          {/* 월 선택 (월별 보기일 때만) */}
-          {unitType === "month" && activeSemester && (
-            <div className="animate-fadeIn">
-              <span className="text-xs font-bold text-gray-500 block mb-2">
-                {activeSemester.name} 상세 월 선택:
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {semesterMonths.map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => onMonthSelect(m)}
-                    className={`px-3 py-1.5 text-xs rounded-full border transition-all ${
-                      selectedMonth === m
-                        ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-300"
-                        : "bg-white text-gray-600 border-gray-200 hover:bg-gray-100"
-                    }`}
+        <div className="bg-gray-50 p-3 sm:p-4 rounded-xl border border-gray-100 flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
+            {/* 1행: 학기 선택 + 보기 모드 버튼 */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="relative w-full sm:w-auto">
+                <div className="flex items-center bg-white px-3 py-2 rounded-md border border-gray-300 shadow-sm w-full sm:w-auto">
+                  <FaCalendarAlt className="text-indigo-500 mr-2 text-sm flex-shrink-0" />
+                  <select
+                    value={activeSemester?.id || ""}
+                    onChange={(e) => onSemesterChange(Number(e.target.value))}
+                    className="bg-transparent text-gray-700 font-semibold text-sm focus:outline-none cursor-pointer w-full sm:min-w-[140px]"
                   >
-                    {m}월
-                  </button>
-                ))}
+                    {semesters.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* 보기 모드 (모바일: 꽉 찬 버튼) */}
+              <div className="flex bg-gray-200 p-1 rounded-lg w-full sm:w-auto">
+                <button
+                  onClick={() => onUnitTypeChange("month")}
+                  className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-medium rounded-md transition-all whitespace-nowrap ${
+                    unitType === "month"
+                      ? "bg-white text-indigo-700 shadow ring-1 ring-black/5"
+                      : "text-gray-500 hover:bg-gray-300"
+                  }`}
+                >
+                  월별 보기
+                </button>
+                <button
+                  onClick={() => onUnitTypeChange("semester")}
+                  className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-medium rounded-md transition-all whitespace-nowrap ${
+                    unitType === "semester"
+                      ? "bg-white text-indigo-700 shadow ring-1 ring-black/5"
+                      : "text-gray-500 hover:bg-gray-300"
+                  }`}
+                >
+                  학기 전체
+                </button>
               </div>
             </div>
-          )}
+
+            {/* 2행: 월 선택 (가로 스크롤 적용) */}
+            {unitType === "month" && activeSemester && (
+              <div className="animate-fadeIn mt-1">
+                <span className="text-xs font-bold text-gray-500 block mb-2 px-1">
+                  {activeSemester.name} 상세 월 선택:
+                </span>
+                <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x">
+                  {semesterMonths.map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => onMonthSelect(m)}
+                      className={`flex-shrink-0 px-3 py-1.5 text-xs rounded-full border transition-all snap-start ${
+                        selectedMonth === m
+                          ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-300"
+                          : "bg-white text-gray-600 border-gray-200 hover:bg-gray-100"
+                      }`}
+                    >
+                      {m}월
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* 실제 기간 표시 */}
           <div className="flex items-center justify-end text-xs text-gray-500 border-t border-gray-200 pt-3 mt-1">
             <FaClock className="mr-1.5 text-gray-400" />
-            <span className="font-medium">실제 조회 기간:</span>
-            <span className="ml-2 font-mono bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700">
+            <span className="font-medium whitespace-nowrap mr-2">
+              조회 기간:
+            </span>
+            <span className="font-mono bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700 truncate">
               {formatDate(startDate)} ~ {formatDate(endDate)}
             </span>
           </div>
@@ -434,37 +425,37 @@ const AttendanceSummaryCard: React.FC<{
 
         {/* --- 통계 요약 (4칸 그리드) --- */}
         {totalSummary ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center border-t border-b py-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-center border-t border-b py-4">
             <div className="p-3 bg-indigo-50 rounded-lg">
-              <p className="text-xs sm:text-sm font-medium text-indigo-500">
+              <p className="text-xs sm:text-sm font-medium text-indigo-500 break-keep">
                 출석률
               </p>
-              <p className="mt-1 text-2xl sm:text-3xl font-semibold text-indigo-600">
+              <p className="mt-1 text-xl sm:text-3xl font-semibold text-indigo-600">
                 {totalSummary.attendanceRate.toFixed(0)}
-                <span className="text-lg">%</span>
+                <span className="text-sm sm:text-lg">%</span>
               </p>
             </div>
             <div className="p-3 bg-green-50 rounded-lg">
-              <p className="text-xs sm:text-sm font-medium text-green-600">
+              <p className="text-xs sm:text-sm font-medium text-green-600 break-keep">
                 출석
               </p>
-              <p className="mt-1 text-2xl sm:text-3xl font-semibold text-green-700">
+              <p className="mt-1 text-xl sm:text-3xl font-semibold text-green-700">
                 {totalSummary.totalPresent}
               </p>
             </div>
             <div className="p-3 bg-red-50 rounded-lg">
-              <p className="text-xs sm:text-sm font-medium text-red-600">
+              <p className="text-xs sm:text-sm font-medium text-red-600 break-keep">
                 결석
               </p>
-              <p className="mt-1 text-2xl sm:text-3xl font-semibold text-red-700">
+              <p className="mt-1 text-xl sm:text-3xl font-semibold text-red-700">
                 {totalSummary.totalAbsent}
               </p>
             </div>
             <div className="p-3 bg-gray-100 rounded-lg">
-              <p className="text-xs sm:text-sm font-medium text-gray-500">
+              <p className="text-xs sm:text-sm font-medium text-gray-500 break-keep">
                 미체크
               </p>
-              <p className="mt-1 text-2xl sm:text-3xl font-semibold text-gray-600">
+              <p className="mt-1 text-xl sm:text-3xl font-semibold text-gray-600">
                 {uncheckedCount}
               </p>
             </div>
@@ -477,7 +468,7 @@ const AttendanceSummaryCard: React.FC<{
 
         {/* 출석 매트릭스 */}
         <div className="pt-2">
-          <h4 className="text-sm font-medium text-gray-700 mb-3 ml-1">
+          <h4 className="text-sm font-medium text-gray-700 mb-3 ml-1 break-keep">
             {unitType === "semester"
               ? `[${activeSemester?.name}] 전체 현황`
               : `${selectedMonth}월 상세 현황 (학기 교집합)`}
@@ -488,7 +479,6 @@ const AttendanceSummaryCard: React.FC<{
             endDate={endDate}
             year={new Date(startDate).getFullYear()}
             month={new Date(startDate).getMonth() + 1}
-            // ✅ 매트릭스 이동 핸들러 연결
             onMonthChange={onMatrixMonthChange}
             members={[{ memberId, memberName }]}
             attendances={attendances}
@@ -509,7 +499,7 @@ const AdminActionsCard: React.FC<{
 }> = ({ onResetPassword, isResetting }) => (
   <InfoCard title="관리자 도구" className="border-l-4 border-red-500">
     <div className="p-6">
-      <p className="text-sm text-gray-600 mb-4">
+      <p className="text-sm text-gray-600 mb-4 break-keep">
         주의: 아래 버튼은 사용자 계정에 직접적인 영향을 미칩니다.
       </p>
       <button
@@ -551,7 +541,9 @@ const TeamManagementModal: React.FC<{
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
       <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg">
-        <h2 className="text-xl font-bold mb-4">{memberName}님의 팀 관리</h2>
+        <h2 className="text-xl font-bold mb-4 break-keep">
+          {memberName}님의 팀 관리
+        </h2>
         <div className="mb-6 max-h-60 overflow-y-auto">
           <MultiSelect
             options={teamOptions}
@@ -589,15 +581,15 @@ const TempPasswordModal: React.FC<{
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
       <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
-        <h2 className="text-xl font-bold mb-4 text-gray-800">
+        <h2 className="text-xl font-bold mb-4 text-gray-800 break-keep">
           임시 비밀번호 생성 완료
         </h2>
-        <p className="text-sm text-gray-600 mb-4">
+        <p className="text-sm text-gray-600 mb-4 break-keep">
           사용자에게 아래 임시 비밀번호를 전달하고, 로그인 후 즉시 비밀번호를
           변경하도록 안내해주세요.
         </p>
         <div className="p-3 bg-gray-100 rounded-md text-center">
-          <p className="text-lg font-mono font-bold text-indigo-600">
+          <p className="text-lg font-mono font-bold text-indigo-600 break-all">
             {password}
           </p>
         </div>
@@ -661,7 +653,6 @@ const MemberDetailPage: React.FC = () => {
     return Number.isNaN(num) ? null : num;
   }, [id]);
 
-  // [1] 학기 정보 로드 및 초기 설정
   useEffect(() => {
     const loadSemesters = async () => {
       try {
@@ -674,7 +665,6 @@ const MemberDetailPage: React.FC = () => {
 
         if (sortedData.length > 0) {
           const now = new Date();
-          // 현재 월이 포함된 학기 찾기 (없으면 첫 번째 학기)
           const currentSemester = sortedData.find((sem) =>
             isDateInSemesterMonthRange(now, sem)
           );
@@ -684,7 +674,6 @@ const MemberDetailPage: React.FC = () => {
           } else {
             setActiveSemester(sortedData[0]);
           }
-          // 기본값: 학기 전체 보기
           setUnitType("semester");
           setSelectedMonth(null);
         }
@@ -695,7 +684,6 @@ const MemberDetailPage: React.FC = () => {
     loadSemesters();
   }, []);
 
-  // [2] 기간 계산 (computed)
   const periodRange = useMemo(() => {
     if (!activeSemester) return { startDate: "", endDate: "" };
 
@@ -705,11 +693,9 @@ const MemberDetailPage: React.FC = () => {
       return { startDate: semStart, endDate: semEnd };
     }
 
-    // 월별 보기
     let targetYear = new Date(semStart).getFullYear();
     const startMonthIndex = new Date(semStart).getMonth() + 1;
 
-    // 학기가 해를 넘기는 경우 보정
     if (selectedMonth < startMonthIndex) {
       targetYear += 1;
     }
@@ -721,7 +707,6 @@ const MemberDetailPage: React.FC = () => {
       lastDayObj.getDate()
     ).padStart(2, "0")}`;
 
-    // 교집합 계산: 시작일은 늦은 날짜, 종료일은 빠른 날짜
     const finalStart = monthStartStr < semStart ? semStart : monthStartStr;
     const finalEnd = monthEndStr > semEnd ? semEnd : monthEndStr;
 
@@ -731,7 +716,6 @@ const MemberDetailPage: React.FC = () => {
     };
   }, [activeSemester, unitType, selectedMonth]);
 
-  // [3] 핸들러들
   const handleSemesterChange = (semesterId: number) => {
     const target = semesters.find((s) => s.id === semesterId);
     if (target) {
@@ -747,7 +731,6 @@ const MemberDetailPage: React.FC = () => {
       setSelectedMonth(null);
       return;
     }
-    // 월별 보기로 전환 시 스마트 포커싱
     if (activeSemester) {
       const now = new Date();
       if (isDateInSemesterMonthRange(now, activeSemester)) {
@@ -759,22 +742,18 @@ const MemberDetailPage: React.FC = () => {
     }
   };
 
-  // ✅ 매트릭스 월 이동 핸들러
   const handleMatrixMonthChange = useCallback(
     (increment: number) => {
-      // 월별 보기 모드가 아니거나 필수 데이터가 없으면 무시
       if (unitType !== "month" || !activeSemester || !periodRange.startDate)
         return;
 
       const currentStart = new Date(periodRange.startDate);
-      // 목표 날짜(1일) 계산
       const targetDate = new Date(
         currentStart.getFullYear(),
         currentStart.getMonth() + increment,
         1
       );
 
-      // 목표 날짜가 현재 학기 범위 내인지 확인 후 이동
       if (isDateInSemesterMonthRange(targetDate, activeSemester)) {
         setSelectedMonth(targetDate.getMonth() + 1);
       }
@@ -782,7 +761,6 @@ const MemberDetailPage: React.FC = () => {
     [unitType, activeSemester, periodRange.startDate]
   );
 
-  // [4] 데이터 페칭
   const fetchMemberDetails = useCallback(async () => {
     setError(null);
 
@@ -864,7 +842,6 @@ const MemberDetailPage: React.FC = () => {
     }
   }, [member, fetchAttendanceSummary]);
 
-  // [5] 기타 액션 핸들러들
   const handleTeamSave = useCallback(
     async (newTeamIds: number[]) => {
       if (!memberIdNum) return;
@@ -920,35 +897,39 @@ const MemberDetailPage: React.FC = () => {
 
   if (loading && !member)
     return (
-      <p className="mt-4 text-gray-600">
-        로딩 중입니다. 잠시만 기다려 주세요...
-      </p>
+      <div className="flex justify-center items-center min-h-[50vh]">
+        <p className="text-gray-600">로딩 중입니다...</p>
+      </div>
     );
-  if (error) return <p className="mt-4 text-red-600">{error}</p>;
+  if (error) return <div className="p-4 text-red-600 text-center">{error}</div>;
   if (!member)
-    return <p className="mt-4 text-red-600">멤버 정보를 찾을 수 없습니다.</p>;
+    return (
+      <div className="p-4 text-red-600 text-center">
+        멤버 정보를 찾을 수 없습니다.
+      </div>
+    );
 
   const isExecutive = user?.role === "EXECUTIVE";
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 pb-10">
       {/* 상단 타이틀 + 버튼 */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 break-keep">
           {member.name} 상세 정보
         </h1>
-        <div className="flex gap-2 justify-end">
+        <div className="flex gap-2 w-full sm:w-auto">
           {isExecutive && (
             <button
               onClick={() => navigate(`/admin/users/${id}/edit`)}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700"
+              className="flex-1 sm:flex-none bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 text-center whitespace-nowrap"
             >
               수정
             </button>
           )}
           <button
             onClick={() => navigate(-1)}
-            className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-300"
+            className="flex-1 sm:flex-none bg-gray-200 text-gray-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-300 text-center whitespace-nowrap"
           >
             뒤로 가기
           </button>
@@ -974,12 +955,10 @@ const MemberDetailPage: React.FC = () => {
             summary={attendanceSummary}
             memberId={member.id}
             memberName={member.name}
-            // ✅ 날짜 기준 3대장 전달 (셀 배정일 우선)
             cellAssignmentDate={member.cellAssignmentDate}
             memberJoinDate={member.createdAt}
             memberJoinYear={member.joinYear}
             attendances={attendanceList}
-            // 컨트롤 Props 전달
             semesters={semesters}
             activeSemester={activeSemester}
             onSemesterChange={handleSemesterChange}
@@ -987,9 +966,7 @@ const MemberDetailPage: React.FC = () => {
             onUnitTypeChange={handleUnitTypeChange}
             selectedMonth={selectedMonth}
             onMonthSelect={setSelectedMonth}
-            // ✅ 이동 핸들러 전달
             onMatrixMonthChange={handleMatrixMonthChange}
-            // 계산된 기간
             startDate={periodRange.startDate}
             endDate={periodRange.endDate}
           />
