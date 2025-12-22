@@ -214,7 +214,7 @@ const LoginPage: React.FC = () => {
               to="/register"
               className="font-medium text-indigo-600 hover:text-indigo-500"
             >
-              회원가입
+              회원가입 (추후 삭제 예정)
             </Link>
           </p>
         </div>
