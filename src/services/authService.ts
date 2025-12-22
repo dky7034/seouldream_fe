@@ -10,7 +10,12 @@ import type {
   UserRole,
 } from "../types";
 
-const API_BASE_URL = "http://localhost:8080/api";
+// ✅ 환경에 따라 주소가 자동으로 바뀝니다!
+// PROD(배포상태)일 땐 "https://nextdream.store/api" 사용
+// DEV(개발상태)일 땐 "/api" (Vite의 Proxy 설정을 타서 localhost:8080으로 연결됨)
+const API_BASE_URL = import.meta.env.PROD
+  ? "https://nextdream.store/api"
+  : "/api";
 
 // Use a separate axios instance for refresh to avoid interceptor loops
 const refreshAxiosInstance = axios.create({
