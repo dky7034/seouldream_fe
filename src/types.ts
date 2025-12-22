@@ -1,0 +1,814 @@
+// As per the backend's CreateMemberRequest DTO
+export interface CreateMemberRequest {
+  name: string;
+  gender: string;
+  birthDate: string;
+  phone: string;
+  email: string;
+  cellId?: number;
+  role: string;
+  joinYear: number;
+  address?: string;
+  note?: string;
+  username: string;
+  password: string;
+}
+
+// 공통 Role 타입
+export type UserRole = "EXECUTIVE" | "CELL_LEADER" | "MEMBER";
+
+export interface CellShortDto {
+  id: number;
+  name: string;
+}
+
+export interface MemberDto {
+  id: number;
+  name: string;
+  username: string; // Added for user management display
+  gender: "MALE" | "FEMALE";
+  birthDate: string; // LocalDate
+  age: number;
+  phone: string;
+  email: string;
+  cell: {
+    id: number;
+    name: string;
+  } | null;
+  cellAssignmentDate?: string; // 추가: YYYY-MM-DD 형식의 문자열
+  role: UserRole;
+  joinYear: number;
+  active: boolean;
+  address: string;
+  note: string;
+  createdAt: string; // LocalDateTime
+  updatedAt: string; // LocalDateTime
+}
+
+// Assuming JWT payload structure from Spring Security JWT
+export interface JwtPayload {
+  userId: number; // The ID of the user
+  memberId: number | null; // The ID of the corresponding member, can be null
+  sub: string; // The username (subject)
+  name: string; // Added name field
+  role: UserRole;
+  exp: number; // Expiration time
+  iat: number; // Issued at time
+  cellId: number | null; // Add cellId to JWT payload, can be null
+  cellName: string | null; // Add cellName to JWT payload, can be null
+}
+
+// Response from the login endpoint
+export interface JwtAuthenticationResponse {
+  accessToken: string;
+  refreshToken: string;
+  tokenType: string;
+  userId: number;
+  role: UserRole;
+  name: string;
+  cellId: number | null;
+  cellName: string | null; // Add cellName to JwtAuthenticationResponse
+  memberId: number | null;
+}
+
+// User object to be stored in localStorage
+export interface User {
+  id: number;
+  memberId: number | null;
+  username: string;
+  name: string;
+  role: UserRole; // ✅ string → UserRole
+  cellId: number | null;
+  cellName: string | null;
+}
+
+export interface UpdateMemberRequest {
+  name?: string;
+  gender?: "MALE" | "FEMALE";
+  birthDate?: string;
+  phone?: string;
+  email?: string;
+  cellId?: number;
+  role?: UserRole;
+  joinYear?: number;
+  active?: boolean;
+  address?: string;
+  note?: string;
+}
+
+export interface UpdateMyProfileRequest {
+  phone?: string;
+  email?: string;
+  address?: string;
+  note?: string;
+}
+
+export interface TeamDto {
+  id: number;
+  name: string;
+  code: string;
+  description?: string;
+  active: boolean;
+  memberCount?: number; // Added to display member count in AdminTeamsPage
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTeamRequest {
+  name: string;
+  description?: string;
+  active?: boolean;
+}
+
+export interface UpdateTeamRequest {
+  name?: string;
+  code?: string;
+  description?: string;
+  active?: boolean;
+}
+
+export interface CellMemberInfo {
+  id: number;
+  name: string;
+  gender: "MALE" | "FEMALE";
+  birthDate: string;
+}
+
+export interface CellDto {
+  id: number;
+  name: string;
+  leader: CellMemberInfo | null;
+  viceLeader: CellMemberInfo | null;
+  description?: string;
+  active: boolean;
+  memberCount: number;
+  maleCount: number;
+  femaleCount: number;
+  members: MemberDto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ✅ [신규] 셀 보고서 조회 응답 DTO
+export interface CellReportDto {
+  meetingDate: string; // LocalDate (YYYY-MM-DD)
+  cellShare: string;
+  specialNotes: string;
+}
+
+export interface CreateCellRequest {
+  name: string;
+  leaderId?: number;
+  viceLeaderId?: number;
+  description?: string;
+  memberIds?: number[]; // Added to support multiple members on cell creation
+}
+
+export interface UpdateCellRequest {
+  name?: string;
+  leaderId?: number;
+  viceLeaderId?: number | null;
+  description?: string;
+  active?: boolean;
+}
+
+export type AttendanceStatus = "PRESENT" | "ABSENT";
+
+export interface AttendanceMemberInfo {
+  id: number;
+  name: string;
+}
+
+export interface AttendanceUserInfo {
+  id: number;
+  username: string;
+  name: string; // Added name field
+}
+
+export interface AttendanceDto {
+  id: number;
+  member: AttendanceMemberInfo;
+  cell?: CellShortDto;
+  date: string; // LocalDate
+  status: AttendanceStatus;
+  memo?: string;
+  prayerContent?: string; // ✅ [추가] 저장된 기도제목
+  createdBy: AttendanceUserInfo;
+  createdAt: string; // LocalDateTime
+}
+
+export interface ProcessAttendanceRequest {
+  memberId: number;
+  date: string; // LocalDate
+  status: AttendanceStatus;
+  memo?: string;
+  createdById: number;
+}
+
+// 1. [수정] 통합 저장 요청 DTO: 셀 보고서 필드 추가 및 meetingDate 최상위 이동
+export interface ProcessAttendanceWithPrayersRequest {
+  meetingDate: string; // LocalDate (YYYY-MM-DD) - 모든 아이템에 공통 적용
+  cellShare: string; // [신규] 셀 은혜나눔
+  specialNotes?: string; // [신규] 특이사항 (선택)
+  items: AttendanceAndPrayerItem[];
+}
+
+// 2. [수정] 개별 아이템: date 필드 제거 (상위 meetingDate 사용)
+export interface AttendanceAndPrayerItem {
+  memberId: number;
+  // date: string; // -> 제거됨
+  status: AttendanceStatus;
+  memo?: string;
+  prayerContent?: string; // 값이 비어있으면 백엔드는 저장하지 않음
+}
+
+export type AttendanceSummaryGroupBy =
+  | "YEAR"
+  | "HALF_YEAR"
+  | "QUARTER"
+  | "MONTH"
+  | "WEEK"
+  | "DAY"
+  | "SEMESTER";
+
+export interface AttendanceSummaryQueryParams {
+  startDate?: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD
+  groupBy?: AttendanceSummaryGroupBy;
+  year?: number;
+  month?: number;
+  quarter?: number;
+  half?: number;
+}
+
+export interface SimpleAttendanceRateDto {
+  targetId: number | null;
+  targetName: string;
+  attendanceRate: number;
+  presentCount: number;
+  absentCount: number;
+  totalDays: number;
+  startDate: string;
+  endDate: string;
+}
+
+// New interface for overall attendance statistics, matching backend OverallAttendanceStatDto
+export interface OverallAttendanceStatDto {
+  totalRecords: number;
+  attendanceRate: number;
+}
+
+export interface TotalSummaryDto {
+  totalPresent: number;
+  totalAbsent: number;
+  totalMembersInPeriod: number;
+  totalRecordedDates: number;
+  attendanceRate: number;
+}
+
+export interface MemberTotalSummaryDto {
+  totalPresent: number;
+  totalAbsent: number;
+  totalRecordedDates: number;
+  totalPossibleAttendances: number;
+  attendanceRate: number;
+}
+
+export interface PeriodSummaryDto {
+  dateGroup: string;
+  totalPresent: number;
+  totalAbsent: number;
+  totalMembers: number;
+  attendanceRate: number;
+}
+
+export interface OverallAttendanceSummaryDto {
+  periodSummaries: PeriodSummaryDto[];
+  totalSummary: TotalSummaryDto;
+}
+
+export interface CellAttendanceSummaryDto {
+  cellId: number;
+  cellName: string;
+  periodSummaries: PeriodSummaryDto[];
+  totalSummary: TotalSummaryDto;
+}
+
+export interface MemberPeriodSummaryDto {
+  dateGroup: string;
+  status?: AttendanceStatus;
+  memo?: string;
+  presentCount?: number;
+  absentCount?: number;
+}
+
+export interface MemberAttendanceSummaryDto {
+  memberId: number;
+  memberName: string;
+  periodSummaries: MemberPeriodSummaryDto[];
+  totalSummary: MemberTotalSummaryDto;
+}
+
+export interface MemberAlertDto {
+  memberId: number;
+  memberName: string;
+  cellName: string;
+  lastAttendanceDate: string; // LocalDate
+  consecutiveAbsences: number;
+}
+
+export interface IncompleteCheckReportDto {
+  leaderId: number;
+  leaderName: string;
+  cellId: number;
+  cellName: string;
+  missedDatesCount: number;
+  missedDates: string[];
+}
+
+// ✅ NEW: 셀 멤버별 출석 요약 DTO
+export interface CellMemberAttendanceSummaryDto {
+  memberId: number;
+  memberName: string;
+  gender: Gender; // "MALE" | "FEMALE"
+  birthDate: string; // LocalDate (YYYY-MM-DD)
+  joinYear: number;
+  active: boolean;
+  lastAttendanceDate: string | null; // 최근 PRESENT 날짜, 없으면 null
+  consecutiveAbsences: number; // 최근 출석 이후 연속 결석 횟수
+  cellAssignmentDate?: string;
+}
+
+// Updated interface for aggregated attendance trend data, renamed from TrendItemDto
+export interface AggregatedTrendDto {
+  dateGroup: string; // Changed from 'date' to 'dateGroup'
+  totalRecords: number;
+  presentRecords: number;
+  attendanceRate: number;
+}
+
+export type PrayerVisibility = "PRIVATE" | "CELL" | "ALL";
+
+export interface PrayerMemberInfo {
+  id: number;
+  name: string;
+  cell?: {
+    id: number;
+  };
+}
+
+export interface PrayerUserInfo {
+  id: number;
+  username: string;
+  name: string; // Added name field
+}
+
+export interface PrayerDto {
+  id: number;
+  member: PrayerMemberInfo;
+  content: string;
+  weekOfMonth?: number;
+  visibility: PrayerVisibility;
+  isDeleted: boolean;
+  deletedAt?: string; // LocalDateTime
+  createdBy: PrayerUserInfo;
+  createdAt: string; // LocalDateTime
+  updatedAt: string; // LocalDateTime
+}
+
+/**
+ * EXECUTIVE용 멤버별 기도제목 요약
+ * GET /api/admin/prayers/summary/members 응답 DTO
+ */
+export interface PrayerMemberSummaryDto {
+  memberId: number;
+  memberName: string;
+  cellId: number | null;
+  cellName: string | null;
+  totalCount: number;
+  latestCreatedAt: string; // LocalDateTime
+}
+
+/**
+ * EXECUTIVE용 셀별 기도제목 요약
+ * GET /api/admin/prayers/summary/cells 응답 DTO
+ */
+export interface PrayerCellSummaryDto {
+  cellId: number;
+  cellName: string;
+  totalCount: number;
+  latestCreatedAt: string; // LocalDateTime
+}
+
+export interface CreatePrayerRequest {
+  memberId: number;
+  content: string;
+  weekOfMonth?: number;
+  visibility: PrayerVisibility;
+  createdById: number;
+}
+
+export interface UpdatePrayerRequest {
+  content?: string;
+  weekOfMonth?: number;
+  createdAt?: string;
+  visibility?: PrayerVisibility;
+}
+
+export interface PrayerFormErrors {
+  memberId?: string;
+  content?: string;
+  weekOfMonth?: string;
+  visibility?: string;
+  createdById?: string;
+  submit?: string;
+  createdAt?: string;
+}
+
+export type NoticeTarget = "ALL" | "CELL_LEADER" | "EXECUTIVE" | "CELL";
+
+export interface NoticeCellInfo {
+  id: number;
+  name: string;
+}
+
+export interface NoticeUserInfo {
+  id: number;
+  username: string;
+  name: string; // Added name field
+}
+
+export interface NoticeDto {
+  id: number;
+  title: string;
+  content: string;
+  target: NoticeTarget;
+  targetCell: NoticeCellInfo | null;
+  pinned: boolean;
+  publishAt?: string; // LocalDateTime
+  expireAt?: string; // LocalDateTime
+  isDeleted: boolean;
+  createdBy: NoticeUserInfo;
+  createdAt: string; // LocalDateTime
+  updatedAt: string; // LocalDateTime
+}
+
+export interface CreateNoticeRequest {
+  title: string;
+  content: string;
+  target: NoticeTarget;
+  targetCellId?: number;
+  pinned?: boolean;
+  publishAt?: string; // LocalDateTime
+  expireAt?: string; // LocalDateTime
+  createdById: number;
+}
+
+export interface UpdateNoticeRequest {
+  title?: string;
+  content?: string;
+  target?: NoticeTarget;
+  targetCellId?: number;
+  pinned?: boolean;
+  publishAt?: string; // LocalDateTime
+  expireAt?: string; // LocalDateTime
+}
+
+export interface NoticeFormErrors {
+  title?: string;
+  content?: string;
+  target?: string;
+  targetCellId?: string;
+  pinned?: string;
+  publishAt?: string;
+  expireAt?: string;
+  createdById?: string;
+  submit?: string;
+}
+
+export type SuggestionType = "DIFFICULTY" | "REQUEST" | "OTHER";
+export type SuggestionStatus = "PENDING" | "IN_PROGRESS" | "RESOLVED";
+
+export type Gender = "MALE" | "FEMALE";
+export type GroupBy = "DAY" | "WEEK" | "MONTH";
+export type UserStatus = "ACTIVE" | "INACTIVE" | "DELETED";
+
+export interface SuggestionCellInfo {
+  id: number;
+  name: string;
+}
+
+export interface SuggestionUserInfo {
+  id: number;
+  username: string;
+  name: string; // Added name field
+}
+
+export interface SuggestionStatusHistoryDto {
+  id: number;
+  fromStatus: SuggestionStatus;
+  toStatus: SuggestionStatus;
+  changedBy: SuggestionUserInfo;
+  changedAt: string; // LocalDateTime
+  note?: string;
+}
+
+export interface SuggestionDto {
+  id: number;
+  cell: SuggestionCellInfo;
+  type: SuggestionType;
+  content: string;
+  status: SuggestionStatus;
+  response?: string;
+  handledBy: SuggestionUserInfo | null;
+  createdBy: SuggestionUserInfo;
+  statusHistories: SuggestionStatusHistoryDto[];
+  createdAt: string; // LocalDateTime
+  updatedAt: string; // LocalDateTime
+}
+
+export interface CreateSuggestionRequest {
+  cellId: number;
+  type: SuggestionType;
+  content: string;
+  createdById: number;
+}
+
+export interface UpdateSuggestionRequest {
+  status: SuggestionStatus;
+  response?: string;
+  handledById?: number;
+  historyNote?: string;
+}
+
+export interface Page<T> {
+  content: T[];
+  pageable: {
+    pageNumber: number;
+    pageSize: number;
+    sort: {
+      sorted: boolean;
+      unsorted: boolean;
+      empty: boolean;
+    };
+    offset: number;
+    paged: boolean;
+    unpaged: boolean;
+  };
+  totalPages: number;
+  totalElements: number;
+  last: boolean;
+  size: number;
+  number: number;
+  sort: {
+    sorted: boolean;
+    unsorted: boolean;
+    empty: boolean;
+  };
+  numberOfElements: number;
+  first: boolean;
+  empty: boolean;
+}
+
+export interface SuggestionFormErrors {
+  cellId?: string;
+  type?: string;
+  content?: string;
+  status?: string;
+  response?: string;
+  handledById?: number;
+  historyNote?: string;
+  createdById?: string;
+  submit?: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword?: string;
+  newPassword?: string;
+  confirmPassword?: string;
+}
+
+export interface PasswordVerificationRequest {
+  password?: string;
+}
+
+export interface BirthdayInfo {
+  memberId: number;
+  memberName: string;
+  birthDate: string; // LocalDate
+}
+
+export interface RecentPrayerInfo {
+  prayerId: number;
+  memberId: number;
+  memberName: string;
+  content: string;
+  createdAt: string; // LocalDateTime
+}
+
+export interface RecentNoticeInfo {
+  noticeId: number;
+  title: string;
+  createdAt: string; // LocalDateTime
+  pinned: boolean; // Add this field
+}
+
+export interface CellLeaderDashboardDto {
+  presentRecords: number;
+  totalMembers: number;
+  attendanceRate: number;
+  incompleteCheckCount: number;
+}
+
+export interface AttendanceKeyMetricsDto {
+  thisWeekAttendanceRate: number;
+  periodAverageAttendanceRate: number;
+  lastYearPeriodAttendanceRate: number;
+}
+
+export interface DashboardDto {
+  todayBirthdays: BirthdayInfo[];
+  weeklyBirthdays: BirthdayInfo[];
+  monthlyBirthdays: BirthdayInfo[];
+  totalTodayBirthdays: number;
+  totalWeeklyBirthdays: number;
+  totalMonthlyBirthdays: number;
+  recentPrayers: RecentPrayerInfo[];
+  recentNotices: RecentNoticeInfo[];
+  weeklyPrayerCount: number;
+  weeklyNoticeCount: number;
+  overallAttendanceSummary:
+    | OverallAttendanceSummaryDto
+    | OverallAttendanceStatDto;
+  cellAttendanceSummaries: CellAttendanceSummaryDto[];
+  attendanceKeyMetrics: AttendanceKeyMetricsDto;
+  attendanceTrend?: AggregatedTrendDto[];
+}
+
+export interface MyProfileFormErrors {
+  name?: string;
+  gender?: string;
+  birthDate?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  note?: string;
+  currentPassword?: string;
+  newPassword?: string;
+  confirmPassword?: string;
+  submit?: string;
+}
+
+export interface AttendanceFormErrors {
+  memberId?: string;
+  date?: string;
+  status?: string;
+  memo?: string;
+  createdById?: string;
+  submit?: string;
+}
+
+export interface CellFormErrors {
+  name?: string;
+  leaderId?: string;
+  viceLeaderId?: string;
+  description?: string;
+  active?: string;
+  submit?: string;
+}
+
+export interface TeamFormErrors {
+  name?: string;
+  description?: string;
+  active?: string;
+  submit?: string;
+}
+
+export interface FormErrors {
+  name?: string;
+  username?: string;
+  password?: string;
+  currentPassword?: string;
+  newPassword?: string;
+  confirmPassword?: string;
+  gender?: string;
+  birthDate?: string;
+  phone?: string;
+  email?: string;
+  cellId?: string;
+  role?: string;
+  joinYear?: string;
+  address?: string;
+  note?: string;
+  submit?: string;
+}
+
+export interface GetAllMembersParams {
+  name?: string;
+  joinYear?: number;
+  gender?: "MALE" | "FEMALE";
+  role?: "EXECUTIVE" | "CELL_LEADER" | "MEMBER";
+  unassigned?: boolean;
+  cellId?: number;
+  page?: number;
+  size?: number;
+  sort?: string;
+  active?: boolean; // Added active filter
+  month?: number;
+}
+
+export interface GetAllTeamsParams {
+  name?: string;
+  code?: string;
+  active?: boolean;
+  page?: number;
+  size?: number;
+  sort?: string;
+}
+
+export interface GetAllCellsParams {
+  name?: string;
+  active?: boolean;
+  page?: number;
+  size?: number;
+  sort?: string;
+  startDate?: string;
+  endDate?: string;
+  year?: number;
+  month?: number;
+  quarter?: number;
+  half?: number;
+}
+
+export interface GetAllNoticesParams {
+  title?: string;
+  target?: NoticeTarget;
+  pinned?: boolean;
+  page?: number;
+  size?: number;
+  sort?: string;
+  startDate?: string;
+  endDate?: string;
+  year?: number;
+  month?: number;
+  quarter?: number;
+  half?: number;
+}
+
+export interface GetPrayersParams {
+  memberId?: number;
+  cellId?: number;
+  createdById?: number;
+  isDeleted?: boolean;
+  visibility?: PrayerVisibility;
+  startDate?: string; // Add startDate for date filtering
+  endDate?: string; // Add endDate for date filtering
+  year?: number;
+  month?: number;
+  quarter?: number;
+  half?: number;
+  page?: number;
+  size?: number;
+  sort?: string;
+}
+
+export interface GetAttendancesParams {
+  page?: number;
+  size?: number;
+  sort?: string;
+  startDate?: string;
+  endDate?: string;
+  cellId?: number;
+  memberId?: number;
+  status?: AttendanceStatus;
+  year?: number;
+  month?: number;
+  quarter?: number;
+  half?: number;
+}
+
+export interface SemesterDto {
+  id: number;
+  name: string;
+  startDate: string; // LocalDate
+  endDate: string; // LocalDate
+  isActive: boolean; // Add isActive field
+}
+
+export interface CreateSemesterRequest {
+  name: string;
+  startDate: string; // LocalDate
+  endDate: string; // LocalDate
+}
+
+export interface UpdateSemesterRequest {
+  name?: string;
+  startDate?: string; // LocalDate
+  endDate?: string; // LocalDate
+  isActive?: boolean; // Add isActive field
+}
+
+export interface OptionType {
+  value: string;
+  label: string;
+}

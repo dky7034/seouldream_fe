@@ -1,0 +1,59 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependency directories
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+build/
+
+# Vite build cache
+.vite/
+
+# Local environment variables
+# 절대 git에 올리면 안되는 민감한 정보 (API 키 등)
+.env
+.env.local
+.env.*.local
+
+# 테스트 관련
+coverage/
+.vitest-cache/
+
+# IDE & Editor directories
+# VSCode
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/tasks.json
+.history/
+
+# Webstorm / IntelliJ
+.idea/
+
+# Mac OS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# 기타 캐시 및 시스템 파일
+.npm
+.eslintcache
+*.sw?
+*.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln

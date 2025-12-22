@@ -1,0 +1,125 @@
+/* src/styles/datepicker-tailwind.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* react-datepicker 전체 래퍼 */
+.react-datepicker {
+  @apply border-0 rounded-none shadow-none font-sans;
+}
+
+/* 팝업 컨테이너 */
+.react-datepicker-popper {
+  @apply z-50;
+}
+
+/* 헤더(상단) */
+.react-datepicker__header {
+  @apply bg-white border-b border-gray-200 rounded-none pt-3;
+}
+
+/* 상단 타이틀(2025년 12월 / 2020-2029 / 1997년) */
+.react-datepicker__current-month {
+  @apply text-base font-semibold text-gray-900;
+}
+
+/* 요일 라인 */
+.react-datepicker__day-names {
+  @apply mt-2 border-t border-gray-100 pt-2;
+}
+.react-datepicker__day-name {
+  @apply w-10 leading-10 text-sm font-medium text-gray-700;
+}
+
+/* 날짜 셀 */
+.react-datepicker__week {
+  @apply flex justify-center;
+}
+.react-datepicker__day,
+.react-datepicker__month-text,
+.react-datepicker__year-text {
+  @apply w-10 h-10 leading-10 text-center text-base text-gray-800 rounded-md;
+}
+
+/* 바깥달(회색) */
+.react-datepicker__day--outside-month {
+  @apply text-gray-300;
+}
+
+/* 비활성 */
+.react-datepicker__day--disabled,
+.react-datepicker__month-text--disabled,
+.react-datepicker__year-text--disabled {
+  @apply text-gray-300 cursor-not-allowed;
+}
+
+/* 선택됨(검정 배경 + 흰 글씨) */
+.react-datepicker__day--selected,
+.react-datepicker__month-text--selected,
+.react-datepicker__year-text--selected {
+  @apply bg-black text-white;
+}
+
+/* hover */
+.react-datepicker__day:hover,
+.react-datepicker__month-text:hover,
+.react-datepicker__year-text:hover {
+  @apply bg-gray-100;
+}
+
+/* Today 버튼 (하단 “오늘”) */
+.react-datepicker__today-button {
+  @apply mt-3 py-3 text-base font-semibold text-gray-900 bg-white border-t border-gray-200;
+}
+
+/* =========================================================
+   ✅ 월/연도 그리드 열 고정 (분리)
+   - wrapper div에 rdp-month-3/4, rdp-year-3/4 를 붙여서 제어
+   ========================================================= */
+
+.rdp-month-3 .react-datepicker__month-wrapper,
+.rdp-month-4 .react-datepicker__month-wrapper,
+.rdp-year-3 .react-datepicker__year-wrapper,
+.rdp-year-4 .react-datepicker__year-wrapper {
+  @apply w-full max-w-none mx-auto px-2;
+  display: grid;
+  justify-content: center;
+  gap: 0.5rem; /* gap-2 */
+}
+
+/* 월: 3열/4열 */
+.rdp-month-3 .react-datepicker__month-wrapper {
+  grid-template-columns: repeat(3, 1fr);
+}
+.rdp-month-4 .react-datepicker__month-wrapper {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* 연도: 3열/4열 */
+.rdp-year-3 .react-datepicker__year-wrapper {
+  grid-template-columns: repeat(3, 1fr);
+}
+.rdp-year-4 .react-datepicker__year-wrapper {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* 셀 폭 고정(정렬/터치영역 안정) */
+.rdp-month-3 .react-datepicker__month-text,
+.rdp-month-4 .react-datepicker__month-text,
+.rdp-year-3 .react-datepicker__year-text,
+.rdp-year-4 .react-datepicker__year-text {
+  @apply w-20;
+}
+
+/* ✅ react-datepicker 입력 래퍼가 inline-block이라 폭이 줄어드는 문제 해결 */
+.react-datepicker-wrapper {
+  @apply w-full;
+}
+
+.react-datepicker__input-container {
+  @apply w-full;
+}
+
+.react-datepicker__input-container input {
+  @apply w-full;
+}

@@ -1,0 +1,1 @@
+The pagination now uses a default of 20 items per page. However, I have added a dropdown selector in the filter area that allows you to change the number of items displayed per page to 10, 20, 50, or 100. When you change the page size using this selector, the current page will automatically reset to the first page (page 0) to ensure consistent display of the new page size.
