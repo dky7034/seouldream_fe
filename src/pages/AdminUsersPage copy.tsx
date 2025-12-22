@@ -485,23 +485,18 @@ const AdminUsersPage: React.FC = () => {
                       </div>
 
                       {/* 하단: 액션 버튼 */}
-                      {/* 변경 전: <div className="pt-2 flex justify-end gap-2"> */}
-                      <div className="pt-2 flex justify-end gap-6">
-                        {" "}
-                        {/* gap-2 -> gap-6 (약 24px)로 변경 */}
+                      <div className="pt-2 flex justify-end gap-2">
                         <button
                           onClick={() =>
                             navigate(`/admin/users/${member.id}/edit`)
                           }
-                          // 터치 영역 확보를 위해 px-2 py-1 추가 추천
-                          className="text-[11px] font-medium text-indigo-600 hover:text-indigo-900 px-2 py-1"
+                          className="text-[11px] font-medium text-indigo-600 hover:text-indigo-900"
                         >
                           수정
                         </button>
                         <button
                           onClick={() => handleDelete(member)}
-                          // 터치 영역 확보를 위해 px-2 py-1 추가 추천
-                          className="text-[11px] font-medium text-red-600 hover:text-red-800 px-2 py-1"
+                          className="text-[11px] font-medium text-red-600 hover:text-red-800"
                         >
                           삭제
                         </button>
