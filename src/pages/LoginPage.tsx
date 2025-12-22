@@ -90,7 +90,7 @@ const LoginPage: React.FC = () => {
             D
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-            출석 관리 시스템
+            넥스트드림 출석 관리
           </h1>
           <p className="mt-2 text-xs sm:text-sm text-gray-600">
             출석, 셀원, 기도제목을 한 곳에서 관리하세요.
