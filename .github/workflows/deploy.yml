@@ -47,6 +47,6 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: 22
           source: "dist/*"
-          target: "/var/www/seouldream-fe" # 서버에 배포될 경로 (Nginx root와 일치해야 함)
+          target: "/home/ubuntu/seouldream_be-develop/frontend_build" # Docker가 마운트하고 있는 실제 프로젝트 폴더 경로
           strip_components: 1 # dist 폴더 껍데기를 벗기고 내용물만 전송
           overwrite: true
