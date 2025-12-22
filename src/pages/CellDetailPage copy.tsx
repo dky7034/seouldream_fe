@@ -11,10 +11,16 @@ import { useAuth } from "../hooks/useAuth";
 import ConfirmModal from "../components/ConfirmModal";
 import { formatNameWithBirthdate } from "../utils/memberUtils";
 import AttendanceMatrix from "../components/AttendanceMatrix";
-import KoreanCalendarPicker from "../components/KoreanCalendarPicker"; // ✅ 달력 컴포넌트 임포트
-import { FaCalendarAlt, FaClock } from "react-icons/fa";
+import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
+import {
+  FaCalendarAlt,
+  FaClock,
+  FaChevronDown,
+  FaChevronUp,
+  FaQuoteLeft,
+} from "react-icons/fa";
 
-// ───────────────── AddMemberToCellModal ─────────────────
+// ───────────────── [컴포넌트] AddMemberToCellModal ─────────────────
 const AddMemberToCellModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
@@ -97,7 +103,6 @@ const AddMemberToCellModal: React.FC<{
           현재 어떤 셀에도 속하지 않은 멤버만 목록에 표시됩니다.
         </p>
 
-        {/* 모달 내용 스크롤 영역 */}
         <div className="flex-1 overflow-y-auto mb-4 px-1">
           <input
             type="text"
@@ -192,7 +197,257 @@ const AddMemberToCellModal: React.FC<{
   );
 };
 
-// ───────────────── CellAttendanceMatrixCard ─────────────────
+// ───────────────── [컴포넌트] CellReportHistory (신규 추가) ─────────────────
+// 날짜 하나에 대한 아코디언 아이템 (클릭 시 데이터 로딩)
+const CellReportHistoryItem: React.FC<{
+  cellId: number;
+  date: string; // YYYY-MM-DD (일요일)
+}> = ({ cellId, date }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [reportData, setReportData] = useState<{
+    cellShare: string;
+    specialNotes: string;
+    attendances: AttendanceDto[];
+  } | null>(null);
+
+  const fetchReport = async () => {
+    if (reportData) return; // 이미 데이터가 있으면 다시 부르지 않음
+    setLoading(true);
+    try {
+      // 1. 셀 보고서(나눔, 특이사항) 조회
+      const report = await attendanceService
+        .getCellReport(cellId, date)
+        .catch(() => null);
+
+      // 2. 멤버별 출석/기도제목 조회
+      const attRes = await attendanceService.getAttendances({
+        startDate: date,
+        endDate: date,
+        cellId: cellId,
+        size: 100,
+      });
+
+      setReportData({
+        cellShare: report?.cellShare || "",
+        specialNotes: report?.specialNotes || "",
+        attendances: attRes.content || [],
+      });
+    } catch (e) {
+      console.error("보고서 로딩 실패:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleOpen = () => {
+    if (!isOpen && !reportData) {
+      fetchReport();
+    }
+    setIsOpen(!isOpen);
+  };
+
+  // 데이터가 아예 없는 경우(미입력) 체크
+  const isEmpty =
+    reportData &&
+    !reportData.cellShare &&
+    !reportData.specialNotes &&
+    reportData.attendances.length === 0;
+
+  return (
+    <div className="border border-gray-200 rounded-lg bg-white overflow-hidden mb-3 shadow-sm">
+      {/* 헤더 (날짜 클릭 영역) */}
+      <button
+        onClick={toggleOpen}
+        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <span className="font-bold text-gray-700">{date} (일)</span>
+          {!loading && reportData && (
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full border ${
+                isEmpty
+                  ? "bg-gray-100 text-gray-400 border-gray-200"
+                  : "bg-green-50 text-green-600 border-green-200"
+              }`}
+            >
+              {isEmpty ? "미작성" : "작성됨"}
+            </span>
+          )}
+        </div>
+        <div className="text-gray-400">
+          {isOpen ? <FaChevronUp size={14} /> : <FaChevronDown size={14} />}
+        </div>
+      </button>
+
+      {/* 본문 (아코디언 내용) */}
+      {isOpen && (
+        <div className="p-4 border-t border-gray-200 bg-white animate-fadeIn">
+          {loading ? (
+            <div className="text-center py-4 text-sm text-gray-500">
+              보고서 정보를 불러오는 중...
+            </div>
+          ) : isEmpty ? (
+            <div className="text-center py-4 text-sm text-gray-400">
+              등록된 보고서 및 출석 데이터가 없습니다.
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* 1. 셀 보고서 섹션 */}
+              {(reportData!.cellShare || reportData!.specialNotes) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* 은혜 나눔 */}
+                  <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+                    <h4 className="text-xs font-bold text-indigo-800 mb-2 flex items-center gap-1">
+                      <FaQuoteLeft className="opacity-50" /> 셀 은혜 나눔
+                    </h4>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                      {reportData!.cellShare || "내용 없음"}
+                    </p>
+                  </div>
+                  {/* 특이사항 */}
+                  <div className="bg-red-50 p-4 rounded-lg border border-red-100">
+                    <h4 className="text-xs font-bold text-red-800 mb-2">
+                      ⚠ 셀 특이사항
+                    </h4>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                      {reportData!.specialNotes || "내용 없음"}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. 멤버별 기도제목/특이사항 */}
+              {reportData!.attendances.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-bold text-gray-800 mb-3 pl-1 border-l-4 border-indigo-500">
+                    &nbsp;멤버별 기도제목 및 특이사항
+                  </h4>
+                  <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase w-24 whitespace-nowrap">
+                            이름
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase w-20 whitespace-nowrap">
+                            출석
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                            기도제목 / 메모
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 bg-white">
+                        {reportData!.attendances.map((att) => (
+                          <tr key={att.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 font-medium text-gray-900 align-top whitespace-nowrap">
+                              {formatNameWithBirthdate(att.member)}
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <span
+                                className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full ${
+                                  att.status === "PRESENT"
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}
+                              >
+                                {att.status === "PRESENT" ? "출석" : "결석"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-gray-600 align-top whitespace-pre-wrap">
+                              {att.prayerContent || att.memo ? (
+                                <>
+                                  {att.prayerContent && (
+                                    <div className="mb-1 text-gray-800">
+                                      {att.prayerContent}
+                                    </div>
+                                  )}
+                                  {att.memo &&
+                                    att.memo !== att.prayerContent && (
+                                      <div className="text-xs text-gray-400 mt-1">
+                                        (메모: {att.memo})
+                                      </div>
+                                    )}
+                                </>
+                              ) : (
+                                <span className="text-gray-300 text-xs">-</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// 주차별 컨테이너
+const CellReportHistoryContainer: React.FC<{
+  cellId: number;
+  startDate: string;
+  endDate: string;
+}> = ({ cellId, startDate, endDate }) => {
+  const sundayDates = useMemo(() => {
+    if (!startDate || !endDate) return [];
+    const dates: string[] = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    const current = new Date(start);
+    const day = current.getDay();
+    // 시작일이 일요일이 아니면 다음 일요일로 이동
+    if (day !== 0) {
+      current.setDate(current.getDate() + (7 - day));
+    }
+
+    // 종료일까지 루프
+    while (current <= end) {
+      const y = current.getFullYear();
+      const m = String(current.getMonth() + 1).padStart(2, "0");
+      const d = String(current.getDate()).padStart(2, "0");
+      dates.push(`${y}-${m}-${d}`);
+      current.setDate(current.getDate() + 7);
+    }
+    // 최신 날짜가 위로 오도록 역순 정렬
+    return dates.reverse();
+  }, [startDate, endDate]);
+
+  if (sundayDates.length === 0) return null;
+
+  return (
+    <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+      <div className="px-4 py-4 sm:px-6 border-b border-gray-100">
+        <h3 className="text-base sm:text-lg leading-6 font-medium text-gray-900">
+          🗓️ 주간 보고서 히스토리
+        </h3>
+        <p className="mt-1 text-sm text-gray-500 break-keep">
+          선택된 조회 기간 내의 셀 보고서와 기도제목을 확인합니다.
+        </p>
+      </div>
+      <div className="p-4 bg-gray-50 min-h-[200px]">
+        {sundayDates.length === 0 ? (
+          <p className="text-center text-gray-500 py-8">
+            조회할 수 있는 주일(일요일) 날짜가 없습니다.
+          </p>
+        ) : (
+          sundayDates.map((date) => (
+            <CellReportHistoryItem key={date} cellId={cellId} date={date} />
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ───────────────── [컴포넌트] CellAttendanceMatrixCard ─────────────────
 const CellAttendanceMatrixCard: React.FC<{
   cellId: number;
   sortedMembers: MemberDto[];
@@ -290,7 +545,6 @@ const CellAttendanceMatrixCard: React.FC<{
         {/* 컨트롤 패널 */}
         <div className="bg-gray-50 p-3 sm:p-4 rounded-xl border border-gray-100 flex flex-col gap-4">
           <div className="flex flex-col gap-3">
-            {/* 1행: 학기 선택 + 보기 모드 (모바일: 세로/가로 유동적) */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               {/* 학기 선택 Dropdown */}
               <div className="relative w-full sm:w-auto">
@@ -310,7 +564,7 @@ const CellAttendanceMatrixCard: React.FC<{
                 </div>
               </div>
 
-              {/* 보기 모드 Toggle (모바일: 꽉 찬 버튼) */}
+              {/* 보기 모드 Toggle */}
               <div className="flex bg-gray-200 p-1 rounded-lg w-full sm:w-auto">
                 <button
                   onClick={() => onUnitTypeChange("month")}
@@ -335,7 +589,7 @@ const CellAttendanceMatrixCard: React.FC<{
               </div>
             </div>
 
-            {/* 2행: 월 선택 (월별 보기일 때만) - 가로 스크롤 적용 */}
+            {/* 월 선택 (월별 보기일 때만) */}
             {unitType === "month" && activeSemester && (
               <div className="animate-fadeIn mt-1">
                 <span className="text-xs font-bold text-gray-500 block mb-2 px-1">
@@ -361,12 +615,15 @@ const CellAttendanceMatrixCard: React.FC<{
           </div>
 
           {/* 실제 기간 표시 */}
-          <div className="flex items-center justify-end text-xs text-gray-500 border-t border-gray-200 pt-3 mt-1">
-            <FaClock className="mr-1.5 text-gray-400" />
-            <span className="font-medium whitespace-nowrap mr-2">
-              조회 기간:
-            </span>
-            <span className="font-mono bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700 truncate">
+          <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-gray-500 border-t border-gray-200 pt-3 mt-1">
+            {/* 라벨과 아이콘을 하나의 그룹으로 묶어 줄바꿈 시 같이 다니도록 함 */}
+            <div className="flex items-center flex-shrink-0">
+              <FaClock className="mr-1.5 text-gray-400" />
+              <span className="font-medium whitespace-nowrap">조회 기간:</span>
+            </div>
+
+            {/* 날짜 표시 영역: truncate 제거, 모바일 대응 */}
+            <span className="font-mono bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700">
               {formatDate(startDate)} ~ {formatDate(endDate)}
             </span>
           </div>
@@ -466,7 +723,6 @@ const CellDetailPage: React.FC = () => {
   );
   const [periodSummary, setPeriodSummary] = useState<any>(null);
 
-  // ✅ 초기값 비움
   const [exportStartDate, setExportStartDate] = useState("");
   const [exportEndDate, setExportEndDate] = useState("");
 
@@ -777,7 +1033,7 @@ const CellDetailPage: React.FC = () => {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* 왼쪽 영역 */}
           <div className="xl:col-span-2 space-y-6">
-            {/* 기본 정보 카드 (모바일 대응: Grid -> Flex Col) */}
+            {/* 기본 정보 카드 */}
             <div className="bg-white shadow-sm rounded-lg overflow-hidden">
               <div className="px-4 py-4 sm:px-6 border-b border-gray-100">
                 <h3 className="text-base sm:text-lg leading-6 font-medium text-gray-900">
@@ -844,6 +1100,15 @@ const CellDetailPage: React.FC = () => {
               startDate={periodRange.startDate}
               endDate={periodRange.endDate}
             />
+
+            {/* [신규] 셀 보고서 히스토리 */}
+            {cell && periodRange.startDate && (
+              <CellReportHistoryContainer
+                cellId={cell.id}
+                startDate={periodRange.startDate}
+                endDate={periodRange.endDate}
+              />
+            )}
           </div>
 
           {/* 오른쪽 영역 */}
@@ -934,7 +1199,6 @@ const CellDetailPage: React.FC = () => {
                     출석 현황 다운로드 기간 설정
                   </p>
                   <div className="flex flex-col gap-2">
-                    {/* ✅ [수정] KoreanCalendarPicker 적용 */}
                     <KoreanCalendarPicker
                       value={exportStartDate}
                       onChange={setExportStartDate}

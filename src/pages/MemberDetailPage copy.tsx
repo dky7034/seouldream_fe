@@ -221,7 +221,7 @@ const PrayersCard: React.FC<{ prayers: PrayerDto[] }> = ({ prayers }) => (
 );
 
 // ─────────────────────────────────────────────────────────────
-// [핵심] 출석 요약 카드 (미체크 정책 적용 완료 + 모바일 UI 개선)
+// [핵심] 출석 요약 카드 (미체크 정책 적용 완료)
 // ─────────────────────────────────────────────────────────────
 const AttendanceSummaryCard: React.FC<{
   summary: MemberAttendanceSummaryDto | null;
@@ -411,17 +411,13 @@ const AttendanceSummaryCard: React.FC<{
             )}
           </div>
 
-          {/* [수정된 부분] 실제 기간 표시 
-            - 모바일(flex-col): 2줄 배치 (라벨 위, 날짜 아래)
-            - 데스크탑(sm:flex-row): 1줄 배치 (우측 정렬)
-            - truncate 제거: 날짜가 잘리지 않도록 함
-          */}
-          <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-1 sm:gap-2 text-xs text-gray-500 border-t border-gray-200 pt-3 mt-1">
-            <div className="flex items-center">
-              <FaClock className="mr-1.5 text-gray-400" />
-              <span className="font-medium whitespace-nowrap">조회 기간:</span>
-            </div>
-            <span className="font-mono bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700">
+          {/* 실제 기간 표시 */}
+          <div className="flex items-center justify-end text-xs text-gray-500 border-t border-gray-200 pt-3 mt-1">
+            <FaClock className="mr-1.5 text-gray-400" />
+            <span className="font-medium whitespace-nowrap mr-2">
+              조회 기간:
+            </span>
+            <span className="font-mono bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700 truncate">
               {formatDate(startDate)} ~ {formatDate(endDate)}
             </span>
           </div>

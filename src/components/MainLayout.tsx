@@ -127,7 +127,7 @@ const MainLayout: React.FC = () => {
             학기
           </Link>
 
-          {/* 8. 누락 현황 */}
+          {/* 8. 출석 누락 현황 */}
           <Link
             to="/admin/incomplete-checks-report"
             className={getNavLinkClass("/admin/incomplete-checks-report", {
@@ -136,7 +136,7 @@ const MainLayout: React.FC = () => {
             })}
             onClick={onLinkClick}
           >
-            누락 현황
+            출석 누락
           </Link>
 
           {/* 9. 결석 관리 */}

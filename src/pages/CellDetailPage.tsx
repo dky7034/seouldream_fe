@@ -197,12 +197,12 @@ const AddMemberToCellModal: React.FC<{
   );
 };
 
-// ───────────────── [컴포넌트] CellReportHistory (신규 추가) ─────────────────
-// 날짜 하나에 대한 아코디언 아이템 (클릭 시 데이터 로딩)
+// ───────────────── [컴포넌트] CellReportHistory ─────────────────
 const CellReportHistoryItem: React.FC<{
   cellId: number;
-  date: string; // YYYY-MM-DD (일요일)
-}> = ({ cellId, date }) => {
+  date: string; // YYYY-MM-DD
+  isWritten: boolean;
+}> = ({ cellId, date, isWritten }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState<{
@@ -212,15 +212,13 @@ const CellReportHistoryItem: React.FC<{
   } | null>(null);
 
   const fetchReport = async () => {
-    if (reportData) return; // 이미 데이터가 있으면 다시 부르지 않음
+    if (reportData) return;
     setLoading(true);
     try {
-      // 1. 셀 보고서(나눔, 특이사항) 조회
       const report = await attendanceService
         .getCellReport(cellId, date)
         .catch(() => null);
 
-      // 2. 멤버별 출석/기도제목 조회
       const attRes = await attendanceService.getAttendances({
         startDate: date,
         endDate: date,
@@ -247,7 +245,6 @@ const CellReportHistoryItem: React.FC<{
     setIsOpen(!isOpen);
   };
 
-  // 데이터가 아예 없는 경우(미입력) 체크
   const isEmpty =
     reportData &&
     !reportData.cellShare &&
@@ -256,31 +253,27 @@ const CellReportHistoryItem: React.FC<{
 
   return (
     <div className="border border-gray-200 rounded-lg bg-white overflow-hidden mb-3 shadow-sm">
-      {/* 헤더 (날짜 클릭 영역) */}
       <button
         onClick={toggleOpen}
         className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
       >
         <div className="flex items-center gap-3">
           <span className="font-bold text-gray-700">{date} (일)</span>
-          {!loading && reportData && (
-            <span
-              className={`text-[10px] px-2 py-0.5 rounded-full border ${
-                isEmpty
-                  ? "bg-gray-100 text-gray-400 border-gray-200"
-                  : "bg-green-50 text-green-600 border-green-200"
-              }`}
-            >
-              {isEmpty ? "미작성" : "작성됨"}
-            </span>
-          )}
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded-full border ${
+              !isWritten
+                ? "bg-gray-100 text-gray-400 border-gray-200"
+                : "bg-green-50 text-green-600 border-green-200"
+            }`}
+          >
+            {!isWritten ? "미작성" : "작성됨"}
+          </span>
         </div>
         <div className="text-gray-400">
           {isOpen ? <FaChevronUp size={14} /> : <FaChevronDown size={14} />}
         </div>
       </button>
 
-      {/* 본문 (아코디언 내용) */}
       {isOpen && (
         <div className="p-4 border-t border-gray-200 bg-white animate-fadeIn">
           {loading ? (
@@ -293,10 +286,8 @@ const CellReportHistoryItem: React.FC<{
             </div>
           ) : (
             <div className="space-y-6">
-              {/* 1. 셀 보고서 섹션 */}
               {(reportData!.cellShare || reportData!.specialNotes) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* 은혜 나눔 */}
                   <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
                     <h4 className="text-xs font-bold text-indigo-800 mb-2 flex items-center gap-1">
                       <FaQuoteLeft className="opacity-50" /> 셀 은혜 나눔
@@ -305,7 +296,6 @@ const CellReportHistoryItem: React.FC<{
                       {reportData!.cellShare || "내용 없음"}
                     </p>
                   </div>
-                  {/* 특이사항 */}
                   <div className="bg-red-50 p-4 rounded-lg border border-red-100">
                     <h4 className="text-xs font-bold text-red-800 mb-2">
                       ⚠ 셀 특이사항
@@ -317,7 +307,6 @@ const CellReportHistoryItem: React.FC<{
                 </div>
               )}
 
-              {/* 2. 멤버별 기도제목/특이사항 */}
               {reportData!.attendances.length > 0 && (
                 <div>
                   <h4 className="text-sm font-bold text-gray-800 mb-3 pl-1 border-l-4 border-indigo-500">
@@ -394,7 +383,22 @@ const CellReportHistoryContainer: React.FC<{
   cellId: number;
   startDate: string;
   endDate: string;
-}> = ({ cellId, startDate, endDate }) => {
+  attendances: AttendanceDto[];
+}> = ({ cellId, startDate, endDate, attendances }) => {
+  // [수정] attendanceDate -> date 로 변경
+  const writtenDates = useMemo(() => {
+    const dates = new Set<string>();
+    if (attendances) {
+      attendances.forEach((att) => {
+        if (att.date) {
+          // 여기서 att.attendanceDate 대신 att.date를 사용해야 합니다.
+          dates.add(att.date);
+        }
+      });
+    }
+    return dates;
+  }, [attendances]);
+
   const sundayDates = useMemo(() => {
     if (!startDate || !endDate) return [];
     const dates: string[] = [];
@@ -403,12 +407,10 @@ const CellReportHistoryContainer: React.FC<{
 
     const current = new Date(start);
     const day = current.getDay();
-    // 시작일이 일요일이 아니면 다음 일요일로 이동
     if (day !== 0) {
       current.setDate(current.getDate() + (7 - day));
     }
 
-    // 종료일까지 루프
     while (current <= end) {
       const y = current.getFullYear();
       const m = String(current.getMonth() + 1).padStart(2, "0");
@@ -416,7 +418,6 @@ const CellReportHistoryContainer: React.FC<{
       dates.push(`${y}-${m}-${d}`);
       current.setDate(current.getDate() + 7);
     }
-    // 최신 날짜가 위로 오도록 역순 정렬
     return dates.reverse();
   }, [startDate, endDate]);
 
@@ -439,7 +440,12 @@ const CellReportHistoryContainer: React.FC<{
           </p>
         ) : (
           sundayDates.map((date) => (
-            <CellReportHistoryItem key={date} cellId={cellId} date={date} />
+            <CellReportHistoryItem
+              key={date}
+              cellId={cellId}
+              date={date}
+              isWritten={writtenDates.has(date)}
+            />
           ))
         )}
       </div>
@@ -614,13 +620,12 @@ const CellAttendanceMatrixCard: React.FC<{
             )}
           </div>
 
-          {/* 실제 기간 표시 */}
-          <div className="flex items-center justify-end text-xs text-gray-500 border-t border-gray-200 pt-3 mt-1">
-            <FaClock className="mr-1.5 text-gray-400" />
-            <span className="font-medium whitespace-nowrap mr-2">
-              조회 기간:
-            </span>
-            <span className="font-mono bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700 truncate">
+          <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-gray-500 border-t border-gray-200 pt-3 mt-1">
+            <div className="flex items-center flex-shrink-0">
+              <FaClock className="mr-1.5 text-gray-400" />
+              <span className="font-medium whitespace-nowrap">조회 기간:</span>
+            </div>
+            <span className="font-mono bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700">
               {formatDate(startDate)} ~ {formatDate(endDate)}
             </span>
           </div>
@@ -1098,12 +1103,13 @@ const CellDetailPage: React.FC = () => {
               endDate={periodRange.endDate}
             />
 
-            {/* [신규] 셀 보고서 히스토리 */}
+            {/* [수정] 셀 보고서 히스토리 */}
             {cell && periodRange.startDate && (
               <CellReportHistoryContainer
                 cellId={cell.id}
                 startDate={periodRange.startDate}
                 endDate={periodRange.endDate}
+                attendances={matrixAttendances}
               />
             )}
           </div>
