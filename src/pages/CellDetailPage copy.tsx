@@ -426,7 +426,7 @@ const CellReportHistoryContainer: React.FC<{
     <div className="bg-white shadow-sm rounded-lg overflow-hidden">
       <div className="px-4 py-4 sm:px-6 border-b border-gray-100">
         <h3 className="text-base sm:text-lg leading-6 font-medium text-gray-900">
-          🗓️ 주간 보고서 히스토리
+          🗓️ 주간 보고서 기록
         </h3>
         <p className="mt-1 text-sm text-gray-500 break-keep">
           선택된 조회 기간 내의 셀 보고서와 기도제목을 확인합니다.
@@ -1008,7 +1008,8 @@ const CellDetailPage: React.FC = () => {
               {cell.name} 상세 정보
             </h1>
             <p className="text-sm text-gray-600 break-keep">
-              셀 기본 정보, 출석 요약, 셀원 목록을 확인할 수 있습니다.
+              셀 기본 정보, 출석 요약, 셀원 목록, 셀 보고서를 확인할 수
+              있습니다.
             </p>
           </div>
           {user?.role === "EXECUTIVE" && (
@@ -1101,7 +1102,7 @@ const CellDetailPage: React.FC = () => {
               endDate={periodRange.endDate}
             />
 
-            {/* [신규] 셀 보고서 히스토리 */}
+            {/* [신규] 셀 보고서 기록 */}
             {cell && periodRange.startDate && (
               <CellReportHistoryContainer
                 cellId={cell.id}

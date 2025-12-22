@@ -12,8 +12,7 @@ import { FaFileAlt } from "react-icons/fa";
 import { memberService } from "../services/memberService";
 import { formatDisplayName } from "../utils/memberUtils";
 import { semesterService } from "../services/semesterService";
-import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
-import { useNavigate } from "react-router-dom"; // ✅ 1. useNavigate 임포트
+import KoreanCalendarPicker from "../components/KoreanCalendarPicker"; // ✅ 달력 컴포넌트 임포트
 
 type FilterType = "unit" | "range";
 type UnitType = "year" | "month" | "semester";
@@ -28,7 +27,6 @@ type Filters = {
 
 const AdminIncompleteChecksReportPage: React.FC = () => {
   const { user } = useAuth();
-  const navigate = useNavigate(); // ✅ 2. navigate 훅 초기화
   const [report, setReport] = useState<IncompleteCheckReportDto[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +40,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
   const hasActiveSemesters = semesters.length > 0;
   const [hasAutoSelectedSemester, setHasAutoSelectedSemester] = useState(false);
 
+  // ✅ 초기값 비워져 있음 ("")
   const [filters, setFilters] = useState<Filters>({
     startDate: "",
     endDate: "",
@@ -52,7 +51,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
   const [filterType, setFilterType] = useState<FilterType>("unit");
   const [unitType, setUnitType] = useState<UnitType>("semester");
 
-  // ... (이전 코드와 동일: yearOptions, handleFilterChange, formatShortDate 등) ...
   const yearOptions = useMemo(
     () =>
       availableYears.length === 0
@@ -108,7 +106,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
     return "";
   }, [filterType, unitType, filters, semesters]);
 
-  // ... (이전 코드와 동일: useEffect for auto select, handlers, renderUnitButtons) ...
   useEffect(() => {
     if (semesters.length > 0 && !hasAutoSelectedSemester) {
       const now = new Date();
@@ -264,7 +261,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
     }
   };
 
-  // ... (fetchIncompleteChecks, fetchAvailableYears, fetchSemesters 등 로직 동일) ...
   const fetchIncompleteChecks = useCallback(
     async (opts?: { skipLoading?: boolean }) => {
       if (!user || user.role !== "EXECUTIVE") {
@@ -444,7 +440,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
     fetchAllMembersForNameCheck();
   }, [user]);
 
-  // ... (권한/로딩/에러 렌더링 동일) ...
   if (!user || user.role !== "EXECUTIVE") {
     return (
       <div className="bg-gray-50 min-h-screen flex justify-center items-center px-4">
@@ -490,7 +485,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="container mx-auto max-w-6xl px-3 sm:px-4 py-6 sm:py-8">
-        {/* ... (헤더 및 필터 영역 동일) ... */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 sm:mb-8">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
@@ -538,6 +532,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   기간 시작
                 </label>
+                {/* ✅ KoreanCalendarPicker 적용 */}
                 <KoreanCalendarPicker
                   value={filters.startDate}
                   onChange={(date) => handleFilterChange("startDate", date)}
@@ -547,6 +542,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   기간 종료
                 </label>
+                {/* ✅ KoreanCalendarPicker 적용 */}
                 <KoreanCalendarPicker
                   value={filters.endDate}
                   onChange={(date) => handleFilterChange("endDate", date)}
@@ -634,6 +630,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                   )}
                 </div>
               </div>
+
               {renderUnitButtons()}
             </div>
           )}
@@ -664,9 +661,9 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
           </div>
         ) : (
           <>
-            {/* ✅ Mobile View (수정됨) */}
+            {/* Mobile View */}
             <div className="md:hidden space-y-3 mb-4">
-              {report.map((item: any) => {
+              {report.map((item) => {
                 const leaderMember = allMembersForNameCheck.find(
                   (m) => m.id === item.leaderId
                 );
@@ -684,9 +681,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                 return (
                   <div
                     key={item.leaderId}
-                    // 📌 클릭 핸들러 및 스타일 추가
-                    onClick={() => navigate(`/admin/cells/${item.cellId}`)}
-                    className="bg-white rounded-lg shadow border border-gray-100 p-4 text-xs space-y-2 cursor-pointer hover:bg-gray-50 transition-colors"
+                    className="bg-white rounded-lg shadow border border-gray-100 p-4 text-xs space-y-2"
                   >
                     <div className="flex justify-between items-start gap-2">
                       <div>
@@ -713,17 +708,15 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                       </p>
                       <div className="max-h-32 overflow-y-auto pr-1">
                         <ul className="space-y-1">
-                          {item.missedDates.map(
-                            (date: string, index: number) => (
-                              <li
-                                key={`${date}-${index}`}
-                                className="flex items-center text-[11px] text-gray-700"
-                              >
-                                <span className="mr-1 text-gray-400">•</span>
-                                <span>{formatShortDate(date)}</span>
-                              </li>
-                            )
-                          )}
+                          {item.missedDates.map((date, index) => (
+                            <li
+                              key={`${date}-${index}`}
+                              className="flex items-center text-[11px] text-gray-700"
+                            >
+                              <span className="mr-1 text-gray-400">•</span>
+                              <span>{formatShortDate(date)}</span>
+                            </li>
+                          ))}
                         </ul>
                       </div>
                     </div>
@@ -732,7 +725,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
               })}
             </div>
 
-            {/* ✅ Desktop View (수정됨) */}
+            {/* Desktop View */}
             <div className="hidden md:block bg-white shadow-md rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
@@ -753,13 +746,8 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {report.map((item: any) => (
-                      <tr
-                        key={item.leaderId}
-                        // 📌 클릭 핸들러 및 스타일 추가
-                        onClick={() => navigate(`/admin/cells/${item.cellId}`)}
-                        className="cursor-pointer hover:bg-gray-50 transition-colors"
-                      >
+                    {report.map((item) => (
+                      <tr key={item.leaderId}>
                         <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">
                           {(() => {
                             const leaderMember = allMembersForNameCheck.find(
@@ -795,19 +783,15 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                         <td className="px-4 sm:px-6 py-3 align-top text-xs sm:text-sm text-gray-700">
                           <div className="max-h-32 overflow-y-auto pr-1">
                             <ul className="space-y-1">
-                              {item.missedDates.map(
-                                (date: string, index: number) => (
-                                  <li
-                                    key={`${date}-${index}`}
-                                    className="flex items-center text-[11px] sm:text-xs text-gray-700"
-                                  >
-                                    <span className="mr-1 text-gray-400">
-                                      •
-                                    </span>
-                                    <span>{formatShortDate(date)}</span>
-                                  </li>
-                                )
-                              )}
+                              {item.missedDates.map((date, index) => (
+                                <li
+                                  key={`${date}-${index}`}
+                                  className="flex items-center text-[11px] sm:text-xs text-gray-700"
+                                >
+                                  <span className="mr-1 text-gray-400">•</span>
+                                  <span>{formatShortDate(date)}</span>
+                                </li>
+                              ))}
                             </ul>
                           </div>
                         </td>

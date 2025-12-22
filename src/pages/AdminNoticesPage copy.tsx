@@ -16,9 +16,11 @@ import { MapPinIcon } from "@heroicons/react/24/solid";
 import Pagination from "../components/Pagination";
 import { useDebounce } from "../hooks/useDebounce";
 import { normalizeNumberInput } from "../utils/numberUtils";
-import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
+import KoreanCalendarPicker from "../components/KoreanCalendarPicker"; // ✅ 달력 컴포넌트 임포트
 
+// ✅ 정렬 키 타입
 type SortKey = "createdAt";
+// ✅ UnitType (반기/분기 제거)
 type UnitType = "year" | "month" | "semester";
 
 const AdminNoticesPage: React.FC = () => {
@@ -101,32 +103,6 @@ const AdminNoticesPage: React.FC = () => {
   });
 
   const debouncedTitleFilter = useDebounce(filters.title, 500);
-
-  // ✅ [성능 최적화] 멤버 ID -> 포맷된 이름 매핑 (Map 사용)
-  // 기존: 렌더링마다 find()로 검색 (O(N*rows)) -> 개선: Map 조회 (O(1))
-  const memberNameMap = useMemo(() => {
-    const map = new Map<number, string>();
-    if (allMembersForNameCheck.length === 0) return map;
-
-    // formatDisplayName 함수가 내부적으로 중복 검사를 하므로,
-    // 여기서 미리 모든 멤버에 대해 계산해둡니다.
-    allMembersForNameCheck.forEach((m) => {
-      // 💡 여기서 formatDisplayName을 호출하여 결과를 저장
-      map.set(m.id, formatDisplayName(m, allMembersForNameCheck));
-    });
-
-    return map;
-  }, [allMembersForNameCheck]);
-
-  // ✅ [성능 최적화] Map 조회 헬퍼 함수
-  const getFormattedName = useCallback(
-    (id?: number, name?: string) => {
-      if (!name) return "알 수 없음";
-      if (!id) return name;
-      return memberNameMap.get(id) || name;
-    },
-    [memberNameMap]
-  );
 
   const formatShortDate = (dateStr: string) => {
     if (!dateStr) return "";
@@ -312,14 +288,24 @@ const AdminNoticesPage: React.FC = () => {
     fetchAllMembers();
   }, [user]);
 
+  const getFormattedName = useCallback(
+    (id?: number, name?: string) => {
+      if (!name) return "알 수 없음";
+      if (!id) return name;
+      const found = allMembersForNameCheck.find((m) => m.id === id);
+      return found ? formatDisplayName(found, allMembersForNameCheck) : name;
+    },
+    [allMembersForNameCheck]
+  );
+
   useEffect(() => {
     fetchNotices();
   }, [fetchNotices]);
 
   useEffect(() => {
     if (user) {
-      // 병렬로 실행하여 초기 로딩 속도 미세 개선
-      Promise.all([fetchAvailableYears(), fetchSemesters()]);
+      fetchAvailableYears();
+      fetchSemesters();
     }
   }, [user, fetchAvailableYears, fetchSemesters]);
 
@@ -649,6 +635,7 @@ const AdminNoticesPage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   기간 시작
                 </label>
+                {/* ✅ KoreanCalendarPicker 적용 */}
                 <KoreanCalendarPicker
                   value={filters.startDate}
                   onChange={(date) => handleFilterChange("startDate", date)}
@@ -658,6 +645,7 @@ const AdminNoticesPage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   기간 종료
                 </label>
+                {/* ✅ KoreanCalendarPicker 적용 */}
                 <KoreanCalendarPicker
                   value={filters.endDate}
                   onChange={(date) => handleFilterChange("endDate", date)}

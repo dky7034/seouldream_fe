@@ -1,10 +1,9 @@
-// src/pages/CellPrayersPage.tsx
+// src/pages/MemberPrayersPage.tsx
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { prayerService } from "../services/prayerService";
-import { cellService } from "../services/cellService";
 import { memberService } from "../services/memberService";
-import { semesterService } from "../services/semesterService"; // ✅ 학기 서비스 추가
+import { semesterService } from "../services/semesterService";
 import { formatDisplayName } from "../utils/memberUtils";
 import { normalizeNumberInput } from "../utils/numberUtils";
 import type { Page, PrayerDto, GetPrayersParams, SemesterDto } from "../types";
@@ -13,7 +12,7 @@ import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
 import { useAuth } from "../hooks/useAuth";
 
 // ─────────────────────────────────────────────────────────────
-// ✅ 헬퍼 함수: 컴포넌트 외부 정의
+// ✅ 헬퍼 함수
 // ─────────────────────────────────────────────────────────────
 
 const toLocalDateStr = (d: Date) => {
@@ -27,7 +26,7 @@ const toLocalDateStr = (d: Date) => {
 
 const getThisWeekRange = () => {
   const now = new Date();
-  const day = now.getDay(); // 0(일) ~ 6(토)
+  const day = now.getDay();
   const diffToSunday = day;
 
   const sunday = new Date(now);
@@ -42,15 +41,11 @@ const getThisWeekRange = () => {
   };
 };
 
-// ─────────────────────────────────────────────────────────────
-// ✅ 타입 정의
-// ─────────────────────────────────────────────────────────────
-
 type FilterType = "week" | "unit" | "range" | "all";
 type UnitType = "month" | "semester" | "year";
 
-const CellPrayersPage: React.FC = () => {
-  const { cellId } = useParams<{ cellId: string }>();
+const MemberPrayersPage: React.FC = () => {
+  const { memberId } = useParams<{ memberId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -63,7 +58,6 @@ const CellPrayersPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
 
-  // 필터 상태
   const [filterType, setFilterType] = useState<FilterType>("week");
   const [unitType, setUnitType] = useState<UnitType>("month");
 
@@ -75,10 +69,9 @@ const CellPrayersPage: React.FC = () => {
     semesterId: "" as number | "",
   });
 
-  // 데이터 상태
-  const [cellName, setCellName] = useState<string | null>(null);
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
+  const [memberName, setMemberName] = useState<string | null>(null);
   const [allMembersForNameCheck, setAllMembersForNameCheck] = useState<
     { id: number; name: string; birthDate?: string }[]
   >([]);
@@ -88,25 +81,12 @@ const CellPrayersPage: React.FC = () => {
   const hasActiveSemesters = semesters.length > 0;
 
   // ─────────────────────────────────────────────────────────────
-  // ✅ Effects: 초기 데이터 로딩
+  // ✅ Effects
   // ─────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!user) return;
 
-    // 1. 셀 이름 가져오기
-    const fetchCellName = async () => {
-      if (cellId) {
-        try {
-          const cellData = await cellService.getCellById(Number(cellId));
-          setCellName(cellData.name);
-        } catch (e) {
-          console.error("Failed to fetch cell name:", e);
-        }
-      }
-    };
-
-    // 2. 전체 멤버 목록 (동명이인 처리용)
     const fetchAllMembers = async () => {
       try {
         const res = await memberService.getAllMembers({
@@ -122,11 +102,10 @@ const CellPrayersPage: React.FC = () => {
           }))
         );
       } catch (e) {
-        console.error("동명이인 목록 로딩 실패:", e);
+        console.error("멤버 목록 로딩 실패:", e);
       }
     };
 
-    // 3. 학기 목록
     const fetchSemesters = async () => {
       try {
         const data = await semesterService.getAllSemesters(true);
@@ -136,7 +115,6 @@ const CellPrayersPage: React.FC = () => {
       }
     };
 
-    // 4. 연도 목록
     const fetchAvailableYears = async () => {
       try {
         const years = await prayerService.getAvailableYears();
@@ -146,15 +124,10 @@ const CellPrayersPage: React.FC = () => {
       }
     };
 
-    fetchCellName();
     fetchAllMembers();
     fetchSemesters();
     fetchAvailableYears();
-  }, [user, cellId]);
-
-  // ─────────────────────────────────────────────────────────────
-  // ✅ 헬퍼 함수
-  // ─────────────────────────────────────────────────────────────
+  }, [user]);
 
   const getFormattedName = useCallback(
     (id?: number, name?: string) => {
@@ -186,20 +159,10 @@ const CellPrayersPage: React.FC = () => {
     return validYears.map((y) => ({ value: y, label: `${y}년` }));
   }, [availableYears]);
 
-  // ─────────────────────────────────────────────────────────────
-  // ✅ 기도제목 조회 (fetchPrayers)
-  // ─────────────────────────────────────────────────────────────
-
   const fetchPrayers = useCallback(async () => {
-    if (!cellId || !user) return;
-
-    // 권한 체크
+    if (!memberId || !user) return;
     if (!isExecutive && !isCellLeader) {
       setError("접근 권한이 없습니다.");
-      return;
-    }
-    if (isCellLeader && user.cellId && String(user.cellId) !== cellId) {
-      setError("본인의 셀 기도제목만 조회할 수 있습니다.");
       return;
     }
 
@@ -209,18 +172,17 @@ const CellPrayersPage: React.FC = () => {
     const params: GetPrayersParams = {
       page: currentPage,
       size: 10,
-      cellId: Number(cellId),
+      memberId: Number(memberId),
       sort: "createdAt,desc",
       isDeleted: false,
     };
 
-    // 🔍 필터 로직 적용
     if (filterType === "week") {
       const { startDate, endDate } = getThisWeekRange();
       params.startDate = startDate;
       params.endDate = endDate;
     } else if (filterType === "all") {
-      // 파라미터 미전송 -> 전체 조회
+      // params 날짜 생략 -> 전체 조회
     } else if (filterType === "range") {
       if (filters.startDate) params.startDate = filters.startDate;
       if (filters.endDate) params.endDate = filters.endDate;
@@ -242,14 +204,17 @@ const CellPrayersPage: React.FC = () => {
     try {
       const data = await prayerService.getPrayers(params);
       setPageData(data);
+      if (!memberName && data.content.length > 0) {
+        setMemberName(data.content[0].member?.name ?? null);
+      }
     } catch (e) {
-      console.error("셀별 기도제목 로딩 실패:", e);
+      console.error("기도제목 로딩 실패:", e);
       setError("데이터를 불러오지 못했습니다.");
     } finally {
       setLoading(false);
     }
   }, [
-    cellId,
+    memberId,
     currentPage,
     user,
     isExecutive,
@@ -258,19 +223,28 @@ const CellPrayersPage: React.FC = () => {
     unitType,
     filters,
     semesters,
+    memberName,
   ]);
 
   useEffect(() => {
     fetchPrayers();
   }, [fetchPrayers]);
 
-  // ─────────────────────────────────────────────────────────────
-  // ✅ 렌더링 준비
-  // ─────────────────────────────────────────────────────────────
-
-  const titleText = useMemo(() => {
-    const base =
-      cellName != null ? `${cellName} 기도제목` : `셀 ID ${cellId} 기도제목`;
+  const displayTitle = useMemo(() => {
+    let namePart = `멤버 ID ${memberId}`;
+    if (memberId && allMembersForNameCheck.length > 0) {
+      const found = allMembersForNameCheck.find(
+        (m) => m.id === Number(memberId)
+      );
+      if (found) {
+        namePart = formatDisplayName(found, allMembersForNameCheck).replace(
+          " (",
+          "("
+        );
+      }
+    } else if (memberName) {
+      namePart = memberName;
+    }
 
     let rangeSuffix = "";
     if (filterType === "week") rangeSuffix = " (이번 주)";
@@ -284,8 +258,16 @@ const CellPrayersPage: React.FC = () => {
       if (unitType === "year") rangeSuffix = ` (${filters.year}년)`;
     } else if (filterType === "range") rangeSuffix = " (지정 기간)";
 
-    return base + rangeSuffix;
-  }, [cellName, cellId, filterType, unitType, filters, semesters]);
+    return `${namePart}님의 기도제목${rangeSuffix}`;
+  }, [
+    memberId,
+    allMembersForNameCheck,
+    memberName,
+    filterType,
+    unitType,
+    filters,
+    semesters,
+  ]);
 
   if (!user) return <div className="p-8 text-center">로그인이 필요합니다.</div>;
 
@@ -296,10 +278,10 @@ const CellPrayersPage: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-              {titleText}
+              {displayTitle}
             </h1>
             <p className="mt-1 text-sm text-gray-600">
-              선택한 셀의 기도제목을 확인하세요.
+              기간별 기도제목을 확인하세요.
             </p>
           </div>
           <div>
@@ -313,10 +295,10 @@ const CellPrayersPage: React.FC = () => {
         </div>
 
         {/* ─────────────────────────────────────────────────────────────
-            ✅ 필터 UI 섹션 (Mobile Optimized)
+            ✅ 필터 UI 섹션
            ───────────────────────────────────────────────────────────── */}
         <div className="bg-white p-4 sm:p-5 rounded-lg shadow border border-gray-200 mb-6 space-y-5">
-          {/* 1. 상단 탭 (조회 유형) */}
+          {/* 1. 상단 탭 (조회 유형) - 모바일 터치 최적화 (가로 스크롤 가능 or Wrap) */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
               { id: "week", label: "이번 주" },
@@ -428,7 +410,7 @@ const CellPrayersPage: React.FC = () => {
                 {/* 2) 단위별 상세 선택 UI */}
                 {unitType === "month" && (
                   <div className="space-y-4">
-                    {/* 연도 선택 */}
+                    {/* 연도 선택 셀렉트박스 (크기 확대) */}
                     <select
                       value={filters.year}
                       onChange={(e) =>
@@ -524,7 +506,7 @@ const CellPrayersPage: React.FC = () => {
         {/* 데이터 리스트 */}
         {!loading && pageData && !error && (
           <>
-            {/* 📱 모바일: 카드 리스트 */}
+            {/* 모바일 뷰 */}
             <div className="space-y-3 md:hidden mb-4">
               {pageData.content.length === 0 ? (
                 <div className="bg-white rounded-lg shadow border border-gray-100 p-8 text-center text-sm text-gray-500">
@@ -538,26 +520,14 @@ const CellPrayersPage: React.FC = () => {
                   >
                     <div className="flex justify-between items-start gap-2">
                       <div className="flex-1">
-                        {/* 멤버 (기도 대상) */}
-                        <div className="text-[11px] font-medium text-gray-500 mb-1">
-                          멤버:{" "}
-                          <span className="font-semibold text-gray-800">
-                            {getFormattedName(
-                              prayer.member?.id,
-                              prayer.member?.name
-                            )}
-                          </span>
-                        </div>
-                        {/* 내용 */}
                         <Link
                           to={`/admin/prayers/${prayer.id}`}
                           className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 break-words"
                         >
                           {prayer.content}
                         </Link>
-                        {/* 작성자 */}
                         <p className="mt-2 text-[11px] text-gray-500">
-                          작성자(셀장):{" "}
+                          작성자:{" "}
                           <span className="font-semibold text-gray-800">
                             {getFormattedName(
                               prayer.createdBy?.id,
@@ -575,21 +545,18 @@ const CellPrayersPage: React.FC = () => {
               )}
             </div>
 
-            {/* 🖥 데스크탑: 테이블 */}
+            {/* 데스크탑 뷰 */}
             <div className="hidden md:block bg-white shadow-md rounded-lg overflow-hidden mb-4">
               <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-32 whitespace-nowrap">
-                      멤버(기도대상)
-                    </th>
                     <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">
                       내용
                     </th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-32 whitespace-nowrap">
-                      작성자(셀장)
+                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap w-32">
+                      작성자
                     </th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-32 whitespace-nowrap">
+                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap w-32">
                       작성일
                     </th>
                   </tr>
@@ -598,7 +565,7 @@ const CellPrayersPage: React.FC = () => {
                   {pageData.content.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={3}
                         className="px-6 py-8 text-center text-gray-500"
                       >
                         조건에 맞는 기도제목이 없습니다.
@@ -607,12 +574,6 @@ const CellPrayersPage: React.FC = () => {
                   ) : (
                     pageData.content.map((prayer) => (
                       <tr key={prayer.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
-                          {getFormattedName(
-                            prayer.member?.id,
-                            prayer.member?.name
-                          )}
-                        </td>
                         <td className="px-6 py-4">
                           <Link
                             to={`/admin/prayers/${prayer.id}`}
@@ -621,7 +582,7 @@ const CellPrayersPage: React.FC = () => {
                             {prayer.content}
                           </Link>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-gray-600">
+                        <td className="px-6 py-4 whitespace-nowrap">
                           {getFormattedName(
                             prayer.createdBy?.id,
                             prayer.createdBy?.name
@@ -650,4 +611,4 @@ const CellPrayersPage: React.FC = () => {
   );
 };
 
-export default CellPrayersPage;
+export default MemberPrayersPage;
