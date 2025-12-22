@@ -515,7 +515,7 @@ const StatisticsPage: React.FC = () => {
                                 : "bg-pink-50 text-pink-700"
                             }`}
                           >
-                            {member.gender === "MALE" ? "형제" : "자매"}
+                            {member.gender === "MALE" ? "남자" : "여자"}
                           </span>
                           <span className="text-sm text-gray-500">
                             {member.birthDate || member.birthYear || "-"}
@@ -605,7 +605,7 @@ const StatisticsPage: React.FC = () => {
                                 : "bg-pink-50 text-pink-700"
                             }`}
                           >
-                            {member.gender === "MALE" ? "형제" : "자매"}
+                            {member.gender === "MALE" ? "남자" : "여자"}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

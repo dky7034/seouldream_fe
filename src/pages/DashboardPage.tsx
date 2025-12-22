@@ -948,8 +948,8 @@ const DashboardPage: React.FC = () => {
                                       }`}
                                     >
                                       {member.gender === "MALE"
-                                        ? "형제"
-                                        : "자매"}
+                                        ? "남자"
+                                        : "여자"}
                                     </span>
                                     <span className="text-xs text-gray-500">
                                       {displayAge !== null &&
@@ -1054,8 +1054,8 @@ const DashboardPage: React.FC = () => {
                                       }`}
                                     >
                                       {member.gender === "MALE"
-                                        ? "형제"
-                                        : "자매"}
+                                        ? "남자"
+                                        : "여자"}
                                     </span>
                                   </td>
                                   <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
