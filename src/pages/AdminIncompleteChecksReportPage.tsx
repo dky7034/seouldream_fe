@@ -12,6 +12,7 @@ import { FaFileAlt } from "react-icons/fa";
 import { memberService } from "../services/memberService";
 import { formatDisplayName } from "../utils/memberUtils";
 import { semesterService } from "../services/semesterService";
+import KoreanCalendarPicker from "../components/KoreanCalendarPicker"; // ✅ 달력 컴포넌트 임포트
 
 type FilterType = "unit" | "range";
 type UnitType = "year" | "month" | "semester";
@@ -39,6 +40,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
   const hasActiveSemesters = semesters.length > 0;
   const [hasAutoSelectedSemester, setHasAutoSelectedSemester] = useState(false);
 
+  // ✅ 초기값 비워져 있음 ("")
   const [filters, setFilters] = useState<Filters>({
     startDate: "",
     endDate: "",
@@ -96,7 +98,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
 
       const yearText = filters.year ? `${filters.year}년` : "전체 연도";
 
-      // ✅ [UI 표시] 연간/월간 선택 시에도 '학기 교집합'임을 암시
       if (unitType === "year") return `조회 단위: ${yearText} (학기 기간만)`;
       if (unitType === "month" && filters.month)
         return `조회 단위: ${yearText} ${filters.month}월 (학기 기간만)`;
@@ -260,7 +261,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
     }
   };
 
-  // ✅ [핵심 수정] 리포트 조회 로직: 연간/월간 조회 시 학기와의 교집합(Intersection) 계산
   const fetchIncompleteChecks = useCallback(
     async (opts?: { skipLoading?: boolean }) => {
       if (!user || user.role !== "EXECUTIVE") {
@@ -275,15 +275,12 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
       let params: GetAttendancesParams = {};
 
       if (filterType === "range") {
-        // 1. 기간 직접 지정: 사용자 입력 그대로 사용
         params = {
           startDate: filters.startDate || undefined,
           endDate: filters.endDate || undefined,
         };
       } else {
-        // 2. 단위 조회 (학기 vs 연간/월간)
         if (filters.semesterId && semesters.length > 0) {
-          // (A) 학기 선택: 해당 학기 전체 기간
           const semester = semesters.find((s) => s.id === filters.semesterId);
           if (semester) {
             params = {
@@ -292,26 +289,21 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
             };
           }
         } else {
-          // (B) 연간/월간 선택: 학기 기간과 교집합(Intersection) 계산
           const yearVal = normalizeNumberInput(filters.year);
           const monthVal = normalizeNumberInput(filters.month);
 
           if (!yearVal) {
-            // 연도가 없으면 조회 불가
             setLoading(false);
-            setReport([]); // 초기화
+            setReport([]);
             return;
           }
 
-          // ① 사용자가 선택한 범위의 시작/끝 날짜 계산
           let rangeStart = "";
           let rangeEnd = "";
 
           if (monthVal) {
-            // 월간
             const startD = new Date(yearVal, monthVal - 1, 1);
-            const endD = new Date(yearVal, monthVal, 0); // 해당 월 마지막 날
-            // YYYY-MM-DD 포맷팅 (로컬 시간 기준)
+            const endD = new Date(yearVal, monthVal, 0);
             const pad = (n: number) => String(n).padStart(2, "0");
             rangeStart = `${startD.getFullYear()}-${pad(
               startD.getMonth() + 1
@@ -320,31 +312,20 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
               endD.getDate()
             )}`;
           } else {
-            // 연간
             rangeStart = `${yearVal}-01-01`;
             rangeEnd = `${yearVal}-12-31`;
           }
 
-          // ② 해당 범위와 겹치는 학기 찾기
-          // (학기 시작일이 범위 끝보다 전이고, 학기 종료일이 범위 시작보다 후여야 함)
           const overlappingSemesters = semesters.filter(
             (s) => s.startDate <= rangeEnd && s.endDate >= rangeStart
           );
 
           if (overlappingSemesters.length === 0) {
-            // 겹치는 학기가 없으면 데이터 없음 처리 (방학 중 조회 등)
             setReport([]);
             if (!opts?.skipLoading) setLoading(false);
             return;
           }
 
-          // ③ 교집합 범위 계산 (Intersection)
-          // 여러 학기가 겹칠 수 있으므로(예: 1학기 + 2학기),
-          // 겹치는 학기들의 전체 범위 내에서 사용자 선택 범위와의 교집합을 구함
-          // 단, API가 단일 startDate/endDate만 받으므로, "첫 학기 시작 ~ 마지막 학기 끝"으로 잡고
-          // 그 안에서 사용자 선택 범위와 자름. (중간 방학이 포함될 수 있으나, API 구조상 최선)
-
-          // 겹치는 학기들 중 가장 빠른 시작일과 가장 늦은 종료일
           const semestersMinStart = overlappingSemesters.reduce(
             (min, s) => (s.startDate < min ? s.startDate : min),
             overlappingSemesters[0].startDate
@@ -354,7 +335,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
             overlappingSemesters[0].endDate
           );
 
-          // 최종 파라미터 = Max(선택시작, 학기최소시작) ~ Min(선택끝, 학기최대끝)
           const finalStart =
             rangeStart > semestersMinStart ? rangeStart : semestersMinStart;
           const finalEnd =
@@ -373,7 +353,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
         )
       );
 
-      // 파라미터가 없으면(유효 기간 없음) 요청 생략
       if (Object.keys(cleanedParams).length === 0) {
         setReport([]);
         if (!opts?.skipLoading) setLoading(false);
@@ -422,7 +401,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
 
   useEffect(() => {
     if (!user || user.role !== "EXECUTIVE") return;
-    // semesters가 로드된 이후에만 fetch 수행하도록 의존성 관리
     if (semesters.length > 0 || hasActiveSemesters === false) {
       fetchIncompleteChecks();
     }
@@ -551,29 +529,23 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
           {filterType === "range" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   기간 시작
                 </label>
-                <input
-                  type="date"
+                {/* ✅ KoreanCalendarPicker 적용 */}
+                <KoreanCalendarPicker
                   value={filters.startDate}
-                  onChange={(e) =>
-                    handleFilterChange("startDate", e.target.value)
-                  }
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
+                  onChange={(date) => handleFilterChange("startDate", date)}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   기간 종료
                 </label>
-                <input
-                  type="date"
+                {/* ✅ KoreanCalendarPicker 적용 */}
+                <KoreanCalendarPicker
                   value={filters.endDate}
-                  onChange={(e) =>
-                    handleFilterChange("endDate", e.target.value)
-                  }
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
+                  onChange={(date) => handleFilterChange("endDate", date)}
                 />
               </div>
             </div>

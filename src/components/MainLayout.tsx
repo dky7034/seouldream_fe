@@ -57,114 +57,11 @@ const MainLayout: React.FC = () => {
   ) => {
     if (!user) return null;
 
-    // ✅ 1) 임원단 메뉴 구성
+    // ✅ 1) 임원단 메뉴 구성 (요청 순서 적용)
     if (isExecutive) {
       return (
         <>
-          {/* 조직 / 마스터 데이터 관리 */}
-          <Link
-            to="/admin/users"
-            className={getNavLinkClass("/admin/users", { variant })}
-            onClick={onLinkClick}
-          >
-            사용자
-          </Link>
-          <Link
-            to="/admin/teams"
-            className={getNavLinkClass("/admin/teams", { variant })}
-            onClick={onLinkClick}
-          >
-            팀
-          </Link>
-          <Link
-            to="/admin/cells"
-            className={getNavLinkClass("/admin/cells", { variant })}
-            onClick={onLinkClick}
-          >
-            셀
-          </Link>
-          <Link
-            to="/admin/semesters"
-            className={getNavLinkClass("/admin/semesters", { variant })}
-            onClick={onLinkClick}
-          >
-            학기
-          </Link>
-
-          {/* 사역 운영 / 리포트 */}
-          <Link
-            to="/admin/attendances"
-            className={getNavLinkClass("/admin/attendances", { variant })}
-            onClick={onLinkClick}
-          >
-            출석
-          </Link>
-          <Link
-            to="/admin/incomplete-checks-report"
-            className={getNavLinkClass("/admin/incomplete-checks-report", {
-              exact: true,
-              variant,
-            })}
-            onClick={onLinkClick}
-          >
-            출석 누락 현황
-          </Link>
-          <Link
-            to="/admin/attendance-alerts"
-            className={getNavLinkClass("/admin/attendance-alerts", {
-              variant,
-            })}
-            onClick={onLinkClick}
-          >
-            결석 관리
-          </Link>
-          <Link
-            to="/admin/prayers/summary/members"
-            className={getNavLinkClass("/admin/prayers/summary", {
-              variant,
-            })}
-            onClick={onLinkClick}
-          >
-            기도제목
-          </Link>
-
-          {/* 공통 정보 + 개인 메뉴 */}
-          <Link
-            to="/birthdays"
-            className={getNavLinkClass("/birthdays", {
-              exact: true,
-              variant,
-            })}
-            onClick={onLinkClick}
-          >
-            생일자
-          </Link>
-          <Link
-            to="/admin/notices"
-            className={getNavLinkClass("/admin/notices", { variant })}
-            onClick={onLinkClick}
-          >
-            공지사항
-          </Link>
-          {/* <Link
-            to="/my-profile"
-            className={getNavLinkClass("/my-profile", {
-              exact: true,
-              variant,
-            })}
-            onClick={onLinkClick}
-          >
-            내 프로필
-          </Link> */}
-        </>
-      );
-    }
-
-    // ✅ 2) 셀장 메뉴 구성 (수정됨: 셀장 대시보드 추가)
-    if (isCellLeader) {
-      return (
-        <>
-          {/* 셀장 대시보드 (추가됨) */}
+          {/* 1. 대시보드 */}
           <Link
             to="/dashboard"
             className={getNavLinkClass("/dashboard", {
@@ -176,7 +73,133 @@ const MainLayout: React.FC = () => {
             대시보드
           </Link>
 
-          {/* 셀장 메인 허브 */}
+          {/* 2. 셀 */}
+          <Link
+            to="/admin/cells"
+            className={getNavLinkClass("/admin/cells", { variant })}
+            onClick={onLinkClick}
+          >
+            셀
+          </Link>
+
+          {/* 3. 사용자 */}
+          <Link
+            to="/admin/users"
+            className={getNavLinkClass("/admin/users", { variant })}
+            onClick={onLinkClick}
+          >
+            사용자
+          </Link>
+
+          {/* 4. 팀 */}
+          <Link
+            to="/admin/teams"
+            className={getNavLinkClass("/admin/teams", { variant })}
+            onClick={onLinkClick}
+          >
+            팀
+          </Link>
+
+          {/* 5. 출석 */}
+          <Link
+            to="/admin/attendances"
+            className={getNavLinkClass("/admin/attendances", { variant })}
+            onClick={onLinkClick}
+          >
+            출석
+          </Link>
+
+          {/* 6. 통계 */}
+          <Link
+            to="/admin/statistics"
+            className={getNavLinkClass("/admin/statistics", { variant })}
+            onClick={onLinkClick}
+          >
+            통계
+          </Link>
+
+          {/* 7. 학기 */}
+          <Link
+            to="/admin/semesters"
+            className={getNavLinkClass("/admin/semesters", { variant })}
+            onClick={onLinkClick}
+          >
+            학기
+          </Link>
+
+          {/* 8. 누락 현황 */}
+          <Link
+            to="/admin/incomplete-checks-report"
+            className={getNavLinkClass("/admin/incomplete-checks-report", {
+              exact: true,
+              variant,
+            })}
+            onClick={onLinkClick}
+          >
+            누락 현황
+          </Link>
+
+          {/* 9. 결석 관리 */}
+          <Link
+            to="/admin/attendance-alerts"
+            className={getNavLinkClass("/admin/attendance-alerts", {
+              variant,
+            })}
+            onClick={onLinkClick}
+          >
+            결석 관리
+          </Link>
+
+          {/* 10. 기도제목 */}
+          <Link
+            to="/admin/prayers/summary/members"
+            className={getNavLinkClass("/admin/prayers/summary", {
+              variant,
+            })}
+            onClick={onLinkClick}
+          >
+            기도제목
+          </Link>
+
+          {/* 11. 생일자 */}
+          <Link
+            to="/birthdays"
+            className={getNavLinkClass("/birthdays", {
+              exact: true,
+              variant,
+            })}
+            onClick={onLinkClick}
+          >
+            생일자
+          </Link>
+
+          {/* 12. 공지사항 */}
+          <Link
+            to="/admin/notices"
+            className={getNavLinkClass("/admin/notices", { variant })}
+            onClick={onLinkClick}
+          >
+            공지사항
+          </Link>
+        </>
+      );
+    }
+
+    // ✅ 2) 셀장 메뉴 구성 (기존 유지)
+    if (isCellLeader) {
+      return (
+        <>
+          <Link
+            to="/dashboard"
+            className={getNavLinkClass("/dashboard", {
+              exact: true,
+              variant,
+            })}
+            onClick={onLinkClick}
+          >
+            대시보드
+          </Link>
+
           <Link
             to="/my-cell"
             className={getNavLinkClass("/my-cell", {
@@ -188,7 +211,6 @@ const MainLayout: React.FC = () => {
             내 셀
           </Link>
 
-          {/* 셀장용 결석 관리 */}
           <Link
             to="/admin/attendance-alerts"
             className={getNavLinkClass("/admin/attendance-alerts", {
@@ -199,7 +221,6 @@ const MainLayout: React.FC = () => {
             결석 관리
           </Link>
 
-          {/* 케어/알림 관련 */}
           <Link
             to="/birthdays"
             className={getNavLinkClass("/birthdays", {
@@ -221,7 +242,7 @@ const MainLayout: React.FC = () => {
       );
     }
 
-    // ✅ 3) 일반 셀원 등 기타 역할
+    // ✅ 3) 일반 셀원 (기존 유지)
     return (
       <>
         <Link

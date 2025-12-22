@@ -1,112 +1,231 @@
 // src/components/attendance/TakeAttendanceView.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { attendanceService } from "../../services/attendanceService";
 import { memberService } from "../../services/memberService";
+import { semesterService } from "../../services/semesterService";
+import { formatDisplayName } from "../../utils/memberUtils";
 import type {
   MemberDto,
   AttendanceStatus,
   User,
   ProcessAttendanceRequest,
   AttendanceAndPrayerItem,
+  SemesterDto,
 } from "../../types";
 import StatusButton from "./StatusButton";
 import ConfirmationModal from "./ConfirmationModal";
+import KoreanCalendarPicker from "../KoreanCalendarPicker";
+import { FaCalendarAlt } from "react-icons/fa";
 
-// 로컬 상태 관리를 위한 인터페이스
+// ─────────────────────────────────────────────────────────────
+// [Internal Component] 단순 알림 모달
+// ─────────────────────────────────────────────────────────────
+const AlertModal: React.FC<{
+  isOpen: boolean;
+  title: string;
+  message: string;
+  onClose: () => void;
+}> = ({ isOpen, title, message, onClose }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 animate-fadeIn">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden transform transition-all scale-100">
+        <div className="p-5">
+          <h3 className="text-lg font-bold text-gray-900 mb-2 break-keep">
+            {title}
+          </h3>
+          <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed break-keep">
+            {message}
+          </p>
+        </div>
+        <div className="bg-gray-50 px-4 py-3 flex justify-end">
+          <button
+            onClick={onClose}
+            className="w-full sm:w-auto inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm"
+          >
+            확인
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+// [Types & Helpers]
+// ─────────────────────────────────────────────────────────────
+
 interface MemberAttendanceForm extends ProcessAttendanceRequest {
   id?: number;
   prayerContent?: string;
+  isExistingData?: boolean;
 }
 
-// 가장 최근 일요일 반환 함수
-const getMostRecentSundayString = (): string => {
-  const now = new Date();
-  const dayOfWeek = now.getDay();
-  const sunday = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate() - dayOfWeek
-  );
-  const year = sunday.getFullYear();
-  const month = String(sunday.getMonth() + 1).padStart(2, "0");
-  const day = String(sunday.getDate()).padStart(2, "0");
+interface TakeAttendanceViewProps {
+  user: User;
+  allMembers: { id: number; name: string; birthDate?: string }[];
+}
+
+const toISODate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
 
-const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
+// 오늘 기준 가장 최근 일요일 구하기
+const getMostRecentSunday = (): Date => {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const sunday = new Date(now);
+  sunday.setDate(now.getDate() - dayOfWeek);
+  return sunday;
+};
+
+// 최근 N주간의 일요일 리스트 생성
+const getRecentSundays = (count: number = 5) => {
+  const sundays: { dateStr: string; label: string }[] = [];
+  const latest = getMostRecentSunday();
+
+  for (let i = 0; i < count; i++) {
+    const d = new Date(latest);
+    d.setDate(latest.getDate() - i * 7);
+    const dateStr = toISODate(d);
+
+    let label = `${d.getMonth() + 1}/${d.getDate()} (이번 주)`;
+    if (i === 1) label = `${d.getMonth() + 1}/${d.getDate()} (지난주)`;
+    else if (i > 1) label = `${d.getMonth() + 1}/${d.getDate()} (${i}주 전)`;
+
+    sundays.push({ dateStr, label });
+  }
+  return sundays;
+};
+
+// ─────────────────────────────────────────────────────────────
+// [Component] Main
+// ─────────────────────────────────────────────────────────────
+
+const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
+  user,
+  allMembers,
+}) => {
+  // ── Data State ──
   const [members, setMembers] = useState<MemberDto[]>([]);
   const [memberAttendances, setMemberAttendances] = useState<
     MemberAttendanceForm[]
   >([]);
+  const [allSemesters, setAllSemesters] = useState<SemesterDto[]>([]);
 
-  const [selectedDate, setSelectedDate] = useState<string>(
-    getMostRecentSundayString()
-  );
+  // ── UI State ──
+  // 초기값을 빈 문자열로 두어, 학기 데이터 로드 및 스마트 설정 전까지 달력을 숨김
+  const [selectedDate, setSelectedDate] = useState<string>("");
 
-  // 셀 보고서 관련 State
   const [cellShare, setCellShare] = useState("");
   const [specialNotes, setSpecialNotes] = useState("");
+  const [isEditMode, setIsEditMode] = useState(false);
 
+  // ── Status & Modal State ──
   const [loading, setLoading] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+
+  const [alertState, setAlertState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+  }>({ isOpen: false, title: "", message: "" });
+
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const handleAttendanceChange = (
-    memberId: number,
-    field: keyof MemberAttendanceForm,
-    value: any
-  ) => {
-    setMemberAttendances((prev) =>
-      prev.map((att) =>
-        att.memberId === memberId ? { ...att, [field]: value } : att
-      )
+  // ── Helpers ──
+  const showAlert = (title: string, message: string) => {
+    setAlertState({ isOpen: true, title, message });
+  };
+  const closeAlert = () => {
+    setAlertState((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  // ── 1. 학기 목록 로드 ──
+  useEffect(() => {
+    const fetchSemesters = async () => {
+      try {
+        const semesters = await semesterService.getAllSemesters(true);
+        // 날짜 비교를 위해 정렬 (필요 시)
+        setAllSemesters(semesters);
+      } catch (e) {
+        console.error("학기 정보 로드 실패", e);
+      }
+    };
+    fetchSemesters();
+  }, []);
+
+  // ─────────────────────────────────────────────────────────────
+  // [NEW] 스마트 초기 날짜 설정
+  // 학기 정보가 로드되면, 오늘 날짜가 학기 내인지 확인하고
+  // 아니라면 가장 최근 학기의 종료일을 기본값으로 잡음.
+  // ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    // 이미 날짜가 설정되어 있거나 학기 정보가 없으면 패스
+    if (selectedDate || allSemesters.length === 0) return;
+
+    const defaultSunday = toISODate(getMostRecentSunday());
+
+    // 1. 오늘 기준 최근 일요일이 학기 기간 내인지 확인
+    const isValidDate = allSemesters.some(
+      (s) => defaultSunday >= s.startDate && defaultSunday <= s.endDate
     );
-  };
 
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (!value) {
-      setSelectedDate(value);
-      return;
-    }
-    const selected = new Date(value + "T00:00:00");
-    const dayOfWeek = selected.getDay();
-    if (dayOfWeek !== 0) {
-      setSubmitError(
-        "출석 체크는 일요일만 가능합니다. 일요일 날짜를 선택해 주세요."
+    if (isValidDate) {
+      setSelectedDate(defaultSunday);
+    } else {
+      // 2. 학기 기간 밖(방학 등)이라면, 가장 최근 학기의 종료일을 찾음
+      const sortedSemesters = [...allSemesters].sort((a, b) =>
+        b.endDate.localeCompare(a.endDate)
       );
-      return;
-    }
-    setSubmitError(null);
-    setSelectedDate(value);
-  };
+      const latestSemester = sortedSemesters[0];
 
-  // ✅ [수정됨] 데이터 불러오기 로직 (보고서 조회 + 기도제목 매핑)
+      if (latestSemester) {
+        setSelectedDate(latestSemester.endDate);
+      } else {
+        // 만약 학기 정보가 하나도 없다면 어쩔 수 없이 오늘 날짜
+        setSelectedDate(defaultSunday);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allSemesters]);
+
+  // [Memo] 선택된 날짜에 해당하는 학기
+  const semesterForSelectedDate = useMemo(() => {
+    if (!selectedDate || allSemesters.length === 0) return null;
+    return allSemesters.find(
+      (s) => selectedDate >= s.startDate && selectedDate <= s.endDate
+    );
+  }, [selectedDate, allSemesters]);
+
+  // ── 2. 데이터 불러오기 (날짜 변경 시) ──
   useEffect(() => {
     const cellId = user.cellId;
-    if (!cellId || !selectedDate) {
+
+    // 날짜가 아직 세팅되지 않았으면 로드하지 않음
+    if (!selectedDate) return;
+
+    if (!cellId) {
       setMembers([]);
       setMemberAttendances([]);
-      if (!cellId) {
-        setSubmitError("셀장 정보에 셀 ID가 없습니다. 관리자에게 문의하세요.");
-      }
+      if (!cellId) setSubmitError("셀장 정보에 셀 ID가 없습니다.");
       return;
     }
 
-    const fetchMembersAndAttendances = async () => {
+    const fetchData = async () => {
       setLoading(true);
       setSubmitError(null);
+      setIsEditMode(false);
+
       try {
-        // Promise.all에 getCellReport 추가
-        // 보고서가 없는 경우(404 등) 에러를 무시하고 null을 반환하도록 catch 처리
         const [membersPage, existingAttendancesPage, cellReportData] =
           await Promise.all([
-            memberService.getAllMembers({
-              cellId,
-              size: 200,
-              active: true,
-            }),
+            memberService.getAllMembers({ cellId, size: 200, active: true }),
             attendanceService.getAttendances({
               startDate: selectedDate,
               endDate: selectedDate,
@@ -115,7 +234,7 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
             }),
             attendanceService
               .getCellReport(cellId, selectedDate)
-              .catch(() => null), // 실패 시 null 반환
+              .catch(() => null),
           ]);
 
         const relevantMembers = membersPage.content.sort((a, b) => {
@@ -127,8 +246,11 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
         });
         setMembers(relevantMembers);
 
-        // 🔹 1. 출석 및 기도제목 매핑
         const existingAttendances = existingAttendancesPage.content;
+        const hasExistingData =
+          existingAttendances.length > 0 || !!cellReportData;
+        setIsEditMode(hasExistingData);
+
         const initialAttendances = relevantMembers.map((member) => {
           const existing = existingAttendances.find(
             (att) => att.member.id === member.id
@@ -140,13 +262,12 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
             status: existing?.status || "PRESENT",
             memo: existing?.memo || "",
             createdById: user.id,
-            // ✅ 기존 기도제목이 있으면 불러오고, 없으면 빈 문자열
             prayerContent: existing?.prayerContent || "",
+            isExistingData: !!existing,
           };
         });
         setMemberAttendances(initialAttendances);
 
-        // 🔹 2. 셀 보고서 데이터 반영 (데이터가 있으면 채우고, 없으면 초기화)
         if (cellReportData) {
           setCellShare(cellReportData.cellShare);
           setSpecialNotes(cellReportData.specialNotes);
@@ -162,31 +283,81 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
       }
     };
 
-    fetchMembersAndAttendances();
+    fetchData();
   }, [selectedDate, user]);
+
+  const recentSundays = useMemo(() => getRecentSundays(5), []);
+
+  // ── Handlers ──
+
+  // 날짜 선택 핸들러 (엄격한 제한 적용)
+  const onDateSelect = (newDateStr: string) => {
+    if (!newDateStr) return;
+
+    // [검증 1] 일요일 체크
+    const selected = new Date(newDateStr + "T00:00:00");
+    if (selected.getDay() !== 0) {
+      showAlert("날짜 선택 불가", "출석 체크는 일요일만 선택 가능합니다.");
+      return;
+    }
+
+    // [검증 2] 학기 범위 포함 여부 체크
+    if (allSemesters.length > 0) {
+      const belongsToAnySemester = allSemesters.some(
+        (s) => newDateStr >= s.startDate && newDateStr <= s.endDate
+      );
+
+      if (!belongsToAnySemester) {
+        showAlert(
+          "날짜 선택 불가",
+          "선택하신 날짜는 등록된 학기 기간에 포함되지 않습니다.\n(방학 기간이거나 등록되지 않은 날짜입니다.)"
+        );
+        return;
+      }
+    }
+
+    // 통과 시 날짜 변경
+    setSubmitError(null);
+    setSelectedDate(newDateStr);
+  };
 
   const handleBulkChange = (status: AttendanceStatus) => {
     setMemberAttendances((prev) => prev.map((att) => ({ ...att, status })));
   };
 
+  const handleAttendanceChange = (
+    memberId: number,
+    field: keyof MemberAttendanceForm,
+    value: any
+  ) => {
+    setMemberAttendances((prev) =>
+      prev.map((att) =>
+        att.memberId === memberId ? { ...att, [field]: value } : att
+      )
+    );
+  };
+
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedDate) return setSubmitError("출석 날짜를 선택해 주세요.");
 
-    if (!selectedDate) {
-      setSubmitError("출석 날짜를 선택해 주세요.");
-      return;
-    }
-    const selected = new Date(selectedDate + "T00:00:00");
-    if (selected.getDay() !== 0) {
-      setSubmitError("출석 체크는 일요일만 가능합니다.");
-      return;
-    }
-    if (memberAttendances.length === 0) {
-      setSubmitError("출석을 처리할 멤버가 없습니다.");
-      return;
+    // 최종 제출 시 학기 체크 (이중 방어)
+    if (allSemesters.length > 0) {
+      const belongsToAnySemester = allSemesters.some(
+        (s) => selectedDate >= s.startDate && selectedDate <= s.endDate
+      );
+      if (!belongsToAnySemester) {
+        showAlert(
+          "저장 불가",
+          "선택하신 날짜는 학기 기간에 포함되지 않아 저장할 수 없습니다."
+        );
+        return;
+      }
     }
 
-    // ✅ 1. 멤버별 기도제목/특이사항 필수 검증
+    if (memberAttendances.length === 0)
+      return setSubmitError("출석을 처리할 멤버가 없습니다.");
+
     for (const member of members) {
       const attendance = memberAttendances.find(
         (a) => a.memberId === member.id
@@ -196,38 +367,25 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
         return;
       }
     }
+    if (!cellShare.trim())
+      return setSubmitError("셀 나눔 내용을 입력해 주세요.");
+    if (!specialNotes.trim())
+      return setSubmitError("셀 특이사항을 입력해 주세요.");
 
-    // ✅ 2. 셀 보고서 필수항목 검증
-    if (!cellShare.trim()) {
-      setSubmitError("셀 나눔(은혜나눔) 내용을 입력해 주세요.");
-      return;
-    }
-
-    // ✅ 3. 특이사항 필수 체크
-    if (!specialNotes.trim()) {
-      setSubmitError(
-        "셀 특이사항을 입력해 주세요. (없으면 '없음'이라도 적어주세요)"
-      );
-      return;
-    }
-
-    setIsModalOpen(true);
+    setIsConfirmModalOpen(true);
   };
 
   const handleConfirmSubmit = async () => {
-    setIsModalOpen(false);
+    setIsConfirmModalOpen(false);
     setLoading(true);
     try {
       const cellId = user.cellId;
-      if (!cellId) {
-        setSubmitError("셀 정보가 없습니다. 관리자에게 문의하세요.");
-        return;
-      }
+      if (!cellId) throw new Error("셀 정보가 없습니다.");
 
       const items: AttendanceAndPrayerItem[] = memberAttendances.map((att) => ({
         memberId: att.memberId,
         status: att.status,
-        memo: undefined, // 메모는 입력받지 않으므로 undefined 처리
+        memo: undefined,
         prayerContent: att.prayerContent?.trim() || undefined,
       }));
 
@@ -239,19 +397,13 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
       };
 
       await attendanceService.processAttendanceWithPrayers(cellId, payload);
-
       setSubmitError(null);
-      setSuccessMessage("셀 보고서 및 출석이 저장되었습니다.");
-
-      setTimeout(() => {
-        setSuccessMessage(null);
-      }, 3000);
+      setSuccessMessage("저장되었습니다.");
+      setTimeout(() => setSuccessMessage(null), 3000);
+      setIsEditMode(true);
     } catch (err: any) {
       setSuccessMessage(null);
-      setSubmitError(
-        err.response?.data?.message ||
-          "출석/기도제목 처리 중 오류가 발생했습니다."
-      );
+      setSubmitError(err.response?.data?.message || "오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
@@ -260,286 +412,397 @@ const TakeAttendanceView: React.FC<{ user: User }> = ({ user }) => {
   const getAttendanceForMember = (memberId: number) =>
     memberAttendances.find((att) => att.memberId === memberId);
 
+  // ── Render ──
   return (
-    <form onSubmit={handleFormSubmit} className="space-y-6">
-      {/* 알림 영역 */}
-      {successMessage && (
-        <div className="p-3 text-sm font-medium text-green-700 bg-green-100 border border-green-400 rounded-md">
-          {successMessage}
-        </div>
-      )}
+    <>
+      <form onSubmit={handleFormSubmit} className="space-y-6 pb-20 sm:pb-0">
+        {successMessage && (
+          <div className="p-3 text-sm font-medium text-green-700 bg-green-100 border border-green-400 rounded-md break-keep">
+            {successMessage}
+          </div>
+        )}
+        {submitError && (
+          <div className="p-3 text-sm font-medium text-red-700 bg-red-100 border border-red-400 rounded-md break-keep">
+            {submitError}
+          </div>
+        )}
 
-      {submitError && (
-        <div className="p-3 text-sm font-medium text-red-700 bg-red-100 border border-red-400 rounded-md">
-          {submitError}
-        </div>
-      )}
-
-      {/* 날짜 선택 영역 */}
-      <div className="p-4 bg-gray-50 rounded-lg">
-        <label
-          htmlFor="attendanceDate"
-          className="block text-sm font-medium text-gray-700"
-        >
-          모임 날짜
-        </label>
-        <div className="mt-1">
-          <input
-            id="attendanceDate"
-            type="date"
-            required
-            value={selectedDate}
-            onChange={handleDateChange}
-            className="block w-full sm:max-w-xs rounded-md border-gray-300 shadow-sm"
-            disabled={loading}
-          />
-        </div>
-        <p className="mt-1 text-xs text-gray-500">
-          일요일만 선택할 수 있습니다.
-        </p>
-      </div>
-
-      {loading && <div className="text-center p-8">로딩 중...</div>}
-
-      {!loading && members.length > 0 && (
-        <>
-          {/* ✅ 1. 일괄 변경 버튼 */}
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="text-sm font-medium text-gray-700">
-              셀원 출석 일괄 변경:
-            </span>
-            <button
-              type="button"
-              onClick={() => handleBulkChange("PRESENT")}
-              className="px-3 py-1 text-xs sm:text-sm border border-green-500 text-green-600 rounded-md hover:bg-green-100 disabled:opacity-50"
-              disabled={loading}
-            >
-              모두 출석
-            </button>
-            <button
-              type="button"
-              onClick={() => handleBulkChange("ABSENT")}
-              className="px-3 py-1 text-xs sm:text-sm border border-red-500 text-red-600 rounded-md hover:bg-red-100 disabled:opacity-50"
-              disabled={loading}
-            >
-              모두 결석
-            </button>
+        {/* ─────────────────────────────────────────────────────────────
+          [날짜 선택 영역]
+         ───────────────────────────────────────────────────────────── */}
+        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="flex justify-between items-center mb-3">
+            <label className="text-sm font-bold text-gray-800">
+              모임 날짜 선택
+            </label>
+            {!loading && selectedDate && (
+              <span
+                className={`px-2.5 py-1 text-xs font-bold rounded-full ${
+                  isEditMode
+                    ? "bg-blue-100 text-blue-700 border border-blue-200"
+                    : "bg-orange-100 text-orange-700 border border-orange-200"
+                }`}
+              >
+                {isEditMode ? "✍ 기존 내용 수정" : "✨ 신규 작성"}
+              </span>
+            )}
           </div>
 
-          {/* ✅ 2. 멤버 리스트 */}
-          {/* 🔹 모바일: 카드 리스트 */}
-          <div className="space-y-3 md:hidden">
-            {members.map((member) => {
-              const attendance = getAttendanceForMember(member.id);
-              if (!attendance) return null;
+          {/* [조건부 렌더링] 
+            selectedDate가 결정되지 않았다면(초기 로딩중) 달력을 보여주지 않음.
+            이로 인해 '오늘 날짜'가 잠깐 보이는 현상을 방지함.
+          */}
+          {!selectedDate ? (
+            <div className="flex justify-center items-center py-10 text-gray-500 text-sm">
+              <div className="flex flex-col items-center">
+                <span className="block mb-2">📅</span>
+                <span>학기 정보를 불러와 날짜를 설정 중입니다...</span>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* 1. 퀵 선택 버튼 */}
+              <div className="flex gap-2 mb-4 overflow-x-auto pb-2 no-scrollbar -mx-1 px-1">
+                {recentSundays.map((sunday) => {
+                  const isValid = allSemesters.some(
+                    (s) =>
+                      sunday.dateStr >= s.startDate &&
+                      sunday.dateStr <= s.endDate
+                  );
 
-              return (
-                <div
-                  key={member.id}
-                  className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-gray-800">
-                      {member.name}
-                    </span>
-                    <span className="text-[10px] text-gray-400">
-                      출석 및 기도제목/특이사항
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5 items-center">
-                    {(["PRESENT", "ABSENT"] as AttendanceStatus[]).map(
-                      (status) => (
-                        <StatusButton
-                          key={status}
-                          status={status}
-                          currentStatus={attendance.status}
-                          onClick={(s) =>
-                            handleAttendanceChange(member.id, "status", s)
-                          }
-                          disabled={loading}
-                          small
-                        />
-                      )
-                    )}
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-medium text-gray-600">
-                      기도제목 및 특이사항{" "}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <textarea
-                      placeholder="기도제목 및 특이사항 (셀장 본인 또는 셀원의 상황을 상세하게 기록해 주시면 상황을 보고 목회자가 연락하겠습니다.)"
-                      required
-                      value={attendance.prayerContent || ""}
-                      onChange={(e) =>
-                        handleAttendanceChange(
-                          member.id,
-                          "prayerContent",
-                          e.target.value
-                        )
-                      }
-                      className="block w-full text-xs p-2 rounded-md border-gray-300 shadow-sm 
-                        focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 
-                        resize-y max-h-40"
-                      rows={2}
-                      disabled={loading}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* 🔹 데스크탑: 테이블 */}
-          <div className="hidden md:block bg-white shadow-md rounded-lg overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="w-[15%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    이름
-                  </th>
-                  <th className="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    출석
-                  </th>
-                  <th className="w-[65%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    기도제목 및 특이사항<span className="text-red-500">*</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {members.map((member) => {
-                  const attendance = getAttendanceForMember(member.id);
-                  if (!attendance) return null;
                   return (
-                    <tr key={member.id}>
-                      <td className="w-[15%] px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-800 align-top">
-                        {member.name}
-                      </td>
-                      <td className="w-[20%] px-4 py-4 whitespace-nowrap align-top">
-                        <div className="flex flex-wrap gap-2 items-center">
-                          {(["PRESENT", "ABSENT"] as AttendanceStatus[]).map(
-                            (status) => (
-                              <StatusButton
-                                key={status}
-                                status={status}
-                                currentStatus={attendance.status}
-                                onClick={(s) =>
-                                  handleAttendanceChange(member.id, "status", s)
-                                }
-                                disabled={loading}
-                                small
-                              />
-                            )
-                          )}
-                        </div>
-                      </td>
-                      <td className="w-[65%] px-4 py-4 align-top">
-                        <textarea
-                          placeholder="기도제목 및 특이사항 (셀원의 상황을 상세하게 기록해 주시면 상황을 보고 목회자가 연락하겠습니다.)"
-                          required
-                          value={attendance.prayerContent || ""}
-                          onChange={(e) =>
-                            handleAttendanceChange(
-                              member.id,
-                              "prayerContent",
-                              e.target.value
-                            )
-                          }
-                          className="mt-1 block w-full text-sm p-2 rounded-md border-gray-300 shadow-sm 
-                          focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 
-                          resize-y max-h-40"
-                          rows={2}
-                          disabled={loading}
-                        />
-                      </td>
-                    </tr>
+                    <button
+                      key={sunday.dateStr}
+                      type="button"
+                      // [수정] 유효하지 않은 날짜는 버튼 자체를 비활성화할지, 아니면 Alert를 띄울지 결정.
+                      // 여기서는 Alert를 띄우기 위해 disable은 안 하되 스타일로 구분함.
+                      onClick={() => onDateSelect(sunday.dateStr)}
+                      className={`flex-shrink-0 px-3.5 py-2 text-xs sm:text-sm rounded-lg border font-medium transition-all active:scale-95 ${
+                        selectedDate === sunday.dateStr
+                          ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
+                          : isValid
+                          ? "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                          : "bg-gray-100 text-gray-400 border-gray-200 opacity-60" // 비활성 느낌 추가
+                      }`}
+                    >
+                      {sunday.label}
+                    </button>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="border-t border-gray-200 my-6"></div>
-
-          {/* ✅ 3. 셀 보고서 입력 섹션 */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-              <h3 className="text-sm font-bold text-gray-800">
-                📝 셀 모임 보고서
-              </h3>
-            </div>
-            <div className="p-4 space-y-4">
-              {/* 셀 나눔 */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  셀 은혜나눔 <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  required
-                  value={cellShare}
-                  onChange={(e) => setCellShare(e.target.value)}
-                  placeholder="셀 나눔 내용과 은혜를 나눠주세요."
-                  rows={3}
-                  className="w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                />
               </div>
 
-              {/* 특이사항 (필수) */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  셀 특이사항 <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  required
-                  value={specialNotes}
-                  onChange={(e) => setSpecialNotes(e.target.value)}
-                  placeholder="심방요청, 결혼, 질병, 장례 등 공유할 내용을 적어주세요."
-                  rows={2}
-                  className="w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                />
+              {/* 2. KoreanCalendarPicker */}
+              {/* [추가] 시각적 구분선 (버튼 vs 달력) */}
+              <div className="relative flex py-3 items-center">
+                <div className="flex-grow border-t border-gray-200"></div>
+                <span className="flex-shrink-0 mx-3 text-gray-400 text-xs font-medium">
+                  또는
+                </span>
+                <div className="flex-grow border-t border-gray-200"></div>
               </div>
-            </div>
-          </div>
 
-          {/* 저장 버튼 */}
-          <div className="flex justify-center md:justify-end pt-4 pb-8">
-            <button
-              type="submit"
-              className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-2.5 rounded-md hover:bg-indigo-700 disabled:bg-indigo-300 text-sm font-semibold shadow-sm"
-              disabled={loading || memberAttendances.length === 0}
-            >
-              {loading ? "저장 중..." : "셀 보고서 및 출석 저장"}
-            </button>
-          </div>
-        </>
-      )}
+              {/* 2. KoreanCalendarPicker (아이콘 및 라벨 추가) */}
+              <div className="relative">
+                {/* 안내 라벨 추가 */}
+                <label className="mb-2 text-xs font-bold text-gray-600 flex items-center gap-1.5">
+                  <FaCalendarAlt className="text-indigo-500 text-sm" />
+                  <span>달력에서 직접 선택</span>
+                </label>
 
-      {!loading && members.length === 0 && !submitError && (
-        <div className="text-center p-8 bg-white rounded-lg shadow-sm text-sm text-gray-600">
-          해당 셀에 활동중인 멤버가 없습니다.
+                {/* 캘린더 컴포넌트 */}
+                <KoreanCalendarPicker
+                  value={selectedDate}
+                  onChange={onDateSelect}
+                />
+
+                {/* 학기 정보 표시 */}
+                {semesterForSelectedDate ? (
+                  <p className="mt-2 text-xs text-gray-500 text-right break-keep flex justify-end items-center gap-1">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                    <span>
+                      <span className="font-bold text-gray-700">
+                        {semesterForSelectedDate.name}
+                      </span>{" "}
+                      기간 ({semesterForSelectedDate.startDate} ~{" "}
+                      {semesterForSelectedDate.endDate})
+                    </span>
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-red-500 text-right font-medium break-keep flex justify-end items-center gap-1">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                    ⚠ 선택한 날짜는 등록된 학기 기간에 포함되지 않습니다.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
         </div>
-      )}
 
+        {loading && (
+          <div className="text-center p-8 text-gray-500">
+            데이터를 불러오는 중...
+          </div>
+        )}
+
+        {!loading && members.length > 0 && selectedDate && (
+          <>
+            {/* 일괄 변경 버튼 */}
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <span className="text-sm font-medium text-gray-700">
+                일괄 상태 변경:
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleBulkChange("PRESENT")}
+                  className="px-3 py-1.5 text-xs border border-green-500 text-green-600 rounded-md hover:bg-green-50 font-medium active:bg-green-100"
+                  disabled={loading}
+                >
+                  모두 출석
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleBulkChange("ABSENT")}
+                  className="px-3 py-1.5 text-xs border border-red-500 text-red-600 rounded-md hover:bg-red-50 font-medium active:bg-red-100"
+                  disabled={loading}
+                >
+                  모두 결석
+                </button>
+              </div>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="space-y-4 md:hidden">
+              {members.map((member) => {
+                const attendance = getAttendanceForMember(member.id);
+                if (!attendance) return null;
+
+                return (
+                  <div
+                    key={member.id}
+                    className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 space-y-3"
+                  >
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
+                      <span className="text-base font-bold text-gray-800 break-keep">
+                        {formatDisplayName(member, allMembers)}
+                      </span>
+                      {attendance.isExistingData && (
+                        <span
+                          className="h-2.5 w-2.5 rounded-full bg-blue-500 ring-2 ring-blue-100"
+                          title="저장된 데이터 있음"
+                        ></span>
+                      )}
+                    </div>
+
+                    {/* [유지] 모바일 출석/결석 버튼 좌측 정렬 (justify-start) */}
+                    <div className="flex flex-wrap gap-2 items-center justify-start">
+                      {(["PRESENT", "ABSENT"] as AttendanceStatus[]).map(
+                        (status) => (
+                          <StatusButton
+                            key={status}
+                            status={status}
+                            currentStatus={attendance.status}
+                            onClick={(s) =>
+                              handleAttendanceChange(member.id, "status", s)
+                            }
+                            disabled={loading}
+                            small
+                          />
+                        )
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5 pt-1">
+                      <label className="text-xs font-semibold text-gray-700 flex items-center">
+                        기도제목 및 특이사항{" "}
+                        <span className="text-red-500 ml-0.5">*</span>
+                      </label>
+                      <textarea
+                        placeholder="상세 내용을 기록해 주세요."
+                        required
+                        value={attendance.prayerContent || ""}
+                        onChange={(e) =>
+                          handleAttendanceChange(
+                            member.id,
+                            "prayerContent",
+                            e.target.value
+                          )
+                        }
+                        className="block w-full text-sm p-3 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-y min-h-[100px]"
+                        rows={3}
+                        disabled={loading}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="w-[15%] px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                      이름
+                    </th>
+                    <th className="w-[20%] px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                      출석
+                    </th>
+                    <th className="w-[65%] px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                      기도제목 및 특이사항
+                      <span className="text-red-500 ml-0.5">*</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {members.map((member) => {
+                    const attendance = getAttendanceForMember(member.id);
+                    if (!attendance) return null;
+                    return (
+                      <tr
+                        key={member.id}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="w-[15%] px-6 py-4 font-medium text-gray-900 align-top pt-5">
+                          {formatDisplayName(member, allMembers)}
+                          {attendance.isExistingData && (
+                            <span className="ml-2 inline-block h-1.5 w-1.5 rounded-full bg-blue-400 align-middle"></span>
+                          )}
+                        </td>
+                        <td className="w-[20%] px-6 py-4 align-top pt-5">
+                          <div className="flex gap-2">
+                            {(["PRESENT", "ABSENT"] as AttendanceStatus[]).map(
+                              (status) => (
+                                <StatusButton
+                                  key={status}
+                                  status={status}
+                                  currentStatus={attendance.status}
+                                  onClick={(s) =>
+                                    handleAttendanceChange(
+                                      member.id,
+                                      "status",
+                                      s
+                                    )
+                                  }
+                                  disabled={loading}
+                                  small
+                                />
+                              )
+                            )}
+                          </div>
+                        </td>
+                        <td className="w-[65%] px-6 py-4 align-top">
+                          <textarea
+                            placeholder="상세 내용을 기록해 주세요."
+                            required
+                            value={attendance.prayerContent || ""}
+                            onChange={(e) =>
+                              handleAttendanceChange(
+                                member.id,
+                                "prayerContent",
+                                e.target.value
+                              )
+                            }
+                            className="mt-1 block w-full text-sm p-3 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-y min-h-[80px]"
+                            rows={2}
+                            disabled={loading}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="border-t border-gray-200 my-8"></div>
+
+            {/* 셀 보고서 입력 */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center gap-2">
+                <span className="text-lg">📝</span>
+                <h3 className="text-sm font-bold text-gray-800">
+                  셀 모임 보고서
+                </h3>
+              </div>
+              <div className="p-4 sm:p-6 space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    셀 은혜나눔 <span className="text-red-500 ml-0.5">*</span>
+                  </label>
+                  <textarea
+                    required
+                    value={cellShare}
+                    onChange={(e) => setCellShare(e.target.value)}
+                    placeholder="셀 나눔 내용과 은혜를 나눠주세요."
+                    rows={4}
+                    className="w-full text-sm p-3 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 min-h-[100px]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    셀 특이사항 <span className="text-red-500 ml-0.5">*</span>
+                  </label>
+                  <textarea
+                    required
+                    value={specialNotes}
+                    onChange={(e) => setSpecialNotes(e.target.value)}
+                    placeholder="공유할 내용을 적어주세요."
+                    rows={3}
+                    className="w-full text-sm p-3 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 min-h-[80px]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 저장 버튼 */}
+            <div className="flex justify-center md:justify-end pt-6 pb-8 sticky bottom-0 bg-gray-50 p-4 -mx-4 sm:static sm:bg-transparent sm:p-0 sm:mx-0 border-t sm:border-t-0 border-gray-200 z-10">
+              <button
+                type="submit"
+                className="w-full sm:w-auto bg-indigo-600 text-white px-8 py-3 rounded-md hover:bg-indigo-700 disabled:bg-indigo-300 text-base font-bold shadow-md transition-all active:scale-95"
+                disabled={loading || memberAttendances.length === 0}
+              >
+                {loading
+                  ? "저장 중..."
+                  : isEditMode
+                  ? "수정사항 저장"
+                  : "보고서 및 출석 저장"}
+              </button>
+            </div>
+          </>
+        )}
+      </form>
+
+      {/* Confirmation Modal */}
       <ConfirmationModal
-        isOpen={isModalOpen}
+        isOpen={isConfirmModalOpen}
         onConfirm={handleConfirmSubmit}
-        onCancel={() => setIsModalOpen(false)}
+        onCancel={() => setIsConfirmModalOpen(false)}
         title="보고서 저장 확인"
       >
-        <div className="text-sm space-y-2">
+        <div className="text-sm space-y-3 break-keep">
           <p>
-            <span className="font-semibold">{selectedDate}</span> 날짜의 셀
-            보고서와
+            <span className="font-bold text-indigo-600">{selectedDate}</span>{" "}
+            날짜의
           </p>
           <p>멤버들의 출석 및 셀 모임 보고서 내용을 저장하시겠습니까?</p>
-          <p className="text-xs text-gray-500 mt-2">
-            (기존에 저장된 내용이 있다면 덮어씌워집니다.)
-          </p>
+          {isEditMode && (
+            <p className="text-xs text-orange-600 bg-orange-50 p-2 rounded border border-orange-100 font-medium">
+              ⚠ 이미 저장된 보고서가 있습니다. 저장 시 덮어씌워집니다.
+            </p>
+          )}
         </div>
       </ConfirmationModal>
-    </form>
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertState.isOpen}
+        title={alertState.title}
+        message={alertState.message}
+        onClose={closeAlert}
+      />
+    </>
   );
 };
 

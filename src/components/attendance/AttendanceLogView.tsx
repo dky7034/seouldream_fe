@@ -1,8 +1,9 @@
-// src/components/AttendanceLogView.tsx
+// src/components/attendance/AttendanceLogView.tsx
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { attendanceService } from "../../services/attendanceService";
 import { memberService } from "../../services/memberService";
 import { semesterService } from "../../services/semesterService";
+import { formatDisplayName } from "../../utils/memberUtils";
 import type {
   MemberDto,
   AttendanceDto,
@@ -17,6 +18,7 @@ import { FaTh, FaChartBar } from "react-icons/fa";
 
 interface AttendanceLogViewProps {
   user: User;
+  allMembers: { id: number; name: string; birthDate?: string }[];
 }
 
 type FilterMode = "unit" | "range";
@@ -26,7 +28,6 @@ type UnitType = "month" | "semester";
  * Helpers (프로덕션용 안전 버전)
  * ----------------------------- */
 
-/** YYYY-MM-DD를 로컬 00:00:00 Date로 파싱 (UTC 파싱 방지) */
 const parseLocal = (dateStr: string | undefined | null): Date | null => {
   if (!dateStr) return null;
   const [y, m, d] = dateStr.slice(0, 10).split("-").map(Number);
@@ -34,13 +35,11 @@ const parseLocal = (dateStr: string | undefined | null): Date | null => {
   return new Date(y, m - 1, d);
 };
 
-/** 어떤 date 문자열이든 YYYY-MM-DD로 정규화 */
 const normalizeISODate = (v: string | undefined | null) => {
   if (!v) return "";
   return v.slice(0, 10);
 };
 
-/** Date -> YYYY-MM-DD (로컬 기준) */
 const toLocalISODate = (date: Date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -48,7 +47,6 @@ const toLocalISODate = (date: Date) => {
   return `${y}-${m}-${d}`;
 };
 
-/** AttendanceDto에서 member id를 최대한 안전하게 추출 */
 const getAttendanceMemberId = (att: any): string | number | null => {
   if (att?.memberId !== undefined && att?.memberId !== null)
     return att.memberId;
@@ -66,8 +64,6 @@ const getAttendanceMemberId = (att: any): string | number | null => {
 
 /** ------------------------------------------------------------
  * AttendanceMatrixView
- * - 통계 + 매트릭스
- * - 미체크 주 계산: 일요일 기준, (cellAssignmentDate 우선 / 없으면 joinYear-01-01)
  * ------------------------------------------------------------ */
 const AttendanceMatrixView: React.FC<{
   members: MemberDto[];
@@ -82,6 +78,7 @@ const AttendanceMatrixView: React.FC<{
   limitStartDate?: string;
   limitEndDate?: string;
   filterMode: FilterMode;
+  allMembers: { id: number; name: string; birthDate?: string }[];
 }> = ({
   members,
   attendances,
@@ -95,8 +92,8 @@ const AttendanceMatrixView: React.FC<{
   limitStartDate,
   limitEndDate,
   filterMode,
+  allMembers,
 }) => {
-  // ✅ "미체크된 주(Week)" 계산
   const uncheckedCount = useMemo(() => {
     if (!startDate || !endDate || members.length === 0) return 0;
 
@@ -108,7 +105,6 @@ const AttendanceMatrixView: React.FC<{
     filterEnd.setHours(0, 0, 0, 0);
     if (filterStart > filterEnd) return 0;
 
-    // 1) 기간 내 모든 일요일 목록 생성 (YYYY-MM-DD)
     const targetSundays: string[] = [];
     const cur = new Date(filterStart);
 
@@ -117,7 +113,6 @@ const AttendanceMatrixView: React.FC<{
       cur.setDate(cur.getDate() + 1);
     }
 
-    // 2) 출석 데이터 Set (Key: memberId-YYYY-MM-DD)
     const attendanceSet = new Set<string>();
     for (const a of attendances) {
       const mId = getAttendanceMemberId(a);
@@ -129,7 +124,6 @@ const AttendanceMatrixView: React.FC<{
       attendanceSet.add(`${String(mId)}-${dateKey}`);
     }
 
-    // 3) 각 일요일마다 검사
     let incompleteWeeks = 0;
 
     for (const sundayStr of targetSundays) {
@@ -158,54 +152,62 @@ const AttendanceMatrixView: React.FC<{
     return incompleteWeeks;
   }, [startDate, endDate, members, attendances]);
 
-  // 통계
   const summary = useMemo(() => {
     const present = attendances.filter((a) => a.status === "PRESENT").length;
     const absent = attendances.filter((a) => a.status === "ABSENT").length;
     return { present, absent, unchecked: uncheckedCount };
   }, [attendances, uncheckedCount]);
 
-  // 매트릭스 멤버 포맷
   const matrixMembers = useMemo(
-    () => members.map((m) => ({ memberId: m.id, memberName: m.name })),
-    [members]
+    () =>
+      members.map((m) => {
+        const found = allMembers.find((am) => am.id === m.id);
+        return {
+          memberId: m.id,
+          memberName: found ? formatDisplayName(found, allMembers) : m.name,
+        };
+      }),
+    [members, allMembers]
   );
 
-  // Matrix 모드: range 또는 semester => semester
   const matrixMode =
     filterMode === "range" || unitType === "semester" ? "semester" : "month";
 
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* 통계 카드 */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 text-center">
-        <div className="p-4 bg-green-50 rounded-xl border border-green-100">
-          <p className="text-xs sm:text-sm font-medium text-green-600">출석</p>
-          <p className="mt-1 text-2xl sm:text-3xl font-bold text-green-700">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 text-center">
+        <div className="p-3 sm:p-4 bg-green-50 rounded-xl border border-green-100">
+          <p className="text-xs sm:text-sm font-medium text-green-600 break-keep">
+            출석
+          </p>
+          <p className="mt-1 text-xl sm:text-3xl font-bold text-green-700">
             {summary.present}
           </p>
         </div>
 
-        <div className="p-4 bg-red-50 rounded-xl border border-red-100">
-          <p className="text-xs sm:text-sm font-medium text-red-600">결석</p>
-          <p className="mt-1 text-2xl sm:text-3xl font-bold text-red-700">
+        <div className="p-3 sm:p-4 bg-red-50 rounded-xl border border-red-100">
+          <p className="text-xs sm:text-sm font-medium text-red-600 break-keep">
+            결석
+          </p>
+          <p className="mt-1 text-xl sm:text-3xl font-bold text-red-700">
             {summary.absent}
           </p>
         </div>
 
-        <div className="p-4 bg-gray-100 rounded-xl border border-gray-200">
-          <p className="text-xs sm:text-sm font-medium text-gray-500">
+        <div className="p-3 sm:p-4 bg-gray-100 rounded-xl border border-gray-200 col-span-2 lg:col-span-1">
+          <p className="text-xs sm:text-sm font-medium text-gray-500 break-keep">
             출석 체크 누락 (주)
           </p>
-          <p className="mt-1 text-2xl sm:text-3xl font-bold text-gray-600">
+          <p className="mt-1 text-xl sm:text-3xl font-bold text-gray-600">
             {summary.unchecked}
           </p>
         </div>
       </div>
 
       {/* 매트릭스 */}
-      <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-4">
-        <h4 className="text-sm font-bold text-gray-700 mb-4 ml-1 flex items-center">
+      <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-3 sm:p-4">
+        <h4 className="text-sm font-bold text-gray-700 mb-4 ml-1 flex items-center break-keep">
           <FaTh className="mr-2 text-indigo-500" />
           {matrixMode === "semester" ? "기간 전체 현황" : "월간 상세 현황"}
         </h4>
@@ -218,7 +220,6 @@ const AttendanceMatrixView: React.FC<{
           month={month}
           members={matrixMembers}
           attendances={attendances}
-          // ✅ 핵심: AttendanceMatrix가 필수 콜백을 요구한다면 undefined 방지
           onMonthChange={onMonthChange ?? (() => {})}
           loading={loading}
           limitStartDate={limitStartDate}
@@ -232,7 +233,10 @@ const AttendanceMatrixView: React.FC<{
 /** ------------------------------------------------------------
  * Main Component
  * ------------------------------------------------------------ */
-const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
+const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
+  user,
+  allMembers,
+}) => {
   const now = new Date();
   const isCellLeader = user.role === "CELL_LEADER";
 
@@ -264,7 +268,6 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 현재 날짜가 학기 범위 또는 시작/종료 월에 걸치는지
   const isDateInSemesterOrSameMonth = useCallback(
     (date: Date, semester: SemesterDto) => {
       const start = new Date(semester.startDate);
@@ -334,7 +337,6 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
     }
   }, []);
 
-  // 최초 학기/월 초기값 세팅
   useEffect(() => {
     if (semesters.length === 0) return;
     if (isInitialized) return;
@@ -529,19 +531,15 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
       : members;
   }, [members, filters.memberId]);
 
-  // Matrix/Stats에 넘길 날짜 범위
   const viewProps = useMemo(() => {
-    // 1) range 모드
     if (filterMode === "range")
       return { sDate: filters.startDate, eDate: filters.endDate };
 
-    // 2) 학기 모드
     if (unitType === "semester") {
       const sem = semesters.find((s) => s.id === filters.semesterId);
       return { sDate: sem?.startDate || "", eDate: sem?.endDate || "" };
     }
 
-    // 3) 월 모드 (학기 교집합)
     const y = filters.year;
     const m = filters.month;
 
@@ -561,8 +559,15 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
   }, [filterMode, unitType, filters, semesters, selectedSemester]);
 
   const memberOptions = useMemo(
-    () => members.map((m) => ({ value: m.id, label: m.name })),
-    [members]
+    () =>
+      members.map((m) => {
+        const found = allMembers.find((am) => am.id === m.id);
+        return {
+          value: m.id,
+          label: found ? formatDisplayName(found, allMembers) : m.name,
+        };
+      }),
+    [members, allMembers]
   );
 
   return (
@@ -574,37 +579,39 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
       )}
 
       {/* Control Panel */}
-      <div className="p-4 bg-gray-50 rounded-lg space-y-4 border border-gray-200">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="p-3 sm:p-4 bg-gray-50 rounded-lg space-y-4 border border-gray-200">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-2">
             <FaChartBar className="text-indigo-500" />
-            <h3 className="text-lg font-semibold text-gray-800">출석부 조회</h3>
+            <h3 className="text-lg font-semibold text-gray-800 break-keep">
+              출석부 조회
+            </h3>
           </div>
 
           {!isCellLeader && (
-            <div className="bg-white p-1 rounded-lg border border-gray-200 flex text-sm">
+            <div className="bg-white p-1 rounded-lg border border-gray-200 flex text-sm w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setFilterMode("unit")}
-                className={`px-3 py-1 rounded-md transition-colors ${
+                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ${
                   filterMode === "unit"
                     ? "bg-blue-100 text-blue-700 font-medium"
                     : "text-gray-500 hover:bg-gray-50"
                 }`}
               >
-                학기/월 단위
+                학기/월
               </button>
               <div className="w-px bg-gray-200 my-1 mx-1" />
               <button
                 type="button"
                 onClick={() => setFilterMode("range")}
-                className={`px-3 py-1 rounded-md transition-colors ${
+                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ${
                   filterMode === "range"
                     ? "bg-blue-100 text-blue-700 font-medium"
                     : "text-gray-500 hover:bg-gray-50"
                 }`}
               >
-                직접 기간 입력
+                직접 입력
               </button>
             </div>
           )}
@@ -624,7 +631,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
                 onChange={(e) =>
                   handleFilterChange("startDate", e.target.value)
                 }
-                className="block w-full border-gray-300 rounded-md shadow-sm h-[40px] px-3 focus:ring-blue-500 focus:border-blue-500"
+                className="block w-full border-gray-300 rounded-md shadow-sm h-[40px] px-3 focus:ring-blue-500 focus:border-blue-500 bg-white"
               />
             </div>
             <div>
@@ -635,12 +642,13 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
                 type="date"
                 value={filters.endDate}
                 onChange={(e) => handleFilterChange("endDate", e.target.value)}
-                className="block w-full border-gray-300 rounded-md shadow-sm h-[40px] px-3 focus:ring-blue-500 focus:border-blue-500"
+                className="block w-full border-gray-300 rounded-md shadow-sm h-[40px] px-3 focus:ring-blue-500 focus:border-blue-500 bg-white"
               />
             </div>
           </div>
         ) : (
           <div className="space-y-4">
+            {/* 학기 선택 및 단위 선택 */}
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
@@ -649,7 +657,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
                 <select
                   value={filters.semesterId}
                   onChange={(e) => handleSemesterChange(Number(e.target.value))}
-                  className="block w-full border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+                  className="block w-full border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 bg-white"
                 >
                   {semesters.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -659,15 +667,15 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
                 </select>
               </div>
 
-              <div className="min-w-[180px]">
+              <div className="sm:min-w-[180px]">
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
                   조회 단위
                 </label>
-                <div className="flex bg-white rounded-md border border-gray-300 overflow-hidden">
+                <div className="flex bg-white rounded-md border border-gray-300 overflow-hidden w-full">
                   <button
                     type="button"
                     onClick={() => handleUnitTypeClick("month")}
-                    className={`flex-1 py-2 text-sm transition-colors ${
+                    className={`flex-1 py-2 text-sm transition-colors whitespace-nowrap ${
                       unitType === "month"
                         ? "bg-blue-600 text-white font-medium"
                         : "text-gray-600 hover:bg-gray-50"
@@ -679,7 +687,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
                   <button
                     type="button"
                     onClick={() => handleUnitTypeClick("semester")}
-                    className={`flex-1 py-2 text-sm transition-colors ${
+                    className={`flex-1 py-2 text-sm transition-colors whitespace-nowrap ${
                       unitType === "semester"
                         ? "bg-blue-600 text-white font-medium"
                         : "text-gray-600 hover:bg-gray-50"
@@ -691,13 +699,15 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
               </div>
             </div>
 
+            {/* 월 선택 (가로 스크롤 적용) */}
             {unitType === "month" && (
               <div className="bg-white p-3 rounded-md border border-gray-200">
-                <div className="text-xs text-gray-400 mb-2">
+                <div className="text-xs text-gray-400 mb-2 break-keep">
                   * 선택된 학기({selectedSemester?.name})에 포함된 월만
                   표시됩니다.
                 </div>
-                <div className="flex flex-wrap gap-2">
+                {/* [수정] 가로 스크롤 영역 */}
+                <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x">
                   {semesterMonths.length > 0 ? (
                     semesterMonths.map((m) => {
                       const isActive =
@@ -709,10 +719,10 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
                           onClick={() =>
                             handleMonthButtonClick(m.year, m.month)
                           }
-                          className={`px-4 py-2 text-sm rounded-md transition-all shadow-sm ${
+                          className={`flex-shrink-0 snap-start px-4 py-2 text-sm rounded-md transition-all shadow-sm border ${
                             isActive
-                              ? "bg-blue-600 text-white font-bold ring-2 ring-blue-300"
-                              : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-blue-400"
+                              ? "bg-blue-600 text-white font-bold border-blue-600 ring-2 ring-blue-300"
+                              : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-blue-400"
                           }`}
                         >
                           {m.year !== filters.year && (
@@ -758,7 +768,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
               <select
                 value={filters.status}
                 onChange={(e) => handleFilterChange("status", e.target.value)}
-                className="block w-full border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:ring-blue-500 focus:border-blue-500"
+                className="block w-full border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white"
               >
                 <option value="all">모든 상태</option>
                 <option value="PRESENT">출석만 표시</option>
@@ -783,6 +793,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({ user }) => {
         limitStartDate={selectedSemester?.startDate}
         limitEndDate={selectedSemester?.endDate}
         filterMode={filterMode}
+        allMembers={allMembers}
       />
     </div>
   );

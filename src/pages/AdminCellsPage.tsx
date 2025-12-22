@@ -16,6 +16,8 @@ import { formatDisplayName } from "../utils/memberUtils";
 import { memberService } from "../services/memberService";
 import { semesterService } from "../services/semesterService";
 import type { SemesterDto } from "../types";
+// ✅ [추가] 달력 컴포넌트 import
+import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
 
 type SortKey =
   | "name"
@@ -116,11 +118,13 @@ const AdminCellsPage: React.FC = () => {
   };
 
   // 🔹 URL에서 초기 정렬/페이지 읽기
+  // [수정 후] ✅
   const [sortConfig, setSortConfig] = useState<SortConfig>(() => {
     const key = getValidSortKey(searchParams.get("sortKey"));
     const dirParam = searchParams.get("sortDir");
+    // URL 파라미터가 'descending'이라고 명시되지 않은 이상 무조건 'ascending' (기본값)
     const direction: SortConfig["direction"] =
-      dirParam === "ascending" ? "ascending" : "descending";
+      dirParam === "descending" ? "descending" : "ascending";
     return { key, direction };
   });
 
@@ -131,11 +135,13 @@ const AdminCellsPage: React.FC = () => {
   });
 
   // 🔹 브라우저 뒤로가기/앞으로가기 동기화
+  // [수정 후] ✅
   useEffect(() => {
     const key = getValidSortKey(searchParams.get("sortKey"));
     const dirParam = searchParams.get("sortDir");
+    // 여기도 동일하게 로직 변경
     const direction: SortConfig["direction"] =
-      dirParam === "ascending" ? "ascending" : "descending";
+      dirParam === "descending" ? "descending" : "ascending";
 
     const pageParam = searchParams.get("page");
     const pageNum = pageParam ? Number(pageParam) : 0;
@@ -149,7 +155,7 @@ const AdminCellsPage: React.FC = () => {
     setCurrentPage((prev) => (prev === safePage ? prev : safePage));
   }, [searchParams]);
 
-  // ✅ [수정] 학기 자동 선택 로직 (초기 로딩 시)
+  // ✅ 학기 자동 선택 로직
   useEffect(() => {
     if (semesters.length > 0 && !hasAutoSelectedSemester) {
       const now = new Date();
@@ -157,7 +163,6 @@ const AdminCellsPage: React.FC = () => {
         now.getMonth() + 1
       ).padStart(2, "0")}`;
 
-      // 1. 현재 '월'이 학기 기간에 포함되는지 확인
       let targetSemester = semesters.find((s) => {
         const startYearMonth = s.startDate.substring(0, 7);
         const endYearMonth = s.endDate.substring(0, 7);
@@ -166,7 +171,6 @@ const AdminCellsPage: React.FC = () => {
         );
       });
 
-      // 2. 없으면 최신 학기 선택
       if (!targetSemester) {
         const sorted = [...semesters].sort((a, b) => b.id - a.id);
         targetSemester = sorted[0];
@@ -495,14 +499,13 @@ const AdminCellsPage: React.FC = () => {
     setSearchParams(nextParams);
   };
 
-  // ✅ [수정] 단위 타입 클릭 핸들러 (학기 선택 시 자동 학기 매핑 로직 추가)
   const handleUnitTypeClick = (type: "year" | "month" | "semester") => {
     setUnitType(type);
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;
 
-    const next: Filters = { ...filters }; // 타입 명시
+    const next: Filters = { ...filters };
 
     if (type === "year") {
       if (!next.year) next.year = currentYear;
@@ -515,26 +518,19 @@ const AdminCellsPage: React.FC = () => {
     } else if (type === "semester") {
       next.year = "";
       next.month = "";
-
-      // ✅ 학기 버튼 클릭 시: 현재 월에 맞는 학기를 찾아 자동 선택
       if (semesters.length > 0) {
         const currentYearMonth = `${currentYear}-${String(
           currentMonth
         ).padStart(2, "0")}`;
-
-        // 1. 현재 월이 포함된 학기 찾기
         let target = semesters.find((s) => {
           const start = s.startDate.substring(0, 7);
           const end = s.endDate.substring(0, 7);
           return currentYearMonth >= start && currentYearMonth <= end;
         });
-
-        // 2. 없으면 가장 최신 학기 선택
         if (!target) {
           const sorted = [...semesters].sort((a, b) => b.id - a.id);
           target = sorted[0];
         }
-
         if (target) {
           next.semesterId = target.id;
         }
@@ -548,7 +544,6 @@ const AdminCellsPage: React.FC = () => {
     setSearchParams(nextParams);
   };
 
-  // ✅ [수정] unit 파라미터 삭제
   const handleUnitValueClick = (value: number) => {
     const nextFilters: Filters = {
       ...filters,
@@ -561,7 +556,6 @@ const AdminCellsPage: React.FC = () => {
     setSearchParams(nextParams);
   };
 
-  // ✅ [수정] 버튼 렌더링
   const renderUnitButtons = () => {
     switch (unitType) {
       case "month":
@@ -570,7 +564,6 @@ const AdminCellsPage: React.FC = () => {
             {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
               <button
                 key={m}
-                // ✅ [수정] "month" 인자 삭제
                 onClick={() => handleUnitValueClick(m)}
                 className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.month === m ? "bg-blue-500 text-white" : "bg-white"
@@ -644,7 +637,6 @@ const AdminCellsPage: React.FC = () => {
           </div>
         )}
 
-        {/* 필터 영역 */}
         <div className="p-4 bg-gray-50 rounded-lg mb-6 shadow-sm space-y-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-base sm:text-lg font-semibold">
@@ -676,35 +668,31 @@ const AdminCellsPage: React.FC = () => {
 
           {filterType === "range" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* ✅ [수정] 기본 input -> KoreanCalendarPicker로 교체 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   기간 시작
                 </label>
-                <input
-                  type="date"
-                  value={filters.startDate}
-                  onChange={(e) =>
-                    handleFilterChange("startDate", e.target.value)
-                  }
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
-                />
+                <div className="relative">
+                  <KoreanCalendarPicker
+                    value={filters.startDate}
+                    onChange={(date) => handleFilterChange("startDate", date)}
+                  />
+                </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   기간 종료
                 </label>
-                <input
-                  type="date"
-                  value={filters.endDate}
-                  onChange={(e) =>
-                    handleFilterChange("endDate", e.target.value)
-                  }
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
-                />
+                <div className="relative">
+                  <KoreanCalendarPicker
+                    value={filters.endDate}
+                    onChange={(date) => handleFilterChange("endDate", date)}
+                  />
+                </div>
               </div>
             </div>
           ) : (
-            // ✅ 단위 조회 (월간 -> 학기 -> 연간 순서)
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -740,7 +728,6 @@ const AdminCellsPage: React.FC = () => {
                     조회 단위
                   </label>
                   <div className="flex flex-wrap items-center gap-2 mt-1">
-                    {/* 1. 월간 (맨 앞) */}
                     <button
                       type="button"
                       onClick={() => handleUnitTypeClick("month")}
@@ -753,7 +740,6 @@ const AdminCellsPage: React.FC = () => {
                       월간
                     </button>
 
-                    {/* 2. 학기 (중간) */}
                     <button
                       type="button"
                       onClick={() =>
@@ -771,7 +757,6 @@ const AdminCellsPage: React.FC = () => {
                       학기
                     </button>
 
-                    {/* 3. 연간 (맨 뒤) */}
                     <button
                       type="button"
                       onClick={() => handleUnitTypeClick("year")}
@@ -848,7 +833,6 @@ const AdminCellsPage: React.FC = () => {
 
         {!loading && cellPage && (
           <>
-            {/* 🔹 모바일: 카드 리스트 */}
             <div className="space-y-3 md:hidden mb-4">
               {sortedCells.length === 0 ? (
                 <div className="bg-white rounded-lg shadow border border-gray-100 p-4 text-center text-xs text-gray-500">
@@ -947,7 +931,6 @@ const AdminCellsPage: React.FC = () => {
               )}
             </div>
 
-            {/* 🔹 데스크탑: 테이블 */}
             <div className="hidden md:block bg-white shadow-md rounded-lg overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
                 <thead className="bg-gray-50">

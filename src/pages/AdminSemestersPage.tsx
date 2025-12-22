@@ -8,6 +8,7 @@ import type {
 } from "../types";
 import ConfirmModal from "../components/ConfirmModal";
 import AlertModal from "../components/AlertModal";
+import KoreanCalendarPicker from "../components/KoreanCalendarPicker"; // ✅ 전달주신 컴포넌트 임포트
 
 const AdminSemestersPage: React.FC = () => {
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
@@ -17,6 +18,7 @@ const AdminSemestersPage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
+  // ✅ 초기값은 요청하신 대로 빈 문자열("")로 비워둡니다.
   const [form, setForm] = useState<{
     name: string;
     startDate: string;
@@ -45,6 +47,7 @@ const AdminSemestersPage: React.FC = () => {
   };
 
   const resetForm = () => {
+    // ✅ 폼 초기화 시에도 날짜를 비워둡니다.
     setForm({
       name: "",
       startDate: "",
@@ -87,6 +90,14 @@ const AdminSemestersPage: React.FC = () => {
     }));
   };
 
+  // ✅ KoreanCalendarPicker는 선택된 날짜 문자열("YYYY-MM-DD")을 그대로 반환합니다.
+  const handleDateStringChange = (
+    field: "startDate" | "endDate",
+    val: string
+  ) => {
+    setForm((prev) => ({ ...prev, [field]: val }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -95,7 +106,7 @@ const AdminSemestersPage: React.FC = () => {
       return;
     }
 
-    // (선택) 날짜 유효성 간단 체크: 종료일 >= 시작일
+    // 날짜 유효성 체크: 종료일 >= 시작일
     if (form.endDate < form.startDate) {
       showAlert("입력 오류", "종료일은 시작일 이후여야 합니다.");
       return;
@@ -139,13 +150,11 @@ const AdminSemestersPage: React.FC = () => {
     });
   };
 
-  // 삭제 버튼 클릭 시: 모달 오픈
   const handleDeleteClick = (id: number) => {
     setSemesterToDelete(id);
     setIsDeleteModalOpen(true);
   };
 
-  // 모달에서 "삭제" 확인
   const handleConfirmDelete = async () => {
     if (semesterToDelete == null) return;
 
@@ -181,7 +190,6 @@ const AdminSemestersPage: React.FC = () => {
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="container mx-auto max-w-4xl px-3 sm:px-4 py-6 sm:py-8">
-        {/* 알림 Modal */}
         <AlertModal
           isOpen={isAlertModalOpen}
           onClose={() => setIsAlertModalOpen(false)}
@@ -189,7 +197,6 @@ const AdminSemestersPage: React.FC = () => {
           message={alertModalMessage}
         />
 
-        {/* 삭제 ConfirmModal */}
         <ConfirmModal
           isOpen={isDeleteModalOpen}
           onClose={() => setIsDeleteModalOpen(false)}
@@ -206,14 +213,11 @@ const AdminSemestersPage: React.FC = () => {
             </h1>
             <p className="mt-1 text-sm text-gray-600">
               임원단이 생성하는 실제 학기 단위를 등록하고, 활성 상태를
-              관리합니다. <br />
-              활성 학기만 출석·공지·기도제목 페이지의 ‘학기 단위 조회’에서
-              선택할 수 있습니다.
+              관리합니다.
             </p>
           </div>
         </div>
 
-        {/* 에러 메시지 */}
         {error && (
           <div className="mb-4 rounded-md bg-red-50 p-4 text-xs sm:text-sm text-red-700">
             {error}
@@ -239,35 +243,32 @@ const AdminSemestersPage: React.FC = () => {
                 value={form.name}
                 onChange={handleChange}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                placeholder="예: 2025년 1학기, 2025년 상반기"
+                placeholder="예: 2025년 봄학기"
               />
             </div>
+
+            {/* 시작일 - 초기값은 "" 이며 비워져 있습니다. */}
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 시작일 <span className="text-red-500">*</span>
               </label>
-              <input
-                type="date"
-                name="startDate"
+              <KoreanCalendarPicker
                 value={form.startDate}
-                onChange={handleChange}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                onChange={(val) => handleDateStringChange("startDate", val)}
               />
             </div>
+
+            {/* 종료일 - 초기값은 "" 이며 비워져 있습니다. */}
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 종료일 <span className="text-red-500">*</span>
               </label>
-              <input
-                type="date"
-                name="endDate"
+              <KoreanCalendarPicker
                 value={form.endDate}
-                onChange={handleChange}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                onChange={(val) => handleDateStringChange("endDate", val)}
               />
             </div>
 
-            {/* ✅ 여기서 '이 학기를 바로 활성화하기' 제거, 버튼만 우측 정렬 */}
             <div className="md:col-span-4 flex flex-wrap items-center justify-end gap-2 pt-2">
               <div className="flex flex-wrap gap-2">
                 {isEditing && (
@@ -291,7 +292,7 @@ const AdminSemestersPage: React.FC = () => {
           </form>
         </div>
 
-        {/* 학기 목록 - 모바일 카드 리스트 */}
+        {/* 학기 목록 리스트 (모바일) */}
         <div className="space-y-3 md:hidden">
           {loading && semesters.length === 0 && (
             <div className="px-4 py-6 text-center text-xs sm:text-sm text-gray-500 bg-white rounded-lg shadow">
@@ -316,7 +317,6 @@ const AdminSemestersPage: React.FC = () => {
                     {semester.name}
                   </h3>
                 </div>
-                {/* 활성 상태 토글 + 라벨 */}
                 <div className="flex items-center">
                   <button
                     type="button"
@@ -348,7 +348,6 @@ const AdminSemestersPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* 날짜 정보 */}
               <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-gray-700">
                 <div>
                   <p className="text-gray-400">시작일</p>
@@ -360,7 +359,6 @@ const AdminSemestersPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* 액션 버튼 */}
               <div className="mt-3 flex justify-end gap-2">
                 <button
                   type="button"
@@ -383,7 +381,7 @@ const AdminSemestersPage: React.FC = () => {
           ))}
         </div>
 
-        {/* 학기 목록 - 데스크탑 테이블 */}
+        {/* 학기 목록 테이블 (데스크탑) */}
         <div className="hidden md:block overflow-x-auto rounded-lg bg-white shadow">
           <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
             <thead className="bg-gray-50">

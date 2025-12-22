@@ -1,3 +1,4 @@
+// src/components/CellMembersManager.tsx
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { memberService } from "../services/memberService";
@@ -10,8 +11,10 @@ type SortConfig = {
   direction: "ascending" | "descending";
 };
 
+// [수정] Props 인터페이스: allMembers 추가
 interface CellMembersManagerProps {
   user: User;
+  allMembers: { id: number; name: string; birthDate?: string }[];
 }
 
 // 만 나이 계산 함수
@@ -27,7 +30,10 @@ const calculateAge = (birthDateString: string): number | null => {
   return age;
 };
 
-const CellMembersManager: React.FC<CellMembersManagerProps> = ({ user }) => {
+const CellMembersManager: React.FC<CellMembersManagerProps> = ({
+  user,
+  allMembers, // [추가]
+}) => {
   const navigate = useNavigate();
   const [members, setMembers] = useState<MemberDto[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -145,6 +151,12 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({ user }) => {
                 member.birthDate && calculateAge(member.birthDate || "");
               const isMe = user.memberId === member.id;
 
+              // [수정] 동명이인 처리: 전체 리스트(allMembers)를 기준 비교
+              const found = allMembers.find((am) => am.id === member.id);
+              const displayName = found
+                ? formatDisplayName(found, allMembers)
+                : member.name;
+
               return (
                 <div
                   key={member.id}
@@ -156,7 +168,7 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({ user }) => {
                   {/* 상단: 이름 + 역할 뱃지 */}
                   <div className="flex items-center justify-between gap-2">
                     <div className="font-semibold text-gray-900 text-sm">
-                      {formatDisplayName(member, sortedMembers)}
+                      {displayName}
                       {isMe && (
                         <span className="ml-2 text-[11px] text-indigo-600 font-medium">
                           나
@@ -267,64 +279,72 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({ user }) => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {sortedMembers.map((member) => (
-                  <tr
-                    key={member.id}
-                    className={
-                      !member.active ? "bg-gray-100 text-gray-500" : ""
-                    }
-                  >
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() => navigate(`/admin/users/${member.id}`)}
-                        className={`font-semibold ${
-                          !member.active
-                            ? "text-gray-500 cursor-default"
-                            : "text-indigo-600 hover:text-indigo-900"
-                        }`}
-                      >
-                        {formatDisplayName(member, sortedMembers)}
-                      </button>
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
-                      <span
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          member.role === "EXECUTIVE"
-                            ? "bg-red-100 text-red-800"
-                            : member.role === "CELL_LEADER"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : "bg-green-100 text-green-800"
-                        }`}
-                      >
-                        {translateRole(member.role)}
-                      </span>
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
-                      {member.birthDate}{" "}
-                      {member.birthDate &&
-                        `(만 ${calculateAge(member.birthDate)}세)`}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
-                      {member.joinYear}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
-                      {member.cellAssignmentDate || "미배정"}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      {/* 내 정보일 때만 수정 버튼 보임 */}
-                      {user.memberId === member.id && (
+                {sortedMembers.map((member) => {
+                  // [수정] 동명이인 처리
+                  const found = allMembers.find((am) => am.id === member.id);
+                  const displayName = found
+                    ? formatDisplayName(found, allMembers)
+                    : member.name;
+
+                  return (
+                    <tr
+                      key={member.id}
+                      className={
+                        !member.active ? "bg-gray-100 text-gray-500" : ""
+                      }
+                    >
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <button
-                          onClick={() =>
-                            navigate(`/admin/users/${member.id}/edit`)
-                          }
-                          className="text-indigo-600 hover:text-indigo-900 mr-2 sm:mr-4"
+                          onClick={() => navigate(`/admin/users/${member.id}`)}
+                          className={`font-semibold ${
+                            !member.active
+                              ? "text-gray-500 cursor-default"
+                              : "text-indigo-600 hover:text-indigo-900"
+                          }`}
                         >
-                          수정
+                          {displayName}
                         </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
+                        <span
+                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            member.role === "EXECUTIVE"
+                              ? "bg-red-100 text-red-800"
+                              : member.role === "CELL_LEADER"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-green-100 text-green-800"
+                          }`}
+                        >
+                          {translateRole(member.role)}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
+                        {member.birthDate}{" "}
+                        {member.birthDate &&
+                          `(만 ${calculateAge(member.birthDate)}세)`}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
+                        {member.joinYear}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
+                        {member.cellAssignmentDate || "미배정"}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        {/* 내 정보일 때만 수정 버튼 보임 */}
+                        {user.memberId === member.id && (
+                          <button
+                            onClick={() =>
+                              navigate(`/admin/users/${member.id}/edit`)
+                            }
+                            className="text-indigo-600 hover:text-indigo-900 mr-2 sm:mr-4"
+                          >
+                            수정
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
                 {sortedMembers.length === 0 && (
                   <tr>
                     <td

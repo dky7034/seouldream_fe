@@ -1,3 +1,4 @@
+// src/App.tsx
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -38,6 +39,7 @@ import MemberPrayersPage from "./pages/MemberPrayersPage";
 import CellPrayersPage from "./pages/CellPrayersPage";
 import AdminPrayerSummaryPage from "./pages/AdminPrayerSummaryPage";
 import CellLeaderDashboard from "./pages/CellLeaderDashboard";
+import StatisticsPage from "./pages/StatisticsPage";
 import "react-datepicker/dist/react-datepicker.css";
 import "./styles/datepicker-tailwind.css";
 
@@ -53,9 +55,12 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
             {/* --- [공통 접근 가능] --- */}
+            {/* 임원/셀장 모두 메인 메뉴에서 이 경로(/dashboard)를 사용합니다. */}
             <Route path="/dashboard" element={<DashboardPage />} />
+
             <Route path="/my-cell" element={<MyCellPage />} />
             <Route path="/birthdays" element={<BirthdaysPage />} />
+            {/* 셀장 전용 대시보드 컴포넌트 직접 접근용 (필요시 사용) */}
             <Route path="/cell-dashboard" element={<CellLeaderDashboard />} />
 
             {/* 멤버 상세 및 출석 기록 */}
@@ -99,6 +104,9 @@ function App() {
             {/* --- [임원(EXECUTIVE) 전용] --- */}
             <Route element={<ExecOnlyRoute />}>
               {/* <Route path="/my-profile" element={<MyProfilePage />} /> */}
+
+              {/* ✅ [신규] 통계 및 리포트 페이지 (임원 전용) */}
+              <Route path="/admin/statistics" element={<StatisticsPage />} />
 
               {/* 사용자 관리 */}
               <Route path="/admin/users" element={<AdminUsersPage />} />

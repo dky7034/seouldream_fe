@@ -2,10 +2,12 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { attendanceService } from "../../services/attendanceService";
 import { semesterService } from "../../services/semesterService";
+import { formatDisplayName } from "../../utils/memberUtils";
 import type { SimpleAttendanceRateDto, User, SemesterDto } from "../../types";
 
 interface AttendanceStatisticsViewProps {
   user: User;
+  allMembers: { id: number; name: string; birthDate?: string }[];
 }
 
 type UnitType = "month" | "semester";
@@ -15,11 +17,9 @@ type FilterMode = "unit" | "range";
  * Helpers
  * ----------------------------- */
 
-/** 두 날짜 사이의 일요일 개수 계산 (시간 정규화 포함) */
 const countSundays = (startInput: Date, endInput: Date): number => {
   if (startInput > endInput) return 0;
 
-  // 로컬 시간 기준 0시/23시 설정
   const current = new Date(startInput);
   current.setHours(0, 0, 0, 0);
 
@@ -28,7 +28,6 @@ const countSundays = (startInput: Date, endInput: Date): number => {
 
   let count = 0;
 
-  // 시작일 이후 첫 일요일로 이동
   if (current.getDay() !== 0) {
     current.setDate(current.getDate() + (7 - current.getDay()));
   }
@@ -40,21 +39,16 @@ const countSundays = (startInput: Date, endInput: Date): number => {
   return count;
 };
 
-/** * 날짜가 학기 범위 내에 있거나, 시작/종료 월과 같은지 확인 (느슨한 비교)
- * 정책: 학기가 15일에 끝나더라도, 20일(같은 달)에 접속하면 그 학기를 보여준다.
- */
 const isDateInSemesterOrSameMonth = (date: Date, semester: SemesterDto) => {
   const start = new Date(semester.startDate);
   const end = new Date(semester.endDate);
 
-  // 1. 정확한 날짜 범위 포함 여부
   const startDay = new Date(start);
   startDay.setHours(0, 0, 0, 0);
   const endDay = new Date(end);
   endDay.setHours(23, 59, 59, 999);
   if (date >= startDay && date <= endDay) return true;
 
-  // 2. 날짜는 벗어났어도 '월(Month)'이 겹치는지 확인
   const isSameYear =
     date.getFullYear() === start.getFullYear() ||
     date.getFullYear() === end.getFullYear();
@@ -74,6 +68,7 @@ const isDateInSemesterOrSameMonth = (date: Date, semester: SemesterDto) => {
  * ----------------------------- */
 const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
   user,
+  allMembers,
 }) => {
   const isCellLeader = user.role === "CELL_LEADER";
   const now = new Date();
@@ -84,7 +79,7 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
 
   // Filter State
   const [filterMode, setFilterMode] = useState<FilterMode>("unit");
-  const [unitType, setUnitType] = useState<UnitType>("semester"); // 기본: 학기 전체
+  const [unitType, setUnitType] = useState<UnitType>("semester");
 
   const [filters, setFilters] = useState({
     startDate: "",
@@ -98,19 +93,25 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // 셀리더는 항상 unit 모드 (UI 단순화)
   const effectiveFilterMode = isCellLeader ? "unit" : filterMode;
 
+  const formatName = useCallback(
+    (id: number | null, originalName: string) => {
+      if (!id) return originalName;
+      const found = allMembers.find((m) => m.id === id);
+      return found ? formatDisplayName(found, allMembers) : originalName;
+    },
+    [allMembers]
+  );
+
   // -------------------------------------------------
-  // Derived State (Data Computation)
+  // Derived State
   // -------------------------------------------------
 
-  // 선택된 학기
   const currentSemester = useMemo(() => {
     return semesters.find((s) => s.id === filters.semesterId) || null;
   }, [semesters, filters.semesterId]);
 
-  // 선택된 학기에 유효한 월 목록 (시작일~종료일 범위 내)
   const semesterMonths = useMemo(() => {
     if (!currentSemester) return [];
 
@@ -132,8 +133,6 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
     return list;
   }, [currentSemester]);
 
-  // ✅ 핵심 정책: 조회 범위의 '총 일요일 수' (모수) 정밀 계산
-  // 학기 시작일/종료일이 월 중간에 걸칠 경우, 교집합(Intersection)만 계산
   const expectedTotalDays = useMemo(() => {
     let start: Date | null = null;
     let end: Date | null = null;
@@ -144,16 +143,13 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
         end = new Date(filters.endDate);
       }
     } else {
-      // Unit Mode
       if (unitType === "semester" && currentSemester) {
         start = new Date(currentSemester.startDate);
         end = new Date(currentSemester.endDate);
       } else if (unitType === "month") {
-        // 해당 월의 1일 ~ 말일
         start = new Date(filters.year, filters.month - 1, 1);
         end = new Date(filters.year, filters.month, 0);
 
-        // ✅ 학기 범위와 교집합 처리 (정책 적용)
         if (currentSemester) {
           const semStart = new Date(currentSemester.startDate);
           const semEnd = new Date(currentSemester.endDate);
@@ -183,13 +179,10 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
     }
   }, []);
 
-  // ✅ 초기화 로직: "오늘의 월"을 기준으로 학기 찾기
   useEffect(() => {
     if (semesters.length === 0 || isInitialized) return;
 
     const today = new Date();
-
-    // 1. "오늘 날짜 혹은 같은 월"이 포함된 학기 찾기
     const targetSem =
       semesters.find((s) => isDateInSemesterOrSameMonth(today, s)) ||
       semesters.find((s) => s.isActive) ||
@@ -199,8 +192,8 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
       setFilters((prev) => ({
         ...prev,
         semesterId: targetSem.id,
-        year: today.getFullYear(), // 오늘 연도
-        month: today.getMonth() + 1, // 오늘 월
+        year: today.getFullYear(),
+        month: today.getMonth() + 1,
       }));
       setUnitType("semester");
     }
@@ -221,7 +214,6 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
         endDate: filters.endDate,
       };
     } else {
-      // Unit Mode
       if (unitType === "semester") {
         const sem = semesters.find((s) => s.id === filters.semesterId);
         if (sem) {
@@ -231,7 +223,6 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
           };
         }
       } else {
-        // Month Mode
         params = {
           year: filters.year,
           month: filters.month,
@@ -240,7 +231,6 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
     }
 
     try {
-      // API 호출 시 null/empty 값 제거
       const cleanedParams = Object.fromEntries(
         Object.entries(params).filter(([, v]) => v)
       );
@@ -273,7 +263,7 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
   }, [fetchStats]);
 
   // -------------------------------------------------
-  // Event Handlers (정책 적용)
+  // Event Handlers
   // -------------------------------------------------
 
   const handleFilterChange = (field: string, value: any) => {
@@ -289,13 +279,11 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
     setFilters((prev) => ({
       ...prev,
       semesterId: newSemesterId,
-      // 학기 변경 시, 해당 학기의 시작 연/월로 이동 (UX 편의)
       year: start.getFullYear(),
       month: start.getMonth() + 1,
     }));
   };
 
-  // ✅ 단위 변경 핸들러: 월별 보기 클릭 시 "오늘 월" 포커싱 로직 개선
   const handleUnitTypeClick = (type: UnitType) => {
     setUnitType(type);
 
@@ -304,21 +292,17 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
       const currentYear = today.getFullYear();
       const currentMonth = today.getMonth() + 1;
 
-      // semesterMonths는 이미 현재 선택된 학기의 유효한 월 목록임
-      // 이 목록에 "오늘의 연/월"이 있는지 확인 (단순 포함 여부)
       const isCurrentMonthValid = semesterMonths.some(
         (m) => m.year === currentYear && m.month === currentMonth
       );
 
       if (isCurrentMonthValid) {
-        // 목록에 있으면 오늘 날짜로 세팅
         setFilters((prev) => ({
           ...prev,
           year: currentYear,
           month: currentMonth,
         }));
       } else {
-        // 목록에 없으면(학기 범위 밖의 날짜면) 해당 학기의 첫 달로 세팅
         const first = semesterMonths[0];
         setFilters((prev) => ({
           ...prev,
@@ -346,34 +330,36 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
       )}
 
       {/* Control Panel */}
-      <div className="p-4 bg-gray-50 rounded-lg space-y-4 border border-gray-200">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-lg font-semibold text-gray-800">통계 조회</h3>
+      <div className="p-3 sm:p-4 bg-gray-50 rounded-lg space-y-4 border border-gray-200">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h3 className="text-lg font-semibold text-gray-800 break-keep">
+            통계 조회
+          </h3>
 
           {!isCellLeader && (
-            <div className="bg-white p-1 rounded-lg border border-gray-200 flex text-sm">
+            <div className="bg-white p-1 rounded-lg border border-gray-200 flex text-sm w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setFilterMode("unit")}
-                className={`px-3 py-1 rounded-md transition-colors ${
+                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ${
                   effectiveFilterMode === "unit"
                     ? "bg-blue-100 text-blue-700 font-medium"
                     : "text-gray-500 hover:bg-gray-50"
                 }`}
               >
-                학기/월 단위
+                학기/월
               </button>
               <div className="w-px bg-gray-200 my-1 mx-1" />
               <button
                 type="button"
                 onClick={() => setFilterMode("range")}
-                className={`px-3 py-1 rounded-md transition-colors ${
+                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ${
                   effectiveFilterMode === "range"
                     ? "bg-blue-100 text-blue-700 font-medium"
                     : "text-gray-500 hover:bg-gray-50"
                 }`}
               >
-                직접 기간 입력
+                직접 입력
               </button>
             </div>
           )}
@@ -393,7 +379,7 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
                 onChange={(e) =>
                   handleFilterChange("startDate", e.target.value)
                 }
-                className="block w-full border-gray-300 rounded-md shadow-sm h-[40px] px-3 focus:ring-blue-500 focus:border-blue-500"
+                className="block w-full border-gray-300 rounded-md shadow-sm h-[40px] px-3 focus:ring-blue-500 focus:border-blue-500 bg-white"
               />
             </div>
             <div>
@@ -404,12 +390,13 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
                 type="date"
                 value={filters.endDate}
                 onChange={(e) => handleFilterChange("endDate", e.target.value)}
-                className="block w-full border-gray-300 rounded-md shadow-sm h-[40px] px-3 focus:ring-blue-500 focus:border-blue-500"
+                className="block w-full border-gray-300 rounded-md shadow-sm h-[40px] px-3 focus:ring-blue-500 focus:border-blue-500 bg-white"
               />
             </div>
           </div>
         ) : (
           <div className="space-y-4">
+            {/* 학기 선택 및 단위 선택 */}
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
@@ -418,7 +405,7 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
                 <select
                   value={filters.semesterId}
                   onChange={(e) => handleSemesterChange(Number(e.target.value))}
-                  className="block w-full border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+                  className="block w-full border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 bg-white"
                 >
                   {semesters.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -428,15 +415,15 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
                 </select>
               </div>
 
-              <div className="min-w-[160px]">
+              <div className="sm:min-w-[180px]">
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
                   조회 단위
                 </label>
-                <div className="flex bg-white rounded-md border border-gray-300 overflow-hidden">
+                <div className="flex bg-white rounded-md border border-gray-300 overflow-hidden w-full">
                   <button
                     type="button"
                     onClick={() => handleUnitTypeClick("month")}
-                    className={`flex-1 py-2 text-sm transition-colors ${
+                    className={`flex-1 py-2 text-sm transition-colors whitespace-nowrap ${
                       unitType === "month"
                         ? "bg-blue-600 text-white font-medium"
                         : "text-gray-600 hover:bg-gray-50"
@@ -448,7 +435,7 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => handleUnitTypeClick("semester")}
-                    className={`flex-1 py-2 text-sm transition-colors ${
+                    className={`flex-1 py-2 text-sm transition-colors whitespace-nowrap ${
                       unitType === "semester"
                         ? "bg-blue-600 text-white font-medium"
                         : "text-gray-600 hover:bg-gray-50"
@@ -460,12 +447,14 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
               </div>
             </div>
 
+            {/* 월 선택 (가로 스크롤 적용) */}
             {unitType === "month" && (
               <div className="bg-white p-3 rounded-md border border-gray-200 animate-fadeIn">
-                <div className="text-xs text-gray-400 mb-2">
+                <div className="text-xs text-gray-400 mb-2 break-keep">
                   * 선택된 학기 기간 내의 월만 표시됩니다.
                 </div>
-                <div className="flex flex-wrap gap-2">
+                {/* [수정] 가로 스크롤 적용 */}
+                <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x">
                   {semesterMonths.length > 0 ? (
                     semesterMonths.map((m) => {
                       const isActive =
@@ -477,10 +466,10 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
                           onClick={() =>
                             handleMonthButtonClick(m.year, m.month)
                           }
-                          className={`px-4 py-2 text-sm rounded-md transition-all shadow-sm ${
+                          className={`flex-shrink-0 snap-start px-4 py-2 text-sm rounded-md transition-all shadow-sm border ${
                             isActive
-                              ? "bg-blue-600 text-white font-bold ring-2 ring-blue-300"
-                              : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-blue-400"
+                              ? "bg-blue-600 text-white font-bold border-blue-600 ring-2 ring-blue-300"
+                              : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-blue-400"
                           }`}
                         >
                           <span className="text-xs mr-1 opacity-70">
@@ -512,40 +501,40 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
           {/* Mobile View */}
           <div className="sm:hidden space-y-3">
             {stats.map((s) => {
-              // ✅ 백엔드 totalDays보다 프론트에서 계산한 교집합(expectedTotalDays) 우선 사용
               const baseTotal =
                 expectedTotalDays > 0 ? expectedTotalDays : s.totalDays;
               const uncheckedCount =
                 baseTotal - (s.presentCount + s.absentCount);
+              const displayName = formatName(s.targetId, s.targetName);
 
               return (
                 <div
                   key={s.targetId}
-                  className="bg-white rounded-lg shadow-sm p-4 flex justify-between items-start border border-gray-100"
+                  className="bg-white rounded-lg shadow-sm p-4 border border-gray-100"
                 >
-                  <div className="w-full">
-                    <div className="flex justify-between items-center mb-2">
-                      <p className="text-sm font-semibold text-gray-900">
-                        {s.targetName}
-                      </p>
-                      <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                        총 {baseTotal}주
-                      </span>
+                  <div className="flex justify-between items-center mb-3">
+                    <p className="text-sm font-bold text-gray-900 break-keep">
+                      {displayName}
+                    </p>
+                    <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full whitespace-nowrap">
+                      총 {baseTotal}주
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs text-center">
+                    <div className="bg-green-50 text-green-700 p-2 rounded-md border border-green-100">
+                      <div className="font-bold text-sm">{s.presentCount}</div>
+                      <div className="text-[10px] opacity-75 mt-0.5">출석</div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-xs text-center">
-                      <div className="bg-green-50 text-green-700 p-1.5 rounded">
-                        <div className="font-bold">{s.presentCount}</div>
-                        <div className="text-[10px] opacity-75">출석</div>
+                    <div className="bg-red-50 text-red-700 p-2 rounded-md border border-red-100">
+                      <div className="font-bold text-sm">{s.absentCount}</div>
+                      <div className="text-[10px] opacity-75 mt-0.5">결석</div>
+                    </div>
+                    <div className="bg-gray-50 text-gray-600 p-2 rounded-md border border-gray-200">
+                      <div className="font-bold text-sm">
+                        {Math.max(0, uncheckedCount)}
                       </div>
-                      <div className="bg-red-50 text-red-700 p-1.5 rounded">
-                        <div className="font-bold">{s.absentCount}</div>
-                        <div className="text-[10px] opacity-75">결석</div>
-                      </div>
-                      <div className="bg-gray-50 text-gray-600 p-1.5 rounded border border-gray-100">
-                        <div className="font-bold">
-                          {Math.max(0, uncheckedCount)}
-                        </div>
-                        <div className="text-[10px] opacity-75">미체크</div>
+                      <div className="text-[10px] opacity-75 mt-0.5">
+                        미체크
                       </div>
                     </div>
                   </div>
@@ -553,7 +542,7 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
               );
             })}
             {stats.length === 0 && (
-              <div className="text-center p-8 text-sm text-gray-500 bg-white rounded-lg shadow-sm">
+              <div className="text-center p-8 text-sm text-gray-500 bg-white rounded-lg shadow-sm border border-gray-100">
                 해당 조건의 통계 정보가 없습니다.
               </div>
             )}
@@ -565,7 +554,7 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider break-keep">
                       이름
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -584,11 +573,11 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {stats.map((s) => {
-                    // ✅ 정밀 계산된 baseTotal 사용
                     const baseTotal =
                       expectedTotalDays > 0 ? expectedTotalDays : s.totalDays;
                     const uncheckedCount =
                       baseTotal - (s.presentCount + s.absentCount);
+                    const displayName = formatName(s.targetId, s.targetName);
 
                     return (
                       <tr
@@ -596,7 +585,7 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
                         className="hover:bg-gray-50 transition-colors"
                       >
                         <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
-                          {s.targetName}
+                          {displayName}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-green-600 font-medium">
                           {s.presentCount}

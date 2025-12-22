@@ -1,9 +1,11 @@
 // src/pages/AttendanceAlertsPage.tsx
 import React, { useEffect, useState, useCallback } from "react";
-import { attendanceService } from "../services/attendanceService";
-import type { MemberAlertDto } from "../types";
-import { useAuth } from "../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
+import { attendanceService } from "../services/attendanceService";
+import { memberService } from "../services/memberService"; // 추가
+import { useAuth } from "../hooks/useAuth";
+import { formatDisplayName } from "../utils/memberUtils"; // 추가
+import type { MemberAlertDto } from "../types";
 
 const AttendanceAlertsPage: React.FC = () => {
   const { user } = useAuth();
@@ -12,6 +14,11 @@ const AttendanceAlertsPage: React.FC = () => {
   const [alerts, setAlerts] = useState<MemberAlertDto[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // 동명이인 판별을 위한 전체 멤버 리스트 (ID, 이름, 생년월일)
+  const [allMembersForNameCheck, setAllMembersForNameCheck] = useState<
+    { id: number; name: string; birthDate?: string }[]
+  >([]);
 
   // 인풋은 문자열 중심으로 관리
   const [consecutiveAbsences, setConsecutiveAbsences] = useState<string>("3");
@@ -49,6 +56,34 @@ const AttendanceAlertsPage: React.FC = () => {
 
     void fetchAlerts(3);
   }, [user, fetchAlerts]);
+
+  // --- [추가] 동명이인 처리를 위해 전체 멤버 목록 미리 로딩 ---
+  useEffect(() => {
+    if (!user || !["EXECUTIVE", "CELL_LEADER"].includes(user.role)) return;
+
+    const fetchAllMembers = async () => {
+      try {
+        // 이름 중복 확인을 위해 충분히 큰 사이즈로 조회
+        const page = await memberService.getAllMembers({
+          page: 0,
+          size: 2000,
+          sort: "id,asc",
+        });
+
+        // 필요한 정보만 추출하여 저장
+        const list = page.content.map((m) => ({
+          id: m.id,
+          name: m.name,
+          birthDate: m.birthDate,
+        }));
+        setAllMembersForNameCheck(list);
+      } catch (e) {
+        console.error("동명이인 확인용 멤버 목록 로딩 실패:", e);
+      }
+    };
+
+    fetchAllMembers();
+  }, [user]);
 
   // --- 조회 버튼 핸들러 ---
   const handleSearch = () => {
@@ -111,8 +146,6 @@ const AttendanceAlertsPage: React.FC = () => {
           </div>
         )}
 
-        {/* 필터 영역 */}
-        {/* 필터 영역 */}
         {/* 필터 영역 */}
         <div className="mb-4 p-4 bg-gray-50 rounded-lg shadow-sm">
           <div className="flex flex-col gap-3">
@@ -184,48 +217,58 @@ const AttendanceAlertsPage: React.FC = () => {
                   설정한 기준에 해당하는 경고 대상이 없습니다.
                 </div>
               ) : (
-                alerts.map((alert) => (
-                  <div
-                    key={alert.memberId}
-                    className="bg-white rounded-lg shadow border border-gray-100 p-4 text-xs space-y-2"
-                  >
-                    {/* 상단: 이름 / 셀 */}
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="flex-1">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            navigate(`/admin/users/${alert.memberId}`)
-                          }
-                          className="text-sm font-semibold text-indigo-700 hover:text-indigo-900 text-left"
-                        >
-                          {alert.memberName}
-                        </button>
-                        <p className="mt-0.5 text-[11px] text-gray-500">
-                          셀:{" "}
-                          <span className="font-medium text-gray-700">
-                            {alert.cellName || "*소속 셀 없음"}
-                          </span>
-                        </p>
-                      </div>
-                      <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-50 text-[11px] font-semibold text-red-600 whitespace-nowrap">
-                        {alert.consecutiveAbsences}회 연속 결석
-                      </span>
-                    </div>
+                alerts.map((alert) => {
+                  // 동명이인 처리 로직 적용
+                  const foundMember = allMembersForNameCheck.find(
+                    (m) => m.id === alert.memberId
+                  );
+                  const displayName = foundMember
+                    ? formatDisplayName(foundMember, allMembersForNameCheck)
+                    : alert.memberName;
 
-                    {/* 하단: 마지막 출석일 */}
-                    <div className="mt-2 flex justify-between items-center text-[11px] text-gray-600">
-                      <span className="font-medium">마지막 출석일</span>
-                      <span>
-                        {alert.lastAttendanceDate
-                          ? new Date(
-                              alert.lastAttendanceDate
-                            ).toLocaleDateString()
-                          : "-"}
-                      </span>
+                  return (
+                    <div
+                      key={alert.memberId}
+                      className="bg-white rounded-lg shadow border border-gray-100 p-4 text-xs space-y-2"
+                    >
+                      {/* 상단: 이름 / 셀 */}
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="flex-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate(`/admin/users/${alert.memberId}`)
+                            }
+                            className="text-sm font-semibold text-indigo-700 hover:text-indigo-900 text-left"
+                          >
+                            {displayName}
+                          </button>
+                          <p className="mt-0.5 text-[11px] text-gray-500">
+                            셀:{" "}
+                            <span className="font-medium text-gray-700">
+                              {alert.cellName || "*소속 셀 없음"}
+                            </span>
+                          </p>
+                        </div>
+                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-50 text-[11px] font-semibold text-red-600 whitespace-nowrap">
+                          {alert.consecutiveAbsences}회 연속 결석
+                        </span>
+                      </div>
+
+                      {/* 하단: 마지막 출석일 */}
+                      <div className="mt-2 flex justify-between items-center text-[11px] text-gray-600">
+                        <span className="font-medium">마지막 출석일</span>
+                        <span>
+                          {alert.lastAttendanceDate
+                            ? new Date(
+                                alert.lastAttendanceDate
+                              ).toLocaleDateString()
+                            : "-"}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
@@ -251,34 +294,47 @@ const AttendanceAlertsPage: React.FC = () => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {alerts.length > 0 ? (
-                      alerts.map((alert) => (
-                        <tr key={alert.memberId}>
-                          <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm font-medium">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                navigate(`/admin/users/${alert.memberId}`)
-                              }
-                              className="text-indigo-600 hover:text-indigo-900"
-                            >
-                              {alert.memberName}
-                            </button>
-                          </td>
-                          <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-700">
-                            {alert.cellName || "*소속 셀 없음"}
-                          </td>
-                          <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-700">
-                            {alert.lastAttendanceDate
-                              ? new Date(
-                                  alert.lastAttendanceDate
-                                ).toLocaleDateString()
-                              : "-"}
-                          </td>
-                          <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm font-bold text-red-600">
-                            {alert.consecutiveAbsences}회
-                          </td>
-                        </tr>
-                      ))
+                      alerts.map((alert) => {
+                        // 동명이인 처리 로직 적용
+                        const foundMember = allMembersForNameCheck.find(
+                          (m) => m.id === alert.memberId
+                        );
+                        const displayName = foundMember
+                          ? formatDisplayName(
+                              foundMember,
+                              allMembersForNameCheck
+                            )
+                          : alert.memberName;
+
+                        return (
+                          <tr key={alert.memberId}>
+                            <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm font-medium">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  navigate(`/admin/users/${alert.memberId}`)
+                                }
+                                className="text-indigo-600 hover:text-indigo-900"
+                              >
+                                {displayName}
+                              </button>
+                            </td>
+                            <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-700">
+                              {alert.cellName || "*소속 셀 없음"}
+                            </td>
+                            <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-700">
+                              {alert.lastAttendanceDate
+                                ? new Date(
+                                    alert.lastAttendanceDate
+                                  ).toLocaleDateString()
+                                : "-"}
+                            </td>
+                            <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm font-bold text-red-600">
+                              {alert.consecutiveAbsences}회
+                            </td>
+                          </tr>
+                        );
+                      })
                     ) : (
                       <tr>
                         <td

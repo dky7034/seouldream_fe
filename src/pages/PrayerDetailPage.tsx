@@ -1,10 +1,14 @@
-import React, { useEffect, useState } from "react";
+// src/pages/PrayerDetailPage.tsx
+import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { prayerService } from "../services/prayerService";
+import { memberService } from "../services/memberService";
+import { formatDisplayName } from "../utils/memberUtils";
 import type { PrayerDto } from "../types";
 import { useAuth } from "../hooks/useAuth";
 import { checkUserRole } from "../utils/roleUtils";
-import { PRAYER_VISIBILITY_MAP } from "../utils/prayerVisibilityUtils";
+// [변경] 공개범위 관련 import 제거
+// import { PRAYER_VISIBILITY_MAP } from "../utils/prayerVisibilityUtils";
 import ReactMarkdown from "react-markdown";
 
 const PrayerDetailPage: React.FC = () => {
@@ -15,6 +19,11 @@ const PrayerDetailPage: React.FC = () => {
   const [prayer, setPrayer] = useState<PrayerDto | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // 동명이인 판별을 위한 전체 멤버 리스트
+  const [allMembersForNameCheck, setAllMembersForNameCheck] = useState<
+    { id: number; name: string; birthDate?: string }[]
+  >([]);
 
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] =
     useState<boolean>(false);
@@ -48,27 +57,60 @@ const PrayerDetailPage: React.FC = () => {
     fetchPrayer();
   }, [id]);
 
-  // ── 2. [핵심 추가] 접근 권한 제어 로직 ────────────────
+  // ── 동명이인 판별을 위한 전체 멤버 목록 로딩 ──────────
   useEffect(() => {
-    // 로딩 중이거나 데이터/유저 정보가 없으면 검사하지 않음
+    if (!user) return;
+
+    const fetchAllMembers = async () => {
+      try {
+        const page = await memberService.getAllMembers({
+          page: 0,
+          size: 2000,
+          sort: "id,asc",
+        });
+        const list = page.content.map((m) => ({
+          id: m.id,
+          name: m.name,
+          birthDate: m.birthDate,
+        }));
+        setAllMembersForNameCheck(list);
+      } catch (e) {
+        console.error("동명이인 확인용 멤버 목록 로딩 실패:", e);
+      }
+    };
+
+    fetchAllMembers();
+  }, [user]);
+
+  // 이름 포맷팅 헬퍼 함수
+  const getFormattedName = useCallback(
+    (id?: number, name?: string) => {
+      if (!name) return "알 수 없음";
+      if (!id) return name;
+
+      const found = allMembersForNameCheck.find((m) => m.id === id);
+      if (found) {
+        return formatDisplayName(found, allMembersForNameCheck).replace(
+          " (",
+          "("
+        );
+      }
+      return name;
+    },
+    [allMembersForNameCheck]
+  );
+
+  // ── 2. 접근 권한 제어 로직 ──────────────────────────
+  useEffect(() => {
     if (loading || !prayer || !user) return;
 
-    // (1) 임원단(EXECUTIVE)은 모든 글 열람 가능 -> 통과
     if (user.role === "EXECUTIVE") return;
-
-    // (2) 작성자 본인은 본인 글 열람 가능 -> 통과
     if (user.id === prayer.createdBy.id) return;
 
-    // (3) 셀 리더(CELL_LEADER) 권한 체크
     if (user.role === "CELL_LEADER") {
       const currentYear = new Date().getFullYear();
       const prayerYear = new Date(prayer.createdAt).getFullYear();
-
-      // 조건 1: 해당 연도(올해)의 기도제목인지 확인
       const isCurrentYear = prayerYear === currentYear;
-
-      // 조건 2: 작성자가 내 셀원인지 확인
-      // (prayer.member.cell.id 와 user.cellId 비교)
       const authorCellId = prayer.member?.cell?.id;
       const isMyCellMember = Number(authorCellId) === Number(user.cellId);
 
@@ -76,18 +118,16 @@ const PrayerDetailPage: React.FC = () => {
         alert(
           "접근 권한이 없습니다.\n(타 셀원 또는 지난 연도의 기도제목은 조회할 수 없습니다.)"
         );
-        navigate(-1); // 뒤로 가기
+        navigate(-1);
       }
       return;
     }
 
-    // (4) 그 외 일반 멤버가 남의 글에 접근하려 할 경우 -> 차단
     alert("접근 권한이 없습니다.");
     navigate(-1);
   }, [loading, prayer, user, navigate]);
 
-  // ── 3. 수정/삭제 권한 체크 (UI 노출용) ───────────────
-  // 임원단이거나 본인일 때만 버튼 보임
+  // ── 3. 수정/삭제 권한 체크 ──────────────────────────
   const canModify =
     !!user &&
     (checkUserRole(user, ["EXECUTIVE"]) ||
@@ -128,7 +168,7 @@ const PrayerDetailPage: React.FC = () => {
     }
   };
 
-  // ── 상태별 렌더링 ─────────────────────────────────
+  // ── 렌더링 ────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh] bg-gray-50">
@@ -171,9 +211,9 @@ const PrayerDetailPage: React.FC = () => {
     );
   }
 
-  const visibilityLabel = PRAYER_VISIBILITY_MAP[prayer.visibility];
+  // [변경] 공개범위 변수 할당 제거
+  // const visibilityLabel = PRAYER_VISIBILITY_MAP[prayer.visibility];
 
-  // ── 날짜 포맷/비교 로직 ────────────────────────────
   const created = new Date(prayer.createdAt);
   const updated = prayer.updatedAt ? new Date(prayer.updatedAt) : null;
 
@@ -201,7 +241,6 @@ const PrayerDetailPage: React.FC = () => {
     }
   }
 
-  // ── 메인 렌더링 ────────────────────────────────────
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -212,17 +251,21 @@ const PrayerDetailPage: React.FC = () => {
             <div className="border-b border-gray-100 pb-4 mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 break-words">
-                  {prayer.member?.name ?? "알 수 없음"}님의 기도제목
+                  {/* 이름 출력 부분 */}
+                  {getFormattedName(prayer.member?.id, prayer.member?.name)}
+                  님의 기도제목
                 </h1>
                 <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs sm:text-sm text-gray-500">
                   <span>
                     <strong>작성자:</strong>{" "}
-                    {prayer.createdBy?.name ?? "알 수 없음"}
+                    {getFormattedName(
+                      prayer.createdBy?.id,
+                      prayer.createdBy?.name
+                    )}
                   </span>
-                  <span className="text-gray-300 hidden sm:inline">|</span>
-                  <span>
-                    <strong>공개범위:</strong> {visibilityLabel}
-                  </span>
+
+                  {/* [변경] 공개범위 표시 부분 및 구분선(|) 제거됨 */}
+
                   <span className="text-gray-300 hidden sm:inline">|</span>
                   <span>
                     <strong>생성일:</strong> {createdLabel}

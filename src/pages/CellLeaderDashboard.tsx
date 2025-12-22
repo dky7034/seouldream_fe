@@ -10,29 +10,40 @@ import { useAuth } from "../hooks/useAuth";
 import { cellService } from "../services/cellService";
 import { attendanceService } from "../services/attendanceService";
 import { semesterService } from "../services/semesterService";
+import { noticeService } from "../services/noticeService";
+import { prayerService } from "../services/prayerService";
+import { memberService } from "../services/memberService"; // [추가]
+import { formatDisplayName } from "../utils/memberUtils"; // [추가]
 import AttendanceMatrix from "../components/AttendanceMatrix";
+import NewsCenterCard from "../components/dashboard/NewsCenterCard";
+
 import type {
   CellLeaderDashboardDto,
   AttendanceDto,
   CellMemberAttendanceSummaryDto,
   SemesterDto,
+  DashboardDto,
+  BirthdayInfo,
+  RecentNoticeInfo,
+  RecentPrayerInfo,
 } from "../types";
+
 import {
   FaUsers,
   FaHeartBroken,
   FaExclamationTriangle,
   FaInfoCircle,
   FaCalendarAlt,
+  FaBullhorn,
+  FaPrayingHands,
+  FaBirthdayCake,
 } from "react-icons/fa";
 
 type UnitType = "semester" | "month";
-type AttendanceStatus = "PRESENT" | "ABSENT";
 
 // --------------------
 // Helpers
 // --------------------
-
-// 날짜 문자열(YYYY-MM-DD)을 로컬 시간 00:00:00 Date로 변환
 const parseLocal = (dateStr: string | undefined | null) => {
   if (!dateStr) return null;
   const [y, m, d] = dateStr.slice(0, 10).split("-").map(Number);
@@ -59,6 +70,24 @@ const toLocalISODate = (date: Date) => {
   return `${y}-${m}-${d}`;
 };
 
+// ✅ 이번 주 날짜인지 확인하는 헬퍼 함수
+const isDateInThisWeek = (dateStr: string) => {
+  if (!dateStr) return false;
+  const targetDate = new Date(dateStr);
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+
+  const startOfWeek = new Date(today);
+  startOfWeek.setDate(today.getDate() - dayOfWeek);
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
+  endOfWeek.setHours(23, 59, 59, 999);
+
+  return targetDate >= startOfWeek && targetDate <= endOfWeek;
+};
+
 const getAttendanceMemberId = (att: any): string | number | null => {
   if (att?.memberId !== undefined && att?.memberId !== null)
     return att.memberId;
@@ -73,6 +102,74 @@ const getAttendanceMemberId = (att: any): string | number | null => {
 };
 
 // --------------------
+// ✅ Helper: 생일 계산
+// --------------------
+const calculateBirthdays = (members: CellMemberAttendanceSummaryDto[]) => {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth(); // 0-based
+  const currentDate = today.getDate();
+
+  const dayOfWeek = today.getDay();
+  const startOfWeek = new Date(today);
+  startOfWeek.setDate(currentDate - dayOfWeek);
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
+  endOfWeek.setHours(23, 59, 59, 999);
+
+  const todayBirthdays: BirthdayInfo[] = [];
+  const weeklyBirthdays: BirthdayInfo[] = [];
+  const monthlyBirthdays: BirthdayInfo[] = [];
+
+  members.forEach((m) => {
+    if (!m.birthDate) return;
+    const birthDate = new Date(m.birthDate);
+    const mMonth = birthDate.getMonth();
+    const mDate = birthDate.getDate();
+
+    if (mMonth === currentMonth) {
+      monthlyBirthdays.push({
+        memberId: m.memberId,
+        memberName: m.memberName,
+        birthDate: m.birthDate,
+      } as BirthdayInfo);
+    }
+
+    if (mMonth === currentMonth && mDate === currentDate) {
+      todayBirthdays.push({
+        memberId: m.memberId,
+        memberName: m.memberName,
+        birthDate: m.birthDate,
+      } as BirthdayInfo);
+    }
+
+    const thisYearBirthday = new Date(currentYear, mMonth, mDate);
+    if (thisYearBirthday >= startOfWeek && thisYearBirthday <= endOfWeek) {
+      weeklyBirthdays.push({
+        memberId: m.memberId,
+        memberName: m.memberName,
+        birthDate: m.birthDate,
+      } as BirthdayInfo);
+    }
+  });
+
+  const sortFn = (a: BirthdayInfo, b: BirthdayInfo) => {
+    const da = new Date(a.birthDate);
+    const db = new Date(b.birthDate);
+    if (da.getMonth() !== db.getMonth()) return da.getMonth() - db.getMonth();
+    return da.getDate() - db.getDate();
+  };
+
+  return {
+    today: todayBirthdays,
+    weekly: weeklyBirthdays.sort(sortFn),
+    monthly: monthlyBirthdays.sort(sortFn),
+  };
+};
+
+// --------------------
 // Sub Components
 // --------------------
 
@@ -81,12 +178,12 @@ const StatCard: React.FC<{
   value: string;
   icon: React.ReactNode;
 }> = ({ title, value, icon }) => (
-  <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg flex items-center border border-gray-100">
-    <div className="bg-indigo-50 text-indigo-600 p-3 sm:p-4 rounded-full mr-4 sm:mr-6 flex-shrink-0">
+  <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-lg flex items-center border border-gray-100 h-full">
+    <div className="bg-indigo-50 text-indigo-600 p-3 sm:p-4 rounded-full mr-4 flex-shrink-0">
       {icon}
     </div>
-    <div className="min-w-0">
-      <p className="text-xs sm:text-sm font-medium text-gray-500 truncate">
+    <div className="min-w-0 flex-1">
+      <p className="text-xs sm:text-sm font-medium text-gray-500 break-keep leading-tight">
         {title}
       </p>
       <p className="mt-1 text-2xl sm:text-3xl font-bold text-gray-800">
@@ -99,18 +196,43 @@ const StatCard: React.FC<{
 const SummaryChips: React.FC<{
   incompleteCount: number;
   memberCount: number;
-}> = ({ incompleteCount, memberCount }) => (
+  weeklyNoticeCount: number;
+  weeklyPrayerCount: number;
+  weeklyBirthdayCount: number;
+}> = ({
+  incompleteCount,
+  memberCount,
+  weeklyNoticeCount,
+  weeklyPrayerCount,
+  weeklyBirthdayCount,
+}) => (
   <div className="flex flex-wrap gap-2 sm:gap-3 mt-1 sm:mt-2">
-    <div className="inline-flex items-center px-3 py-2 rounded-full bg-amber-50 text-amber-700 text-xs sm:text-sm font-medium">
+    <div className="inline-flex items-center px-3 py-2 rounded-full bg-amber-50 text-amber-700 text-xs sm:text-sm font-medium border border-amber-100">
       <FaUsers className="mr-2" />
       {memberCount > 0 ? `셀원 ${memberCount}명` : `셀원 없음`}
     </div>
+
     {incompleteCount > 0 && (
-      <div className="inline-flex items-center px-3 py-2 rounded-full bg-rose-50 text-rose-700 text-xs sm:text-sm font-medium">
+      <div className="inline-flex items-center px-3 py-2 rounded-full bg-rose-50 text-rose-700 text-xs sm:text-sm font-medium border border-rose-100">
         <FaExclamationTriangle className="mr-2" />
         출석 체크 누락 {incompleteCount}주
       </div>
     )}
+
+    <div className="inline-flex items-center px-3 py-2 rounded-full bg-yellow-50 text-yellow-700 text-xs sm:text-sm font-medium border border-yellow-100">
+      <FaBullhorn className="mr-2" />
+      이번 주 공지 {weeklyNoticeCount}개
+    </div>
+
+    <div className="inline-flex items-center px-3 py-2 rounded-full bg-blue-50 text-blue-700 text-xs sm:text-sm font-medium border border-blue-100">
+      <FaPrayingHands className="mr-2" />
+      이번 주 기도제목 {weeklyPrayerCount}개
+    </div>
+
+    <div className="inline-flex items-center px-3 py-2 rounded-full bg-pink-50 text-pink-700 text-xs sm:text-sm font-medium border border-pink-100">
+      <FaBirthdayCake className="mr-2" />
+      이번 주 생일 {weeklyBirthdayCount}명
+    </div>
   </div>
 );
 
@@ -139,15 +261,14 @@ const MatrixStatusLegend: React.FC<{ label: string }> = ({ label }) => (
   </div>
 );
 
-// -------------------------------------------------------------------------
-// [CellMemberList] 개별 멤버 통계 (셀 배정일 기준 미체크 계산)
-// -------------------------------------------------------------------------
 const CellMemberList: React.FC<{
   members: CellMemberAttendanceSummaryDto[];
   attendances: AttendanceDto[];
   startDate: string;
   endDate: string;
-}> = ({ members, attendances, startDate, endDate }) => {
+  // [추가] 동명이인 처리를 위한 전체 리스트
+  allMembers: { id: number; name: string; birthDate?: string }[];
+}> = ({ members, attendances, startDate, endDate, allMembers }) => {
   const sortedMembers = useMemo(
     () =>
       members && members.length > 0
@@ -159,17 +280,14 @@ const CellMemberList: React.FC<{
   );
 
   const attendanceMap = useMemo(() => {
-    const map = new Map<string, AttendanceStatus>();
-
+    const map = new Map<string, "PRESENT" | "ABSENT">();
     for (const att of attendances) {
       const mId = getAttendanceMemberId(att);
       const dateKey = normalizeISODate(att?.date);
       if (!mId || !dateKey) continue;
-
       if (att.status !== "PRESENT" && att.status !== "ABSENT") continue;
       map.set(`${mId}-${dateKey}`, att.status);
     }
-
     return map;
   }, [attendances]);
 
@@ -184,29 +302,20 @@ const CellMemberList: React.FC<{
   const formatGender = (gender: "MALE" | "FEMALE") =>
     gender === "MALE" ? "남자" : "여자";
 
-  // ✅ [핵심] 개인별 출석/결석/미체크 계산 로직
   const getMemberStats = (member: CellMemberAttendanceSummaryDto) => {
     if (!startDate || !endDate) return { present: 0, absent: 0, unchecked: 0 };
-
     const pStart = parseLocal(startDate);
     const pEnd = parseLocal(endDate);
-
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     if (!pStart || !pEnd) return { present: 0, absent: 0, unchecked: 0 };
 
-    // 1. 미래 날짜 방어 (오늘 이후는 미체크 아님)
     const effectiveEnd = pEnd < today ? pEnd : today;
-
-    // 2. 기준일 설정: 셀 배정일 우선 -> 없으면 가입연도 1월 1일
     const baseDateStr = normalizeISODate(
       member.cellAssignmentDate || `${member.joinYear}-01-01`
     );
     const baseDate = parseLocal(baseDateStr) || new Date(member.joinYear, 0, 1);
-
-    // 3. 유효 시작일 = Max(조회 시작일, 기준일)
-    // (셀 배정일 이전의 과거 날짜는 계산에서 제외)
     const effectiveStart = pStart < baseDate ? baseDate : pStart;
 
     let presentCount = 0;
@@ -215,13 +324,11 @@ const CellMemberList: React.FC<{
 
     if (effectiveStart <= effectiveEnd) {
       const current = new Date(effectiveStart);
-
       while (current <= effectiveEnd) {
         if (current.getDay() === 0) {
           const dateKey = toLocalISODate(current);
           const key = `${member.memberId}-${dateKey}`;
           const status = attendanceMap.get(key);
-
           if (status === "PRESENT") presentCount++;
           else if (status === "ABSENT") absentCount++;
           else uncheckedCount++;
@@ -229,7 +336,6 @@ const CellMemberList: React.FC<{
         current.setDate(current.getDate() + 1);
       }
     }
-
     return {
       present: presentCount,
       absent: absentCount,
@@ -242,14 +348,13 @@ const CellMemberList: React.FC<{
       <div className="px-4 pt-4 pb-2 border-b border-gray-100 flex items-center justify-between">
         <div>
           <h3 className="text-sm sm:text-base font-semibold text-gray-800">
-            셀원 목록 상세
+            셀원 목록
           </h3>
         </div>
         <p className="text-[11px] sm:text-xs text-gray-400">
           총 {sortedMembers.length}명
         </p>
       </div>
-
       <div className="overflow-x-auto">
         <table className="min-w-full text-xs sm:text-sm">
           <thead className="bg-gray-50">
@@ -278,13 +383,19 @@ const CellMemberList: React.FC<{
             {sortedMembers.map((m) => {
               const stats = getMemberStats(m);
 
+              // [수정] 동명이인 포맷팅 적용
+              const found = allMembers.find((am) => am.id === m.memberId);
+              const displayName = found
+                ? formatDisplayName(found, allMembers)
+                : m.memberName;
+
               return (
                 <tr
                   key={m.memberId}
                   className="border-t border-gray-50 hover:bg-gray-50/70"
                 >
                   <td className="px-3 py-2 text-gray-800 font-medium whitespace-nowrap">
-                    {m.memberName}
+                    {displayName}
                   </td>
                   <td className="px-3 py-2 text-center text-gray-700 hidden sm:table-cell">
                     {formatGender(m.gender)}
@@ -339,6 +450,12 @@ const CellLeaderDashboard: React.FC = () => {
   const [members, setMembers] = useState<CellMemberAttendanceSummaryDto[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
 
+  // [추가] 동명이인 판별을 위한 전체 멤버 리스트
+  const [allMembersForNameCheck, setAllMembersForNameCheck] = useState<
+    { id: number; name: string; birthDate?: string }[]
+  >([]);
+
+  // Matrix & Date States
   const [matrixDate, setMatrixDate] = useState(new Date());
   const [matrixAttendances, setMatrixAttendances] = useState<AttendanceDto[]>(
     []
@@ -351,6 +468,11 @@ const CellLeaderDashboard: React.FC = () => {
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const [unitType, setUnitType] = useState<UnitType>("semester");
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+
+  // 소식 센터 State
+  const [newsData, setNewsData] = useState<DashboardDto | null>(null);
+  const [totalNotices, setTotalNotices] = useState(0);
+  const [totalPrayers, setTotalPrayers] = useState(0);
 
   const monthButtonsContainerRef = useRef<HTMLDivElement | null>(null);
   const monthButtonRefs = useRef<Record<number, HTMLButtonElement | null>>({});
@@ -378,9 +500,32 @@ const CellLeaderDashboard: React.FC = () => {
         setError("학기 정보를 불러오지 못했습니다.");
       }
     };
-
     loadSemesters();
   }, []);
+
+  // [추가] 전체 멤버 목록 로딩 (동명이인 처리용)
+  useEffect(() => {
+    if (!user) return;
+    const fetchAllMembers = async () => {
+      try {
+        const res = await memberService.getAllMembers({
+          page: 0,
+          size: 2000,
+          sort: "id,asc",
+        });
+        setAllMembersForNameCheck(
+          res.content.map((m) => ({
+            id: m.id,
+            name: m.name,
+            birthDate: m.birthDate,
+          }))
+        );
+      } catch (e) {
+        console.error("동명이인 목록 로딩 실패:", e);
+      }
+    };
+    fetchAllMembers();
+  }, [user]);
 
   const handleSemesterChange = useCallback(
     (semesterId: number) => {
@@ -396,39 +541,28 @@ const CellLeaderDashboard: React.FC = () => {
   // 2) 기간 계산
   const periodRange = useMemo(() => {
     if (!activeSemester) return { startDate: "", endDate: "", label: "" };
-
     const {
       startDate: semStartStr,
       endDate: semEndStr,
       name: semName,
     } = activeSemester;
-
     if (unitType === "semester" || selectedMonth === null) {
       return { startDate: semStartStr, endDate: semEndStr, label: semName };
     }
-
-    // month 모드
     let targetYear = new Date(semStartStr).getFullYear();
     const startMonthIndex = new Date(semStartStr).getMonth() + 1;
     if (selectedMonth < startMonthIndex) targetYear += 1;
-
     const m = selectedMonth;
-
     let start = new Date(targetYear, m - 1, 1);
     let end = new Date(targetYear, m, 0);
-
     const semStart = parseLocal(semStartStr) || new Date(semStartStr);
     const semEnd = parseLocal(semEndStr) || new Date(semEndStr);
-
     if (start < semStart) start = semStart;
     if (end > semEnd) end = semEnd;
-
     start.setHours(0, 0, 0, 0);
     end.setHours(0, 0, 0, 0);
-
     if (start > end)
       return { startDate: "", endDate: "", label: `${semName} (${m}월)` };
-
     return {
       startDate: toLocalISODate(start),
       endDate: toLocalISODate(end),
@@ -436,26 +570,22 @@ const CellLeaderDashboard: React.FC = () => {
     };
   }, [activeSemester, unitType, selectedMonth]);
 
-  // 3) matrixDate
+  // 3) Matrix Date Sync
   useEffect(() => {
     if (!periodRange.startDate || !periodRange.endDate) return;
-
     const today = new Date();
     const pStart = parseLocal(periodRange.startDate);
     const pEnd = parseLocal(periodRange.endDate);
-
     if (!pStart || !pEnd) return;
-
     if (today >= pStart && today <= pEnd) setMatrixDate(today);
     else setMatrixDate(pStart);
   }, [periodRange.startDate, periodRange.endDate]);
 
-  // 4) month button scroll
+  // 4) Scroll Sync
   useEffect(() => {
     if (unitType !== "month") return;
     if (!activeSemester) return;
     if (selectedMonth == null) return;
-
     requestAnimationFrame(() => {
       const targetBtn = monthButtonRefs.current[selectedMonth];
       if (!targetBtn) return;
@@ -473,10 +603,8 @@ const CellLeaderDashboard: React.FC = () => {
   // --------------------
   const fetchDashboardData = useCallback(async () => {
     if (!user?.cellId || !periodRange.startDate || !periodRange.endDate) return;
-
     setLoading(true);
     setError(null);
-
     try {
       const summary = await cellService.getDashboardSummary(user.cellId, {
         startDate: periodRange.startDate,
@@ -491,26 +619,8 @@ const CellLeaderDashboard: React.FC = () => {
     }
   }, [user?.cellId, periodRange.startDate, periodRange.endDate]);
 
-  const fetchMembers = useCallback(async () => {
-    if (!user?.cellId) return;
-
-    setMembersLoading(true);
-    try {
-      const list = await cellService.getMemberAttendanceSummary(user.cellId);
-      const sorted = (list ?? []).sort((a, b) =>
-        a.memberName.localeCompare(b.memberName, "ko")
-      );
-      setMembers(sorted);
-    } catch (err) {
-      console.error("셀원 목록 조회 실패", err);
-    } finally {
-      setMembersLoading(false);
-    }
-  }, [user?.cellId]);
-
   const fetchMatrixData = useCallback(async () => {
     if (!user?.cellId || !periodRange.startDate || !periodRange.endDate) return;
-
     setMatrixLoading(true);
     try {
       const data = await attendanceService.getAttendances({
@@ -529,28 +639,151 @@ const CellLeaderDashboard: React.FC = () => {
     }
   }, [user?.cellId, periodRange.startDate, periodRange.endDate]);
 
+  const fetchMembersAndNews = useCallback(async () => {
+    if (!user?.cellId) return;
+    setMembersLoading(true);
+
+    try {
+      const [memberList, noticesPage, prayersPage] = await Promise.all([
+        cellService.getMemberAttendanceSummary(user.cellId),
+        noticeService.getAllNotices({ size: 1000 }),
+        prayerService.getPrayers({
+          page: 0,
+          size: 20,
+          sort: "createdAt,desc",
+          cellId: user.cellId,
+        }),
+      ]);
+
+      const sortedMembers = (memberList ?? []).sort((a, b) =>
+        a.memberName.localeCompare(b.memberName, "ko")
+      );
+      setMembers(sortedMembers);
+
+      const birthdays = calculateBirthdays(sortedMembers);
+
+      const thisWeekNoticeCount = noticesPage.content.filter((n: any) =>
+        isDateInThisWeek(n.createdAt)
+      ).length;
+
+      const thisWeekPrayerCount = prayersPage.content.filter((p: any) =>
+        isDateInThisWeek(p.createdAt)
+      ).length;
+
+      // 1. 공지사항 매핑
+      const mappedNotices: RecentNoticeInfo[] = noticesPage.content
+        .slice(0, 5)
+        .map((n: any) => ({
+          noticeId: n.id || n.noticeId,
+          title: n.title,
+          createdAt: n.createdAt,
+          pinned: n.pinned ?? false,
+        }));
+
+      // 2. 기도제목 매핑
+      const mappedPrayers: RecentPrayerInfo[] = prayersPage.content
+        .slice(0, 5)
+        .map((p: any) => ({
+          prayerId: p.id || p.prayerId,
+          memberId: p.member?.id,
+          memberName: p.member?.name || "알 수 없음",
+          content: p.content,
+          createdAt: p.createdAt,
+        }));
+
+      // 3. DashboardDto 구성
+      const fakeDashboardData: DashboardDto = {
+        recentNotices: mappedNotices,
+        recentPrayers: mappedPrayers,
+
+        todayBirthdays: birthdays.today,
+        weeklyBirthdays: birthdays.weekly,
+        monthlyBirthdays: birthdays.monthly,
+
+        totalTodayBirthdays: birthdays.today.length,
+        totalWeeklyBirthdays: birthdays.weekly.length,
+        totalMonthlyBirthdays: birthdays.monthly.length,
+
+        weeklyNoticeCount: thisWeekNoticeCount,
+        weeklyPrayerCount: thisWeekPrayerCount,
+
+        overallAttendanceSummary: null as any,
+        cellAttendanceSummaries: [],
+        attendanceKeyMetrics: {
+          thisWeekAttendanceRate: 0,
+          periodAverageAttendanceRate: 0,
+          lastYearPeriodAttendanceRate: 0,
+        },
+        attendanceTrend: [],
+
+        totalLongTermAbsentees: 0,
+        newcomerCount: 0,
+        attendanceChange: 0,
+        unassignedMemberCount: 0,
+      };
+
+      setNewsData(fakeDashboardData);
+      setTotalNotices(noticesPage.totalElements);
+      setTotalPrayers(prayersPage.totalElements);
+    } catch (err) {
+      console.error("데이터 로딩 실패", err);
+    } finally {
+      setMembersLoading(false);
+    }
+  }, [user?.cellId]);
+
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
   useEffect(() => {
-    fetchMembers();
-  }, [fetchMembers]);
-
-  useEffect(() => {
     fetchMatrixData();
   }, [fetchMatrixData]);
 
-  // --------------------
-  // UI Helpers
-  // --------------------
+  useEffect(() => {
+    fetchMembersAndNews();
+  }, [fetchMembersAndNews]);
+
+  // [추가] 뉴스 센터 데이터에 동명이인 포맷팅 적용 (useMemo)
+  const formattedNewsData = useMemo(() => {
+    if (!newsData) return null;
+    if (allMembersForNameCheck.length === 0) return newsData; // 아직 로딩 전이면 원본 리턴
+
+    const formatName = (id?: number, name?: string) => {
+      if (!name) return "";
+      if (!id) return name;
+      const found = allMembersForNameCheck.find((m) => m.id === id);
+      return found ? formatDisplayName(found, allMembersForNameCheck) : name;
+    };
+
+    // 기도제목 이름 포맷팅
+    const formattedPrayers = newsData.recentPrayers.map((p) => ({
+      ...p,
+      memberName: formatName(p.memberId, p.memberName),
+    }));
+
+    // 생일자 이름 포맷팅
+    const formatBirthdays = (list: BirthdayInfo[]) =>
+      list.map((b) => ({
+        ...b,
+        memberName: formatName(b.memberId, b.memberName),
+      }));
+
+    return {
+      ...newsData,
+      recentPrayers: formattedPrayers,
+      todayBirthdays: formatBirthdays(newsData.todayBirthdays),
+      weeklyBirthdays: formatBirthdays(newsData.weeklyBirthdays),
+      monthlyBirthdays: formatBirthdays(newsData.monthlyBirthdays),
+    };
+  }, [newsData, allMembersForNameCheck]);
+
+  // ... (매트릭스 관련 핸들러들 생략, 동일함) ...
   const handleMatrixMonthChange = useCallback(
     (increment: number) => {
       if (unitType === "semester" || !activeSemester) return;
-
       const newDate = new Date(matrixDate);
       newDate.setMonth(newDate.getMonth() + increment);
-
       const newYearMonth = new Date(
         newDate.getFullYear(),
         newDate.getMonth(),
@@ -559,16 +792,13 @@ const CellLeaderDashboard: React.FC = () => {
       const semStart = parseLocal(activeSemester.startDate);
       const semEnd = parseLocal(activeSemester.endDate);
       if (!semStart || !semEnd) return;
-
       const startLimit = new Date(
         semStart.getFullYear(),
         semStart.getMonth(),
         1
       );
       const endLimit = new Date(semEnd.getFullYear(), semEnd.getMonth(), 1);
-
       if (newYearMonth < startLimit || newYearMonth > endLimit) return;
-
       setMatrixDate(newDate);
       setSelectedMonth(newDate.getMonth() + 1);
     },
@@ -578,18 +808,15 @@ const CellLeaderDashboard: React.FC = () => {
   const handleUnitTypeClick = useCallback(
     (type: UnitType) => {
       setUnitType(type);
-
       if (type === "semester") {
         setSelectedMonth(null);
         return;
       }
       if (!activeSemester) return;
-
       const today = new Date();
       const semStart = parseLocal(activeSemester.startDate);
       const semEnd = parseLocal(activeSemester.endDate);
       if (!semStart || !semEnd) return;
-
       const currentMonthDate = new Date(
         today.getFullYear(),
         today.getMonth(),
@@ -601,7 +828,6 @@ const CellLeaderDashboard: React.FC = () => {
         1
       );
       const endMonthDate = new Date(semEnd.getFullYear(), semEnd.getMonth(), 1);
-
       if (
         currentMonthDate >= startMonthDate &&
         currentMonthDate <= endMonthDate
@@ -623,11 +849,9 @@ const CellLeaderDashboard: React.FC = () => {
     const s = parseLocal(activeSemester.startDate);
     const e = parseLocal(activeSemester.endDate);
     if (!s || !e) return [];
-
     const months: number[] = [];
     const current = new Date(s.getFullYear(), s.getMonth(), 1);
     const end = new Date(e.getFullYear(), e.getMonth(), 1);
-
     while (current <= end) {
       months.push(current.getMonth() + 1);
       current.setMonth(current.getMonth() + 1);
@@ -635,31 +859,22 @@ const CellLeaderDashboard: React.FC = () => {
     return months;
   }, [activeSemester]);
 
-  // --------------------
-  // ✅ 출석 누락 주 계산 (상단 칩) - 셀 배정일 기준 적용
-  // --------------------
   const realIncompleteCheckCount = useMemo(() => {
     if (!periodRange.startDate || !periodRange.endDate) return 0;
     if (!members || members.length === 0) return 0;
-
     const start = parseLocal(periodRange.startDate);
     const end = parseLocal(periodRange.endDate);
     if (!start || !end || start > end) return 0;
-
     const sundays: string[] = [];
     const cur = new Date(start);
     cur.setHours(0, 0, 0, 0);
-
     const endCopy = new Date(end);
     endCopy.setHours(0, 0, 0, 0);
-
     while (cur <= endCopy) {
       if (cur.getDay() === 0) sundays.push(toLocalISODate(cur));
       cur.setDate(cur.getDate() + 1);
     }
-
     if (sundays.length === 0) return 0;
-
     const attendanceSet = new Set<string>();
     for (const att of matrixAttendances) {
       const mId = getAttendanceMemberId(att);
@@ -668,13 +883,10 @@ const CellLeaderDashboard: React.FC = () => {
       if (att.status !== "PRESENT" && att.status !== "ABSENT") continue;
       attendanceSet.add(`${String(mId)}-${dateKey}`);
     }
-
     let incompleteWeeks = 0;
-
     for (const sundayStr of sundays) {
       const sundayDate = parseLocal(sundayStr);
       if (!sundayDate) continue;
-
       const activeMembers = members.filter((m) => {
         const baseDateStr = normalizeISODate(
           m.cellAssignmentDate || `${m.joinYear}-01-01`
@@ -683,17 +895,13 @@ const CellLeaderDashboard: React.FC = () => {
         base.setHours(0, 0, 0, 0);
         return base <= sundayDate;
       });
-
       if (activeMembers.length === 0) continue;
-
       const isMissing = activeMembers.some((m) => {
         const key = `${String(m.memberId)}-${sundayStr}`;
         return !attendanceSet.has(key);
       });
-
       if (isMissing) incompleteWeeks++;
     }
-
     return incompleteWeeks;
   }, [periodRange.startDate, periodRange.endDate, members, matrixAttendances]);
 
@@ -702,9 +910,7 @@ const CellLeaderDashboard: React.FC = () => {
     return members.filter((m) => m.consecutiveAbsences >= 3).length;
   }, [members]);
 
-  // --------------------
   // Render
-  // --------------------
   if (!user) return <div className="p-4">로그인 정보가 없습니다.</div>;
 
   if (loading && !dashboardSummary) {
@@ -721,8 +927,8 @@ const CellLeaderDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-20">
+      {/* Header */}
       <div className="flex flex-col gap-4">
-        {/* Header & Controls ... (기존과 동일) */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
@@ -734,7 +940,6 @@ const CellLeaderDashboard: React.FC = () => {
                   {user.cellName}
                 </span>
               )}
-              {/* 학기 선택 Dropdown */}
               {semesters.length > 1 ? (
                 <div className="flex items-center bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
                   <FaCalendarAlt className="text-indigo-500 mr-2 text-xs" />
@@ -762,7 +967,6 @@ const CellLeaderDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Unit Toggle Buttons */}
           {activeSemester && (
             <div className="flex gap-1 bg-gray-100 p-1 rounded-lg self-start">
               <button
@@ -791,13 +995,12 @@ const CellLeaderDashboard: React.FC = () => {
           )}
         </div>
 
-        {/* Month Selection Buttons */}
+        {/* Month Buttons */}
         {unitType === "month" && activeSemester && (
           <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm animate-fadeIn">
             <span className="text-xs font-bold text-gray-500 block mb-2">
               {activeSemester.name} 상세 월 선택:
             </span>
-
             <div
               ref={monthButtonsContainerRef}
               className="flex flex-wrap gap-2"
@@ -826,80 +1029,112 @@ const CellLeaderDashboard: React.FC = () => {
         <SummaryChips
           incompleteCount={realIncompleteCheckCount}
           memberCount={members.length}
+          weeklyNoticeCount={formattedNewsData?.weeklyNoticeCount ?? 0}
+          weeklyPrayerCount={formattedNewsData?.weeklyPrayerCount ?? 0}
+          weeklyBirthdayCount={formattedNewsData?.totalWeeklyBirthdays ?? 0}
         />
       </div>
 
-      {/* 1. Stat Cards */}
-      {dashboardSummary && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <StatCard
-            title="관심 요망 (3주↑ 결석)"
-            value={`${longTermAbsenteesCount}명`}
-            icon={
-              <FaHeartBroken
-                size={20}
-                className={
-                  longTermAbsenteesCount > 0 ? "text-rose-500" : "text-gray-400"
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Left Column */}
+        <div className="xl:col-span-2 space-y-6">
+          {dashboardSummary && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <StatCard
+                title="관심 요망 (3주↑ 결석)"
+                value={`${longTermAbsenteesCount}명`}
+                icon={
+                  <FaHeartBroken
+                    size={20}
+                    className={
+                      longTermAbsenteesCount > 0
+                        ? "text-rose-500"
+                        : "text-gray-400"
+                    }
+                  />
                 }
               />
-            }
-          />
-          <StatCard
-            title="현재 셀 멤버"
-            value={`${members.length.toLocaleString()}명`}
-            icon={<FaUsers size={20} />}
-          />
-          <StatCard
-            title="출석 체크 누락"
-            value={`${realIncompleteCheckCount}주`}
-            icon={<FaExclamationTriangle size={20} />}
-          />
-        </div>
-      )}
+              <StatCard
+                title="현재 셀 멤버"
+                value={`${members.length.toLocaleString()}명`}
+                icon={<FaUsers size={20} />}
+              />
+              <StatCard
+                title="출석 체크 누락"
+                value={`${realIncompleteCheckCount}주`}
+                icon={<FaExclamationTriangle size={20} />}
+              />
+            </div>
+          )}
 
-      {/* 2. Attendance Matrix */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
-        <MatrixStatusLegend label={periodRange.label} />
-        <div className="p-2 sm:p-4">
-          {activeSemester ? (
-            <AttendanceMatrix
-              mode={unitType}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+            <MatrixStatusLegend label={periodRange.label} />
+            <div className="p-2 sm:p-4">
+              {activeSemester ? (
+                <AttendanceMatrix
+                  mode={unitType}
+                  startDate={periodRange.startDate}
+                  endDate={periodRange.endDate}
+                  year={matrixDate.getFullYear()}
+                  month={matrixDate.getMonth() + 1}
+                  onMonthChange={handleMatrixMonthChange}
+                  // [수정] 매트릭스에 전달하는 멤버 이름도 포맷팅
+                  members={members.map((m) => {
+                    const found = allMembersForNameCheck.find(
+                      (am) => am.id === m.memberId
+                    );
+                    return {
+                      memberId: m.memberId,
+                      memberName: found
+                        ? formatDisplayName(found, allMembersForNameCheck)
+                        : m.memberName,
+                    };
+                  })}
+                  attendances={matrixAttendances}
+                  loading={matrixLoading}
+                  limitStartDate={activeSemester.startDate}
+                  limitEndDate={activeSemester.endDate}
+                />
+              ) : (
+                <div className="text-center p-10 text-gray-400">
+                  활성화된 학기 정보가 없습니다.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {membersLoading ? (
+            <div className="bg-gray-50 text-gray-500 text-sm sm:text-base text-center p-8 rounded-xl flex flex-col items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500 mb-2" />
+              셀원 목록을 불러오는 중입니다...
+            </div>
+          ) : (
+            <CellMemberList
+              members={members}
+              attendances={matrixAttendances}
               startDate={periodRange.startDate}
               endDate={periodRange.endDate}
-              year={matrixDate.getFullYear()}
-              month={matrixDate.getMonth() + 1}
-              onMonthChange={handleMatrixMonthChange}
-              members={members.map((m) => ({
-                memberId: m.memberId,
-                memberName: m.memberName,
-              }))}
-              attendances={matrixAttendances}
-              loading={matrixLoading}
-              limitStartDate={activeSemester.startDate}
-              limitEndDate={activeSemester.endDate}
+              allMembers={allMembersForNameCheck} // [추가]
             />
-          ) : (
-            <div className="text-center p-10 text-gray-400">
-              활성화된 학기 정보가 없습니다.
-            </div>
+          )}
+        </div>
+
+        {/* Right Column: 소식 센터 (우리 셀 전용) */}
+        <div className="space-y-6 xl:col-span-1 xl:sticky xl:top-24 self-start">
+          {formattedNewsData && (
+            <NewsCenterCard
+              data={formattedNewsData} // [수정] 포맷팅된 데이터 전달
+              canManageNotices={false}
+              totalNotices={totalNotices}
+              totalPrayers={totalPrayers}
+              totalTodayBirthdays={formattedNewsData.totalTodayBirthdays}
+              totalWeeklyBirthdays={formattedNewsData.totalWeeklyBirthdays}
+              totalMonthlyBirthdays={formattedNewsData.totalMonthlyBirthdays}
+              baseRoute="cell"
+            />
           )}
         </div>
       </div>
-
-      {/* 3. Member List */}
-      {membersLoading ? (
-        <div className="bg-gray-50 text-gray-500 text-sm sm:text-base text-center p-8 rounded-xl flex flex-col items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500 mb-2" />
-          셀원 목록을 불러오는 중입니다...
-        </div>
-      ) : (
-        <CellMemberList
-          members={members}
-          attendances={matrixAttendances}
-          startDate={periodRange.startDate}
-          endDate={periodRange.endDate}
-        />
-      )}
     </div>
   );
 };

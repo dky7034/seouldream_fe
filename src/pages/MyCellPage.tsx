@@ -1,6 +1,8 @@
-import React, { useEffect } from "react";
+// src/pages/MyCellPage.tsx
+import React, { useEffect, useState } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { memberService } from "../services/memberService"; // [추가]
 import CellAttendanceManager from "../components/CellAttendanceManager";
 import CellPrayersManager from "../components/CellPrayersManager";
 import CellMembersManager from "../components/CellMembersManager";
@@ -19,6 +21,11 @@ const MyCellPage: React.FC = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // [추가] 동명이인 판별을 위한 전체 멤버 리스트 (자식 컴포넌트에 전달용)
+  const [allMembersForNameCheck, setAllMembersForNameCheck] = useState<
+    { id: number; name: string; birthDate?: string }[]
+  >([]);
+
   /** ✅ 셀 배정 여부: cellId 기준 */
   const hasCell = user?.role === "CELL_LEADER" && user.cellId != null;
 
@@ -32,6 +39,30 @@ const MyCellPage: React.FC = () => {
       return next;
     });
   };
+
+  // [추가] 전체 멤버 목록 로딩 (한 번만 수행하여 자식들에게 공유)
+  useEffect(() => {
+    if (!user) return;
+    const fetchAllMembers = async () => {
+      try {
+        const res = await memberService.getAllMembers({
+          page: 0,
+          size: 2000,
+          sort: "id,asc",
+        });
+        setAllMembersForNameCheck(
+          res.content.map((m) => ({
+            id: m.id,
+            name: m.name,
+            birthDate: m.birthDate,
+          }))
+        );
+      } catch (e) {
+        console.error("동명이인 목록 로딩 실패:", e);
+      }
+    };
+    fetchAllMembers();
+  }, [user]);
 
   // 잘못된 tab 쿼리 정리
   useEffect(() => {
@@ -93,7 +124,7 @@ const MyCellPage: React.FC = () => {
             </p>
           ) : (
             <p className="mt-1 text-sm text-gray-500">
-              아직 셀에 배정되지 않았습니다. 관리자에게 문의해 주세요.
+              아직 셀에 배정되지 않았습니다. 관리자에게 문의하세요.
             </p>
           )}
 
@@ -133,7 +164,7 @@ const MyCellPage: React.FC = () => {
           </nav>
         </div>
 
-        {/* ✅ 탭 컨텐츠 */}
+        {/* ✅ 탭 컨텐츠 (각 컴포넌트에 allMembers 전달) */}
         <div className="mt-6 sm:mt-8">
           {activeTab === "attendance" && (
             <div
@@ -142,7 +173,11 @@ const MyCellPage: React.FC = () => {
               aria-labelledby="tab-attendance"
               className="bg-white shadow-sm rounded-lg p-3 sm:p-4"
             >
-              <CellAttendanceManager user={user} />
+              {/* @ts-ignore: 자식 컴포넌트 prop 수정 전 임시 처리 */}
+              <CellAttendanceManager
+                user={user}
+                allMembers={allMembersForNameCheck}
+              />
             </div>
           )}
 
@@ -153,7 +188,11 @@ const MyCellPage: React.FC = () => {
               aria-labelledby="tab-prayers"
               className="bg-white shadow-sm rounded-lg p-3 sm:p-4"
             >
-              <CellPrayersManager user={user} />
+              {/* @ts-ignore: 자식 컴포넌트 prop 수정 전 임시 처리 */}
+              <CellPrayersManager
+                user={user}
+                allMembers={allMembersForNameCheck}
+              />
             </div>
           )}
 
@@ -164,7 +203,11 @@ const MyCellPage: React.FC = () => {
               aria-labelledby="tab-members"
               className="bg-white shadow-sm rounded-lg p-3 sm:p-4"
             >
-              <CellMembersManager user={user} />
+              {/* @ts-ignore: 자식 컴포넌트 prop 수정 전 임시 처리 */}
+              <CellMembersManager
+                user={user}
+                allMembers={allMembersForNameCheck}
+              />
             </div>
           )}
         </div>

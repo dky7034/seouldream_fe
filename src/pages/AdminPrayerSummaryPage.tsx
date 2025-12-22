@@ -3,8 +3,10 @@ import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { prayerService } from "../services/prayerService";
 import { semesterService } from "../services/semesterService";
+import { memberService } from "../services/memberService";
 import { useAuth } from "../hooks/useAuth";
 import { normalizeNumberInput } from "../utils/numberUtils";
+import { formatDisplayName } from "../utils/memberUtils";
 import type {
   GetPrayersParams,
   Page,
@@ -14,9 +16,9 @@ import type {
 } from "../types";
 import SimpleSearchableSelect from "../components/SimpleSearchableSelect";
 import Pagination from "../components/Pagination";
+import KoreanCalendarPicker from "../components/KoreanCalendarPicker"; // ✅ 달력 컴포넌트 임포트
 
 type SummaryMode = "members" | "cells";
-// ✅ [정책 적용 1] UnitType 단순화 (반기/분기 제거)
 type UnitType = "year" | "month" | "semester";
 
 type SortDirection = "ascending" | "descending";
@@ -28,9 +30,6 @@ interface AdminPrayerSummaryPageProps {
 
 const FILTER_STORAGE_KEY = "adminPrayerSummaryFilters";
 
-// =========================
-// 저장 타입 정의 (반기/분기 제거)
-// =========================
 type SavedFilterState = {
   mode: SummaryMode;
   filterType: "unit" | "range";
@@ -49,9 +48,6 @@ type SavedFilterState = {
   sortDirection?: SortDirection;
 };
 
-// =========================
-// sessionStorage에서 로드
-// =========================
 const loadSavedFilterState = (): SavedFilterState | null => {
   if (typeof window === "undefined") return null;
   try {
@@ -72,13 +68,11 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
 
   const savedState = loadSavedFilterState();
 
-  // URL 경로 기반 모드 계산
   const urlMode: SummaryMode = useMemo(() => {
     if (location.pathname.endsWith("/cells")) return "cells";
     return initialMode;
   }, [location.pathname, initialMode]);
 
-  // 모드 초기값
   const [mode, setMode] = useState<SummaryMode>(savedState?.mode ?? urlMode);
 
   useEffect(() => {
@@ -92,8 +86,11 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
 
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
-  // ✅ [정책 적용 3] 학기 자동 선택 플래그
   const [hasAutoSelectedSemester, setHasAutoSelectedSemester] = useState(false);
+
+  const [allMembersForNameCheck, setAllMembersForNameCheck] = useState<
+    { id: number; name: string; birthDate?: string }[]
+  >([]);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +99,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
   const [filterType, setFilterType] = useState<"unit" | "range">(
     savedState?.filterType ?? "unit"
   );
-  // ✅ [정책 적용 2] 기본 조회 단위 'semester'로 변경
   const [unitType, setUnitType] = useState<UnitType>(
     savedState?.unitType ?? "semester"
   );
@@ -119,9 +115,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
 
   const hasActiveSemesters = semesters.length > 0;
 
-  // =========================
-  // 정렬 상태 (세션에서 복원)
-  // =========================
   const [sortConfig, setSortConfig] = useState<{
     key: SortKey;
     direction: SortDirection;
@@ -130,11 +123,9 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     direction: savedState?.sortDirection ?? "descending",
   }));
 
-  // 실제 구현 시 서비스에서 가져오는 구조로 확장 가능
   const memberOptions: { value: number; label: string }[] = [];
   const cellOptions: { value: number; label: string }[] = [];
 
-  // 학기 목록
   const fetchSemesters = useCallback(async () => {
     try {
       const data = await semesterService.getAllSemesters(true);
@@ -145,7 +136,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     }
   }, []);
 
-  // 연도 목록
   const fetchAvailableYears = useCallback(async () => {
     try {
       const years = await prayerService.getAvailableYears();
@@ -156,7 +146,28 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     }
   }, []);
 
-  // 최신 연도 자동 세팅 (단위가 year일 때만)
+  useEffect(() => {
+    if (!user) return;
+    const fetchAllMembers = async () => {
+      try {
+        const page = await memberService.getAllMembers({
+          page: 0,
+          size: 2000,
+          sort: "id,asc",
+        });
+        const list = page.content.map((m) => ({
+          id: m.id,
+          name: m.name,
+          birthDate: m.birthDate,
+        }));
+        setAllMembersForNameCheck(list);
+      } catch (e) {
+        console.error("동명이인 확인용 멤버 목록 로딩 실패:", e);
+      }
+    };
+    fetchAllMembers();
+  }, [user]);
+
   useEffect(() => {
     if (
       filterType === "unit" &&
@@ -170,9 +181,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     }
   }, [filterType, unitType, filters.year, availableYears]);
 
-  // =========================
-  // API Params 구성
-  // =========================
   const buildBaseParams = useCallback((): GetPrayersParams => {
     const params: GetPrayersParams = {
       page: currentPage,
@@ -182,12 +190,10 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
       }`,
     };
 
-    // 기간 필터
     if (filterType === "range") {
       params.startDate = filters.startDate || undefined;
       params.endDate = filters.endDate || undefined;
     } else {
-      // 학기 단위
       if (filters.semesterId && semesters.length > 0) {
         const semester = semesters.find((s) => s.id === filters.semesterId);
         if (semester) {
@@ -195,17 +201,14 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
           params.endDate = semester.endDate;
         }
       } else {
-        // 기존 연/월 (반기/분기 제거됨)
         params.year = normalizeNumberInput(filters.year);
         params.month = normalizeNumberInput(filters.month);
       }
     }
 
-    // 선택 필터
     if (filters.cell !== "all") params.cellId = Number(filters.cell);
     if (filters.member !== "all") params.memberId = Number(filters.member);
 
-    // 불필요 값 제거
     const cleaned = Object.fromEntries(
       Object.entries(params).filter(
         ([, v]) => v !== "" && v !== null && v !== undefined
@@ -215,9 +218,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     return cleaned;
   }, [currentPage, filterType, filters, semesters, sortConfig]);
 
-  // =========================
-  // 실제 데이터 로딩
-  // =========================
   const fetchData = useCallback(async () => {
     if (!user) {
       setLoading(false);
@@ -246,14 +246,12 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     }
   }, [user, buildBaseParams, mode]);
 
-  // 권한 체크 후 로딩
   useEffect(() => {
     if (user?.role === "EXECUTIVE" || user?.role === "CELL_LEADER") {
       fetchData();
     }
   }, [fetchData, user?.role]);
 
-  // 연도 / 학기 목록 로딩
   useEffect(() => {
     if (user) {
       fetchAvailableYears();
@@ -261,9 +259,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     }
   }, [user, fetchAvailableYears, fetchSemesters]);
 
-  // =========================
-  // 필터/정렬 상태 sessionStorage 저장
-  // =========================
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -280,18 +275,13 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     sessionStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(stateToSave));
   }, [mode, filterType, unitType, filters, currentPage, sortConfig]);
 
-  // =========================
-  // ✅ [정책 적용 3] 학기 자동 선택 로직
-  // =========================
   useEffect(() => {
-    // 저장된 상태가 없고, 초기 로딩 시에만 자동 선택 수행
     if (!savedState && semesters.length > 0 && !hasAutoSelectedSemester) {
       const now = new Date();
       const currentYearMonth = `${now.getFullYear()}-${String(
         now.getMonth() + 1
       ).padStart(2, "0")}`;
 
-      // 1. 현재 월이 포함된 학기 찾기
       let targetSemester = semesters.find((s) => {
         const startYearMonth = s.startDate.substring(0, 7);
         const endYearMonth = s.endDate.substring(0, 7);
@@ -300,7 +290,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
         );
       });
 
-      // 2. 없으면 최신 학기
       if (!targetSemester) {
         const sorted = [...semesters].sort((a, b) => b.id - a.id);
         targetSemester = sorted[0];
@@ -313,7 +302,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
           year: "",
           month: "",
         }));
-        // unitType은 기본값 semester 유지
       } else {
         setUnitType("month");
         setFilters((prev) => ({
@@ -327,9 +315,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     }
   }, [semesters, hasAutoSelectedSemester, savedState]);
 
-  // =========================
-  // 필터 핸들러
-  // =========================
   const handleFilterChange = (field: keyof typeof filters, value: any) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
     setCurrentPage(0);
@@ -355,7 +340,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
         next.year = "";
         next.month = "";
 
-        // 학기 버튼 클릭 시 자동 선택 로직
         if (semesters.length > 0) {
           const currentYearMonth = `${now.getFullYear()}-${String(
             now.getMonth() + 1
@@ -384,7 +368,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     setCurrentPage(0);
   };
 
-  // ✅ [정책 적용 5] unit 파라미터 제거
   const handleUnitValueClick = (value: number) => {
     setFilters((prev) => ({
       ...prev,
@@ -404,9 +387,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     setCurrentPage(0);
   };
 
-  // =========================
-  // 정렬 핸들러
-  // =========================
   const requestSort = (key: SortKey) => {
     setSortConfig((prev) => {
       if (prev.key === key) {
@@ -429,9 +409,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     return sortConfig.direction === "ascending" ? "▲" : "▼";
   };
 
-  // =========================
-  // 연도 옵션
-  // =========================
   const yearOptions = useMemo(() => {
     if (availableYears.length === 0) {
       const currentYear = new Date().getFullYear();
@@ -443,9 +420,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     }));
   }, [availableYears]);
 
-  // =========================
-  // 날짜 요약표시
-  // =========================
   const formatShortDate = (dateStr: string) => {
     if (!dateStr) return "";
     const [, m, d] = dateStr.split("-");
@@ -483,7 +457,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
             {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
               <button
                 key={m}
-                // ✅ unit 파라미터 없이 값만 전달
                 onClick={() => handleUnitValueClick(m)}
                 className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
                   filters.month === m ? "bg-blue-500 text-white" : "bg-white"
@@ -525,9 +498,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     }
   };
 
-  // =========================
-  // 권한 체크
-  // =========================
   if (!user) {
     return (
       <div className="bg-gray-50 min-h-screen flex justify-center items-center px-4">
@@ -552,13 +522,9 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     );
   }
 
-  // =========================
-  // UI 렌더링
-  // =========================
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="container mx-auto max-w-6xl px-3 sm:px-4 py-6 sm:py-8">
-        {/* 헤더 */}
         <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-4 sm:mb-6 gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
@@ -571,7 +537,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
           </div>
         </div>
 
-        {/* 모드 탭 */}
         <div className="flex flex-wrap gap-2 mb-3">
           <button
             type="button"
@@ -580,9 +545,10 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
               setSortConfig({ key: "totalCount", direction: "descending" });
               navigate("/admin/prayers/summary/members");
             }}
+            // ✅ 변경됨: bg-indigo-600 -> bg-blue-500, border-indigo-600 -> border-blue-500
             className={`px-3 py-1 text-xs sm:text-sm rounded-full border ${
               mode === "members"
-                ? "bg-indigo-600 text-white border-indigo-600"
+                ? "bg-blue-500 text-white border-blue-500"
                 : "bg-white text-gray-700"
             }`}
           >
@@ -596,9 +562,10 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
               setSortConfig({ key: "totalCount", direction: "descending" });
               navigate("/admin/prayers/summary/cells");
             }}
+            // ✅ 변경됨: bg-indigo-600 -> bg-blue-500, border-indigo-600 -> border-blue-500
             className={`px-3 py-1 text-xs sm:text-sm rounded-full border ${
               mode === "cells"
-                ? "bg-indigo-600 text-white border-indigo-600"
+                ? "bg-blue-500 text-white border-blue-500"
                 : "bg-white text-gray-700"
             }`}
           >
@@ -606,9 +573,7 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
           </button>
         </div>
 
-        {/* 기간 필터 */}
         <div className="p-4 bg-gray-50 rounded-lg mb-3 sm:mb-4 space-y-4 shadow-sm">
-          {/* 필터 종류 */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <h3 className="text-base sm:text-lg font-semibold">
               조회 기간 설정
@@ -637,41 +602,32 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
             </div>
           </div>
 
-          {/* 기간 직접 선택 */}
           {filterType === "range" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   기간 시작
                 </label>
-                <input
-                  type="date"
+                {/* ✅ KoreanCalendarPicker 적용 */}
+                <KoreanCalendarPicker
                   value={filters.startDate}
-                  onChange={(e) =>
-                    handleFilterChange("startDate", e.target.value)
-                  }
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
+                  onChange={(date) => handleFilterChange("startDate", date)}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   기간 종료
                 </label>
-                <input
-                  type="date"
+                {/* ✅ KoreanCalendarPicker 적용 */}
+                <KoreanCalendarPicker
                   value={filters.endDate}
-                  onChange={(e) =>
-                    handleFilterChange("endDate", e.target.value)
-                  }
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
+                  onChange={(date) => handleFilterChange("endDate", date)}
                 />
               </div>
             </div>
           ) : (
             <>
-              {/* 연도 + 단위 선택 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* 연도 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     연도
@@ -701,13 +657,11 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                   )}
                 </div>
 
-                {/* 단위 버튼 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     조회 단위
                   </label>
                   <div className="flex flex-wrap items-center gap-2 mt-1">
-                    {/* ✅ [정책 적용 1] 월간 -> 학기 -> 연간 */}
                     <button
                       type="button"
                       onClick={() => handleUnitTypeClick("month")}
@@ -750,14 +704,12 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                 </div>
               </div>
 
-              {/* 단위별 버튼 */}
               {renderUnitButtons()}
             </>
           )}
 
           <hr />
 
-          {/* 셀/멤버 필터 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
             <SimpleSearchableSelect
               options={cellOptions}
@@ -780,7 +732,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
             />
           </div>
 
-          {/* 임원단 권한 - 새 기도제목 추가 */}
           {user.role === "EXECUTIVE" && (
             <div className="flex justify-end">
               <button
@@ -794,14 +745,12 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
           )}
         </div>
 
-        {/* 기간 요약 */}
         {periodSummary && (
           <p className="mb-4 text-[11px] sm:text-xs text-gray-500">
             {periodSummary}
           </p>
         )}
 
-        {/* 로딩/에러 */}
         {loading && (
           <div className="flex items-center justify-center min-h-[30vh] mb-4">
             <p className="text-sm text-gray-500">
@@ -813,9 +762,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
           <p className="text-center text-sm text-red-500 mb-4">{error}</p>
         )}
 
-        {/* =========================
-            멤버 요약 영역
-        ========================= */}
         {!loading && !error && mode === "members" && memberSummaryPage && (
           <>
             {/* 모바일 카드 */}
@@ -825,59 +771,66 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                   조건에 맞는 멤버가 없습니다.
                 </div>
               ) : (
-                memberSummaryPage.content.map((row) => (
-                  <div
-                    key={row.memberId}
-                    className="bg-white rounded-lg shadow border p-3 text-xs space-y-2"
-                  >
-                    {/* 상단 */}
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <button
-                          onClick={() =>
-                            navigate(`/admin/prayers/members/${row.memberId}`)
-                          }
-                          className="text-sm font-semibold text-indigo-600 hover:underline"
-                        >
-                          {row.memberName}
-                        </button>
-                        <p className="text-[11px] text-gray-500 mt-1">
-                          셀:{" "}
-                          {row.cellId ? (
-                            <button
-                              onClick={() =>
-                                navigate(`/admin/prayers/cells/${row.cellId}`)
-                              }
-                              className="hover:underline"
-                            >
-                              {row.cellName}
-                            </button>
-                          ) : (
-                            "-"
-                          )}
-                        </p>
+                memberSummaryPage.content.map((row) => {
+                  const foundMember = allMembersForNameCheck.find(
+                    (m) => m.id === row.memberId
+                  );
+                  const displayName = foundMember
+                    ? formatDisplayName(foundMember, allMembersForNameCheck)
+                    : row.memberName;
+
+                  return (
+                    <div
+                      key={row.memberId}
+                      className="bg-white rounded-lg shadow border p-3 text-xs space-y-2"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <button
+                            onClick={() =>
+                              navigate(`/admin/prayers/members/${row.memberId}`)
+                            }
+                            className="text-sm font-semibold text-indigo-600 hover:underline"
+                          >
+                            {displayName}
+                          </button>
+                          <p className="text-[11px] text-gray-500 mt-1">
+                            셀:{" "}
+                            {row.cellId ? (
+                              <button
+                                onClick={() =>
+                                  navigate(`/admin/prayers/cells/${row.cellId}`)
+                                }
+                                className="hover:underline"
+                              >
+                                {row.cellName}
+                              </button>
+                            ) : (
+                              "-"
+                            )}
+                          </p>
+                        </div>
+
+                        <div className="text-right text-[11px] text-gray-500">
+                          최근 작성일
+                          <br />
+                          <span className="font-medium text-gray-800">
+                            {new Date(row.latestCreatedAt).toLocaleDateString()}
+                          </span>
+                        </div>
                       </div>
 
-                      <div className="text-right text-[11px] text-gray-500">
-                        최근 작성일
-                        <br />
-                        <span className="font-medium text-gray-800">
-                          {new Date(row.latestCreatedAt).toLocaleDateString()}
+                      <div className="flex justify-between items-center border-t pt-2">
+                        <span className="text-[11px] text-gray-500">
+                          기도제목 수
+                        </span>
+                        <span className="text-sm font-semibold text-gray-900">
+                          {row.totalCount.toLocaleString()}건
                         </span>
                       </div>
                     </div>
-
-                    {/* 하단 */}
-                    <div className="flex justify-between items-center border-t pt-2">
-                      <span className="text-[11px] text-gray-500">
-                        기도제목 수
-                      </span>
-                      <span className="text-sm font-semibold text-gray-900">
-                        {row.totalCount.toLocaleString()}건
-                      </span>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
@@ -935,42 +888,53 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                       </td>
                     </tr>
                   ) : (
-                    memberSummaryPage.content.map((row) => (
-                      <tr key={row.memberId}>
-                        <td className="px-3 sm:px-6 py-2 sm:py-3">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              navigate(`/admin/prayers/members/${row.memberId}`)
-                            }
-                            className="text-indigo-600 hover:text-indigo-900 underline-offset-2 hover:underline"
-                          >
-                            {row.memberName}
-                          </button>
-                        </td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-3">
-                          {row.cellId ? (
+                    memberSummaryPage.content.map((row) => {
+                      const foundMember = allMembersForNameCheck.find(
+                        (m) => m.id === row.memberId
+                      );
+                      const displayName = foundMember
+                        ? formatDisplayName(foundMember, allMembersForNameCheck)
+                        : row.memberName;
+
+                      return (
+                        <tr key={row.memberId}>
+                          <td className="px-3 sm:px-6 py-2 sm:py-3">
                             <button
                               type="button"
                               onClick={() =>
-                                navigate(`/admin/prayers/cells/${row.cellId}`)
+                                navigate(
+                                  `/admin/prayers/members/${row.memberId}`
+                                )
                               }
-                              className="text-gray-700 underline-offset-2 hover:underline"
+                              className="text-indigo-600 hover:text-indigo-900 underline-offset-2 hover:underline"
                             >
-                              {row.cellName}
+                              {displayName}
                             </button>
-                          ) : (
-                            "-"
-                          )}
-                        </td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-3 text-right">
-                          {row.totalCount.toLocaleString()}건
-                        </td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-3 whitespace-nowrap">
-                          {new Date(row.latestCreatedAt).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))
+                          </td>
+                          <td className="px-3 sm:px-6 py-2 sm:py-3">
+                            {row.cellId ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  navigate(`/admin/prayers/cells/${row.cellId}`)
+                                }
+                                className="text-gray-700 underline-offset-2 hover:underline"
+                              >
+                                {row.cellName}
+                              </button>
+                            ) : (
+                              "-"
+                            )}
+                          </td>
+                          <td className="px-3 sm:px-6 py-2 sm:py-3 text-right">
+                            {row.totalCount.toLocaleString()}건
+                          </td>
+                          <td className="px-3 sm:px-6 py-2 sm:py-3 whitespace-nowrap">
+                            {new Date(row.latestCreatedAt).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -985,12 +949,8 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
           </>
         )}
 
-        {/* =========================
-            셀 요약 영역
-        ========================= */}
         {!loading && !error && mode === "cells" && cellSummaryPage && (
           <>
-            {/* 모바일 */}
             <div className="space-y-3 md:hidden mb-4">
               {cellSummaryPage.content.length === 0 ? (
                 <div className="bg-white rounded-lg shadow border p-4 text-center text-xs text-gray-500">
@@ -1002,7 +962,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                     key={row.cellId}
                     className="bg-white rounded-lg shadow border p-3 text-xs space-y-2"
                   >
-                    {/* 상단 */}
                     <div className="flex justify-between items-start">
                       <button
                         onClick={() =>
@@ -1022,7 +981,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                       </div>
                     </div>
 
-                    {/* 하단 */}
                     <div className="flex justify-between border-t pt-2">
                       <span className="text-[11px] text-gray-500">
                         기도제목 수
@@ -1036,7 +994,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
               )}
             </div>
 
-            {/* 데스크탑 */}
             <div className="hidden md:block bg-white shadow-md rounded-lg overflow-x-auto mb-4">
               <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
                 <thead className="bg-gray-50">
