@@ -942,7 +942,7 @@ const CellLeaderDashboard: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
-              우리 셀 대시보드
+              내 셀 대시보드
             </h2>
             <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500 mt-1">
               {user.cellName && (
