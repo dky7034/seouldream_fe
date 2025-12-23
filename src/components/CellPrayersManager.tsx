@@ -389,7 +389,7 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
             {user.cellName ? `${user.cellName} 기도제목` : "내 셀 기도제목"}
           </h2>
           <p className="mt-1 text-sm text-gray-500">
-            셀원들의 기도제목을 모임 날짜 기준으로 조회하고 관리합니다.
+            셀원들의 기도제목을 조회하고 관리합니다.
           </p>
         </div>
       </div>

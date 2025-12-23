@@ -414,9 +414,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
         {/* 날짜 선택 영역 */}
         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
           <div className="flex justify-between items-center mb-3">
-            <label className="text-sm font-bold text-gray-800">
-              모임 날짜 선택
-            </label>
+            <label className="text-sm font-bold text-gray-800">날짜 선택</label>
             {!loading && selectedDate && (
               <span
                 className={`px-2.5 py-1 text-xs font-bold rounded-full ${
