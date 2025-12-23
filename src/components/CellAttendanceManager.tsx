@@ -5,7 +5,6 @@ import TakeAttendanceView from "./attendance/TakeAttendanceView";
 import AttendanceLogView from "./attendance/AttendanceLogView";
 import AttendanceStatisticsView from "./attendance/AttendanceStatisticsView";
 
-// [추가] Props 인터페이스 정의
 interface CellAttendanceManagerProps {
   user: User;
   allMembers: { id: number; name: string; birthDate?: string }[];
@@ -13,14 +12,15 @@ interface CellAttendanceManagerProps {
 
 const CellAttendanceManager: React.FC<CellAttendanceManagerProps> = ({
   user,
-  allMembers, // [추가]
+  allMembers,
 }) => {
   const [viewMode, setViewMode] = useState<"check" | "log" | "stats">("check");
 
+  // ✅ [수정] 탭 네이밍 변경
   const tabs: { id: "check" | "log" | "stats"; label: string }[] = [
-    { id: "check", label: "출석 및 기도제목" },
-    { id: "log", label: "출석 기록" },
-    { id: "stats", label: "출석 통계" },
+    { id: "check", label: "출석/기도제목/보고서 작성" }, // ✨ 출석+기도+보고서를 모두 포함하는 포괄적 단어
+    { id: "log", label: "출석 기록" }, // ✨ 단순히 '출석' 기록이 아닌 전체 보고서 내역임
+    { id: "stats", label: "출석 통계" }, // 그대로 유지
   ];
 
   return (
@@ -52,18 +52,15 @@ const CellAttendanceManager: React.FC<CellAttendanceManagerProps> = ({
         </div>
       </div>
 
-      {/* 콘텐츠 영역 - [수정] 하위 뷰에 allMembers 전달 */}
+      {/* 콘텐츠 영역 */}
       <div className="mt-4 sm:mt-8">
         {viewMode === "check" && (
-          // @ts-ignore: 하위 컴포넌트 수정 전 임시 처리
           <TakeAttendanceView user={user} allMembers={allMembers} />
         )}
         {viewMode === "log" && (
-          // @ts-ignore: 하위 컴포넌트 수정 전 임시 처리
           <AttendanceLogView user={user} allMembers={allMembers} />
         )}
         {viewMode === "stats" && (
-          // @ts-ignore: 하위 컴포넌트 수정 전 임시 처리
           <AttendanceStatisticsView user={user} allMembers={allMembers} />
         )}
       </div>
