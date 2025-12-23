@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import authService from "../services/authService";
 import type { CreateMemberRequest } from "../types";
-import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
 
 interface FormErrors {
   email?: string;
@@ -101,8 +100,8 @@ const RegisterPage: React.FC = () => {
   const validate = (): FormErrors => {
     const newErrors: FormErrors = {};
 
-    // 이메일 (선택 항목이지만 입력값이 있다면 형식 검사 수행)
-    if (formData.email && !/^\S+@\S+\.\S+$/.test(formData.email)) {
+    // 이메일
+    if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
       newErrors.email = "올바른 이메일 형식이 아닙니다.";
     }
 
@@ -171,10 +170,10 @@ const RegisterPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* 이름 (필수) */}
+                {/* 이름 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    이름 <span className="text-red-500">*</span>
+                    이름
                   </label>
                   <input
                     name="name"
@@ -186,10 +185,10 @@ const RegisterPage: React.FC = () => {
                   />
                 </div>
 
-                {/* 아이디 + 중복 확인 (필수) */}
+                {/* 아이디 + 중복 확인 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    아이디 <span className="text-red-500">*</span>
+                    아이디
                   </label>
                   <div className="mt-1 flex flex-col sm:flex-row gap-2">
                     <input
@@ -228,7 +227,7 @@ const RegisterPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 이메일 (선택 항목) */}
+                {/* 이메일 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     이메일
@@ -236,6 +235,7 @@ const RegisterPage: React.FC = () => {
                   <input
                     name="email"
                     type="email"
+                    required
                     value={formData.email}
                     onChange={handleChange}
                     className="mt-1 block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
@@ -247,10 +247,10 @@ const RegisterPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* 연락처 (필수) */}
+                {/* 연락처 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    연락처 <span className="text-red-500">*</span>
+                    연락처
                   </label>
                   <input
                     name="phone"
@@ -268,10 +268,10 @@ const RegisterPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* 비밀번호 (필수) */}
+                {/* 비밀번호 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    비밀번호 <span className="text-red-500">*</span>
+                    비밀번호
                   </label>
                   <input
                     name="password"
@@ -283,10 +283,10 @@ const RegisterPage: React.FC = () => {
                   />
                 </div>
 
-                {/* 비밀번호 확인 (필수) */}
+                {/* 비밀번호 확인 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    비밀번호 확인 <span className="text-red-500">*</span>
+                    비밀번호 확인
                   </label>
                   <input
                     name="passwordConfirm"
@@ -315,11 +315,11 @@ const RegisterPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 성별 / 생년월일 (필수) */}
+                {/* 성별 / 생년월일 */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      성별 <span className="text-red-500">*</span>
+                      성별
                     </label>
                     <select
                       name="gender"
@@ -333,24 +333,24 @@ const RegisterPage: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      생년월일 <span className="text-red-500">*</span>
+                      생년월일
                     </label>
-                    {/* 👇 KoreanCalendarPicker 교체 부분 👇 */}
-                    <KoreanCalendarPicker
+                    <input
+                      name="birthDate"
+                      type="date"
+                      required
                       value={formData.birthDate}
-                      onChange={(dateStr) =>
-                        setFormData((prev) => ({ ...prev, birthDate: dateStr }))
-                      }
-                      maxDate={new Date()} // 생일이 미래일 수 없으므로 제한
+                      onChange={handleChange}
+                      className="mt-1 block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                     />
                   </div>
                 </div>
 
-                {/* 등록 연도 / 역할 (필수) */}
+                {/* 등록 연도 / 역할 */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      교회 등록 연도 <span className="text-red-500">*</span>
+                      교회 등록 연도
                     </label>
                     <input
                       name="joinYear"
@@ -371,7 +371,7 @@ const RegisterPage: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      역할 <span className="text-red-500">*</span>
+                      역할
                     </label>
                     <select
                       name="role"
