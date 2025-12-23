@@ -197,7 +197,7 @@ const AddMemberToCellModal: React.FC<{
   );
 };
 
-// ───────────────── [컴포넌트] CellReportHistoryItem (수정됨) ─────────────────
+// ───────────────── [컴포넌트] CellReportHistoryItem (수정됨: 메모 제거) ─────────────────
 const CellReportHistoryItem: React.FC<{
   cellId: number;
   date: string; // YYYY-MM-DD
@@ -319,7 +319,7 @@ const CellReportHistoryItem: React.FC<{
 
                   {/* ──────────────────────────────────────────────
                       [모바일 뷰] 카드 리스트 형태 (md:hidden)
-                      화면이 좁을 때는 테이블 대신 이 뷰가 보입니다.
+                      메모 관련 로직 제거됨
                      ────────────────────────────────────────────── */}
                   <div className="md:hidden space-y-3">
                     {reportData!.attendances.map((att) => (
@@ -343,25 +343,15 @@ const CellReportHistoryItem: React.FC<{
                           </span>
                         </div>
 
-                        {/* 카드 바디: 기도제목 및 메모 */}
+                        {/* 카드 바디: 기도제목 표시 (메모 제거) */}
                         <div className="text-sm text-gray-700 pt-1">
-                          {att.prayerContent || att.memo ? (
-                            <>
-                              {att.prayerContent && (
-                                <div className="mb-1 whitespace-pre-wrap leading-relaxed">
-                                  <span className="text-xs font-bold text-indigo-500 block mb-0.5">
-                                    기도제목
-                                  </span>
-                                  {att.prayerContent}
-                                </div>
-                              )}
-                              {att.memo && att.memo !== att.prayerContent && (
-                                <div className="mt-2 text-xs text-gray-500 bg-white p-2 rounded border border-gray-100">
-                                  <span className="font-bold mr-1">메모:</span>
-                                  {att.memo}
-                                </div>
-                              )}
-                            </>
+                          {att.prayerContent ? (
+                            <div className="mb-1 whitespace-pre-wrap leading-relaxed">
+                              <span className="text-xs font-bold text-indigo-500 block mb-0.5">
+                                기도제목
+                              </span>
+                              {att.prayerContent}
+                            </div>
                           ) : (
                             <span className="text-gray-400 text-xs">
                               등록된 내용이 없습니다.
@@ -374,7 +364,7 @@ const CellReportHistoryItem: React.FC<{
 
                   {/* ──────────────────────────────────────────────
                       [데스크톱 뷰] 기존 테이블 형태 (hidden md:block)
-                      화면이 넓을 때(768px 이상)만 보입니다.
+                      메모 관련 컬럼 및 로직 제거됨
                      ────────────────────────────────────────────── */}
                   <div className="hidden md:block overflow-x-auto border border-gray-200 rounded-lg">
                     <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -387,7 +377,7 @@ const CellReportHistoryItem: React.FC<{
                             출석
                           </th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                            기도제목 및 특이사항 / 메모
+                            기도제목 및 특이사항
                           </th>
                         </tr>
                       </thead>
@@ -409,20 +399,10 @@ const CellReportHistoryItem: React.FC<{
                               </span>
                             </td>
                             <td className="px-4 py-3 text-gray-600 align-top whitespace-pre-wrap">
-                              {att.prayerContent || att.memo ? (
-                                <>
-                                  {att.prayerContent && (
-                                    <div className="mb-1 text-gray-800">
-                                      {att.prayerContent}
-                                    </div>
-                                  )}
-                                  {att.memo &&
-                                    att.memo !== att.prayerContent && (
-                                      <div className="text-xs text-gray-400 mt-1">
-                                        (메모: {att.memo})
-                                      </div>
-                                    )}
-                                </>
+                              {att.prayerContent ? (
+                                <div className="mb-1 text-gray-800">
+                                  {att.prayerContent}
+                                </div>
                               ) : (
                                 <span className="text-gray-300 text-xs">-</span>
                               )}
