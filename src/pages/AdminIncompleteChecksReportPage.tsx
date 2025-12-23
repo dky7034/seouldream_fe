@@ -656,7 +656,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
           <div className="bg-white p-6 rounded-lg shadow-md text-center text-gray-500">
             <FaFileAlt className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mb-3" />
             <p className="text-base sm:text-lg font-semibold">
-              조건에 맞는 미완료 출석 체크가 없습니다.
+              조건에 맞는 출석 누락 결과가 없습니다.
             </p>
             <p className="mt-1 text-xs sm:text-sm">
               기간 또는 단위를 조정해 다시 조회해 보세요.

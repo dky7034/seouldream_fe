@@ -59,58 +59,153 @@ const calculateAge = (member: UnassignedMemberDto): number | null => {
   return null;
 };
 
-// ✅ 새가족 성장 차트
+// ✅ [신규 추가] 커스텀 툴팁 컴포넌트 (차트 마우스 오버 시 뜨는 창)
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white p-4 border border-gray-100 shadow-xl rounded-xl min-w-[150px]">
+        <p className="text-sm font-bold text-gray-700 mb-2">{label}</p>
+        <div className="space-y-1">
+          {/* 막대 데이터 (등록 인원) */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="flex items-center text-gray-500">
+              <div className="w-2 h-2 rounded-full bg-indigo-500 mr-2" />
+              등록 인원
+            </span>
+            <span className="font-bold text-gray-800">
+              {payload[0].value}명
+            </span>
+          </div>
+          {/* 라인 데이터 (증감률) */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="flex items-center text-gray-500">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 mr-2" />
+              증감률
+            </span>
+            <span
+              className={`font-bold ${
+                payload[1].value > 0
+                  ? "text-red-500" // 성장
+                  : payload[1].value < 0
+                  ? "text-blue-500" // 감소
+                  : "text-gray-500"
+              }`}
+            >
+              {payload[1].value}%
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+// ✅ [교체] 디자인이 개선된 새가족 성장 차트
 const NewcomerGrowthChart = React.memo(
   ({ data }: { data: NewcomerStatDto[] }) => {
     if (!data || data.length === 0) {
       return (
-        <div className="h-[300px] w-full bg-white p-4 rounded-lg shadow border border-gray-100 flex items-center justify-center text-gray-400">
-          데이터가 없습니다.
+        <div className="h-[350px] w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-gray-400 bg-opacity-50">
+          <FaChartLine size={48} className="mb-4 opacity-20" />
+          <p>데이터가 없습니다.</p>
         </div>
       );
     }
 
     return (
-      <div className="h-[300px] w-full bg-white p-4 rounded-lg shadow border border-gray-100">
-        <div style={{ width: "100%", height: "100%", minHeight: "250px" }}>
+      <div className="h-[350px] w-full bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+        <h3 className="text-sm font-semibold text-gray-500 mb-4 px-2">
+          월별 등록 추이 분석
+        </h3>
+        <div style={{ width: "100%", height: "85%" }}>
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
               data={data}
-              margin={{ top: 20, right: 20, bottom: 20, left: 0 }}
+              margin={{ top: 10, right: 10, bottom: 0, left: 0 }}
             >
-              <CartesianGrid stroke="#f5f5f5" vertical={false} />
-              <XAxis dataKey="label" scale="band" tick={{ fontSize: 12 }} />
-              <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
+              {/* 그라데이션 정의 */}
+              <defs>
+                <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0.1} />
+                </linearGradient>
+              </defs>
+
+              {/* 배경 그리드 (점선) */}
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="#f0f0f0"
+              />
+
+              {/* X축 */}
+              <XAxis
+                dataKey="label"
+                scale="band"
+                tick={{ fontSize: 12, fill: "#9ca3af" }}
+                axisLine={false}
+                tickLine={false}
+                dy={10}
+              />
+
+              {/* Y축 (왼쪽 - 인원) */}
+              <YAxis
+                yAxisId="left"
+                orientation="left"
+                tick={{ fontSize: 11, fill: "#9ca3af" }}
+                axisLine={false}
+                tickLine={false}
+                dx={-10}
+              />
+
+              {/* Y축 (오른쪽 - 퍼센트) */}
               <YAxis
                 yAxisId="right"
                 orientation="right"
-                stroke="#82ca9d"
                 unit="%"
+                tick={{ fontSize: 11, fill: "#9ca3af" }}
+                axisLine={false}
+                tickLine={false}
+                dx={10}
               />
+
+              {/* 커스텀 툴팁 적용 */}
               <Tooltip
-                contentStyle={{
-                  borderRadius: "8px",
-                  border: "none",
-                  boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
-                }}
+                content={<CustomTooltip />}
+                cursor={{ fill: "transparent" }}
               />
-              <Legend wrapperStyle={{ paddingTop: "10px" }} />
+
+              {/* 범례 커스텀 */}
+              <Legend
+                wrapperStyle={{ paddingTop: "20px" }}
+                formatter={(value) => (
+                  <span className="text-sm text-gray-500 font-medium ml-1">
+                    {value}
+                  </span>
+                )}
+              />
+
+              {/* 막대 그래프 (등록 인원) */}
               <Bar
                 yAxisId="left"
                 dataKey="count"
                 name="등록 인원"
-                barSize={30}
-                fill="#8884d8"
-                radius={[4, 4, 0, 0]}
+                barSize={32}
+                fill="url(#colorCount)" // 그라데이션 적용
+                radius={[6, 6, 0, 0]} // 상단 둥글게
               />
+
+              {/* 선 그래프 (증감률) */}
               <Line
                 yAxisId="right"
-                type="monotone"
+                type="monotone" // 부드러운 곡선
                 dataKey="growthRate"
                 name="증감률"
-                stroke="#82ca9d"
-                strokeWidth={2}
-                dot={{ r: 4 }}
+                stroke="#10b981" // Emerald Green
+                strokeWidth={3}
+                dot={{ r: 4, fill: "#10b981", strokeWidth: 2, stroke: "#fff" }} // 점 디자인 (흰 테두리)
+                activeDot={{ r: 6, strokeWidth: 0 }}
               />
             </ComposedChart>
           </ResponsiveContainer>
