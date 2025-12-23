@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import authService from "../services/authService";
 import type { CreateMemberRequest } from "../types";
 import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
+// 👇 아이콘 추가
+import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 
 interface FormErrors {
   email?: string;
@@ -31,6 +33,10 @@ const RegisterPage: React.FC = () => {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
   const [passwordMatchMsg, setPasswordMatchMsg] = useState<string>("");
+
+  // 👇 비밀번호 보임/숨김 상태 관리
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
   // username validation
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
@@ -268,34 +274,62 @@ const RegisterPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* 비밀번호 (필수) */}
+                {/* 👇 비밀번호 (필수) - 눈 모양 아이콘 추가됨 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     비밀번호 <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    name="password"
-                    type="password"
-                    required
-                    value={formData.password}
-                    onChange={handleChange}
-                    className="mt-1 block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
+                  <div className="mt-1 relative">
+                    <input
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      required
+                      value={formData.password}
+                      onChange={handleChange}
+                      className="block w-full px-3 py-2 pr-10 text-sm border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                      tabIndex={-1}
+                    >
+                      {showPassword ? (
+                        <EyeSlashIcon className="w-5 h-5" aria-hidden="true" />
+                      ) : (
+                        <EyeIcon className="w-5 h-5" aria-hidden="true" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
-                {/* 비밀번호 확인 (필수) */}
+                {/* 👇 비밀번호 확인 (필수) - 눈 모양 아이콘 추가됨 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     비밀번호 확인 <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    name="passwordConfirm"
-                    type="password"
-                    required
-                    value={passwordConfirm}
-                    onChange={(e) => setPasswordConfirm(e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
+                  <div className="mt-1 relative">
+                    <input
+                      name="passwordConfirm"
+                      type={showPasswordConfirm ? "text" : "password"}
+                      required
+                      value={passwordConfirm}
+                      onChange={(e) => setPasswordConfirm(e.target.value)}
+                      className="block w-full px-3 py-2 pr-10 text-sm border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswordConfirm((prev) => !prev)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                      tabIndex={-1}
+                    >
+                      {showPasswordConfirm ? (
+                        <EyeSlashIcon className="w-5 h-5" aria-hidden="true" />
+                      ) : (
+                        <EyeIcon className="w-5 h-5" aria-hidden="true" />
+                      )}
+                    </button>
+                  </div>
                   <div className="mt-2 text-xs sm:text-sm min-h-[1.25rem]">
                     {errors.password ? (
                       <p className="text-red-600">{errors.password}</p>
@@ -335,13 +369,12 @@ const RegisterPage: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700">
                       생년월일 <span className="text-red-500">*</span>
                     </label>
-                    {/* 👇 KoreanCalendarPicker 교체 부분 👇 */}
                     <KoreanCalendarPicker
                       value={formData.birthDate}
                       onChange={(dateStr) =>
                         setFormData((prev) => ({ ...prev, birthDate: dateStr }))
                       }
-                      maxDate={new Date()} // 생일이 미래일 수 없으므로 제한
+                      maxDate={new Date()}
                     />
                   </div>
                 </div>
