@@ -197,7 +197,7 @@ const AddMemberToCellModal: React.FC<{
   );
 };
 
-// ───────────────── [컴포넌트] CellReportHistory ─────────────────
+// ───────────────── [컴포넌트] CellReportHistoryItem (수정됨) ─────────────────
 const CellReportHistoryItem: React.FC<{
   cellId: number;
   date: string; // YYYY-MM-DD
@@ -253,6 +253,7 @@ const CellReportHistoryItem: React.FC<{
 
   return (
     <div className="border border-gray-200 rounded-lg bg-white overflow-hidden mb-3 shadow-sm">
+      {/* 헤더 영역 */}
       <button
         onClick={toggleOpen}
         className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
@@ -274,6 +275,7 @@ const CellReportHistoryItem: React.FC<{
         </div>
       </button>
 
+      {/* 상세 내용 영역 */}
       {isOpen && (
         <div className="p-4 border-t border-gray-200 bg-white animate-fadeIn">
           {loading ? (
@@ -286,6 +288,7 @@ const CellReportHistoryItem: React.FC<{
             </div>
           ) : (
             <div className="space-y-6">
+              {/* 공통 보고서 내용 */}
               {(reportData!.cellShare || reportData!.specialNotes) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
@@ -307,12 +310,73 @@ const CellReportHistoryItem: React.FC<{
                 </div>
               )}
 
+              {/* 멤버별 리포트 섹션 */}
               {reportData!.attendances.length > 0 && (
                 <div>
                   <h4 className="text-sm font-bold text-gray-800 mb-3 pl-1 border-l-4 border-indigo-500">
                     &nbsp;멤버별 기도제목 및 특이사항
                   </h4>
-                  <div className="overflow-x-auto border border-gray-200 rounded-lg">
+
+                  {/* ──────────────────────────────────────────────
+                      [모바일 뷰] 카드 리스트 형태 (md:hidden)
+                      화면이 좁을 때는 테이블 대신 이 뷰가 보입니다.
+                     ────────────────────────────────────────────── */}
+                  <div className="md:hidden space-y-3">
+                    {reportData!.attendances.map((att) => (
+                      <div
+                        key={att.id}
+                        className="p-3 border border-gray-200 rounded-lg bg-gray-50 flex flex-col gap-2"
+                      >
+                        {/* 카드 헤더: 이름과 출석 상태 */}
+                        <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+                          <span className="font-medium text-gray-900 text-sm">
+                            {formatNameWithBirthdate(att.member)}
+                          </span>
+                          <span
+                            className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full ${
+                              att.status === "PRESENT"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-red-100 text-red-800"
+                            }`}
+                          >
+                            {att.status === "PRESENT" ? "출석" : "결석"}
+                          </span>
+                        </div>
+
+                        {/* 카드 바디: 기도제목 및 메모 */}
+                        <div className="text-sm text-gray-700 pt-1">
+                          {att.prayerContent || att.memo ? (
+                            <>
+                              {att.prayerContent && (
+                                <div className="mb-1 whitespace-pre-wrap leading-relaxed">
+                                  <span className="text-xs font-bold text-indigo-500 block mb-0.5">
+                                    기도제목
+                                  </span>
+                                  {att.prayerContent}
+                                </div>
+                              )}
+                              {att.memo && att.memo !== att.prayerContent && (
+                                <div className="mt-2 text-xs text-gray-500 bg-white p-2 rounded border border-gray-100">
+                                  <span className="font-bold mr-1">MEMO:</span>
+                                  {att.memo}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-gray-400 text-xs">
+                              등록된 내용이 없습니다.
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* ──────────────────────────────────────────────
+                      [데스크톱 뷰] 기존 테이블 형태 (hidden md:block)
+                      화면이 넓을 때(768px 이상)만 보입니다.
+                     ────────────────────────────────────────────── */}
+                  <div className="hidden md:block overflow-x-auto border border-gray-200 rounded-lg">
                     <table className="min-w-full divide-y divide-gray-200 text-sm">
                       <thead className="bg-gray-50">
                         <tr>
@@ -323,7 +387,7 @@ const CellReportHistoryItem: React.FC<{
                             출석
                           </th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                            기도제목 / 메모
+                            기도제목 및 특이사항 / 메모
                           </th>
                         </tr>
                       </thead>
