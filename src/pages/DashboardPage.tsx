@@ -2,7 +2,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  FaBirthdayCake,
   FaPrayingHands,
   FaBullhorn,
   FaChartLine,
@@ -151,26 +150,6 @@ const formatDateGroupLabel = (
   return formatDateKorean(raw);
 };
 
-const calculateAge = (member: UnassignedMemberDto): number | null => {
-  if (member.age !== undefined && member.age !== null && member.age !== 0) {
-    return member.age;
-  }
-  if (member.birthDate) {
-    const today = new Date();
-    const birthDate = new Date(member.birthDate);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    return age;
-  }
-  if (member.birthYear) {
-    return new Date().getFullYear() - Number(member.birthYear);
-  }
-  return null;
-};
-
 // --- Sub Components ---
 
 const DashboardFilterToolbar: React.FC<{
@@ -298,12 +277,6 @@ const TopSummaryChips: React.FC<{ data: DashboardDto }> = ({ data }) => {
         이번 주 기도제목 {data.weeklyPrayerCount ?? 0}개
       </div>
 
-      {/* 생일 */}
-      <div className="inline-flex items-center px-3 py-2 rounded-full bg-pink-50 text-pink-700 text-xs sm:text-sm border border-pink-100">
-        <FaBirthdayCake className="mr-2" />
-        이번 주 생일 {data.totalWeeklyBirthdays}명
-      </div>
-
       {/* 새가족 */}
       {data.newcomerCount > 0 && (
         <div className="inline-flex items-center px-3 py-2 rounded-full bg-emerald-50 text-emerald-700 text-xs sm:text-sm font-medium border border-emerald-100">
@@ -312,7 +285,7 @@ const TopSummaryChips: React.FC<{ data: DashboardDto }> = ({ data }) => {
         </div>
       )}
 
-      {/* 출석 인원 증감 (텍스트 수정됨) */}
+      {/* 출석 인원 증감 */}
       <div
         className={`inline-flex items-center px-3 py-2 rounded-full text-xs sm:text-sm font-medium border ${attendanceChangeColor(
           data.attendanceChange
@@ -522,7 +495,6 @@ const DashboardPage: React.FC = () => {
   const [loadingMain, setLoadingMain] = useState(true);
   const [loadingCharts, setLoadingCharts] = useState(true);
   const [loadingSub, setLoadingSub] = useState(true);
-  // ✅ [New] 출석 누락 리포트 전용 로딩
   const [loadingIncomplete, setLoadingIncomplete] = useState(false);
 
   const [dashboardData, setDashboardData] = useState<DashboardDto | null>(null);
@@ -620,10 +592,9 @@ const DashboardPage: React.FC = () => {
   };
   const handleIncompleteFilterChange = (filter: IncompleteFilter) => {
     setIncompleteFilter(filter);
-    // ✅ 여기서는 로딩을 켜지 않음 (useEffect가 처리)
   };
 
-  // ✅ 메인 Fetch Data (누락 리포트 제외)
+  // ✅ 메인 Fetch Data
   const fetchData = useCallback(async () => {
     if (!user) return;
     if (isExecutive && semesters.length === 0) return;
@@ -694,7 +665,7 @@ const DashboardPage: React.FC = () => {
       );
       setLoadingCharts(false);
 
-      // 3) 부가 데이터 (Notices, Prayers, Unassigned) - 누락리포트 제거됨
+      // 3) 부가 데이터
       setLoadingSub(true);
       const [noticesPage, prayersPage, unassignedData] = await Promise.all([
         noticeService.getAllNotices({ size: 1 }),
@@ -723,7 +694,7 @@ const DashboardPage: React.FC = () => {
     selectedSemesterId,
     semesters,
     isExecutive,
-  ]); // ⚠️ incompleteDateRange 의존성 제거됨
+  ]);
 
   // ✅ 초기 및 주요 필터 변경 시 메인 데이터 로딩
   useEffect(() => {
@@ -737,7 +708,7 @@ const DashboardPage: React.FC = () => {
     };
   }, [fetchData]);
 
-  // ✅ [New] 누락 리포트만 따로 로딩하는 Effect (깜빡임 방지)
+  // ✅ 누락 리포트 로딩
   useEffect(() => {
     if (!isExecutive) return;
 
@@ -885,7 +856,6 @@ const DashboardPage: React.FC = () => {
                     </p>
                   )}
 
-                  {/* ✅ 로딩 상태 분리 적용 */}
                   {loadingIncomplete ? (
                     <div className="py-4 text-center text-xs text-gray-400">
                       데이터 불러오는 중...
@@ -920,7 +890,7 @@ const DashboardPage: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <FaUserTag className="text-orange-500 text-lg" />
                       <h4 className="font-semibold text-gray-800">
-                        미배정 인원 목록 ({unassignedList.length}명)
+                        셀 미배정 인원 목록 ({unassignedList.length}명)
                       </h4>
                     </div>
                   </div>
@@ -933,7 +903,6 @@ const DashboardPage: React.FC = () => {
                     <>
                       <div className="block md:hidden bg-gray-50 p-3 space-y-3 rounded-lg">
                         {unassignedList.slice(0, 5).map((member) => {
-                          const displayAge = calculateAge(member);
                           return (
                             <div
                               key={member.id}
@@ -964,10 +933,6 @@ const DashboardPage: React.FC = () => {
                                       {member.gender === "MALE"
                                         ? "남자"
                                         : "여자"}
-                                    </span>
-                                    <span className="text-xs text-gray-500">
-                                      {displayAge !== null &&
-                                        `(만 ${displayAge}세)`}
                                     </span>
                                   </div>
                                 </div>
@@ -1001,7 +966,7 @@ const DashboardPage: React.FC = () => {
 
                         {unassignedList.length === 0 && (
                           <div className="text-center py-4 text-xs text-gray-500">
-                            미배정 인원이 없습니다.
+                            셀 미배정 인원이 없습니다.
                           </div>
                         )}
 
@@ -1028,9 +993,6 @@ const DashboardPage: React.FC = () => {
                                 성별
                               </th>
                               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
-                                생년월일
-                              </th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
                                 연락처
                               </th>
                               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
@@ -1043,7 +1005,6 @@ const DashboardPage: React.FC = () => {
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
                             {unassignedList.slice(0, 5).map((member) => {
-                              const displayAge = calculateAge(member);
                               return (
                                 <tr
                                   key={member.id}
@@ -1073,16 +1034,6 @@ const DashboardPage: React.FC = () => {
                                     </span>
                                   </td>
                                   <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
-                                    {member.birthDate ||
-                                      member.birthYear ||
-                                      "-"}
-                                    {displayAge !== null && (
-                                      <span className="ml-1 text-gray-400">
-                                        (만 {displayAge}세)
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
                                     {member.phone}
                                   </td>
                                   <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
@@ -1108,10 +1059,10 @@ const DashboardPage: React.FC = () => {
                             {unassignedList.length === 0 && (
                               <tr>
                                 <td
-                                  colSpan={6}
+                                  colSpan={5}
                                   className="px-4 py-6 text-center text-xs text-gray-500"
                                 >
-                                  미배정 인원이 없습니다.
+                                  셀 미배정 인원이 없습니다.
                                 </td>
                               </tr>
                             )}
