@@ -208,7 +208,6 @@ const AttendanceMatrixView = memo(
     endDate,
     unitType,
     isLoading,
-    onNavigate,
   }: {
     members: MemberDto[];
     attendances: AttendanceDto[];
@@ -352,10 +351,6 @@ const AttendanceMatrixView = memo(
             month={targetMonth}
             members={matrixMembers}
             attendances={attendances}
-            // ✅ 내부 화살표 작동을 위한 연결
-            onMonthChange={(increment: number) =>
-              onNavigate(increment > 0 ? "next" : "prev")
-            }
             loading={isLoading}
             limitStartDate={startDate}
             limitEndDate={endDate}

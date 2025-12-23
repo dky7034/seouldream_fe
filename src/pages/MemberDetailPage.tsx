@@ -256,7 +256,6 @@ const AttendanceSummaryCard: React.FC<{
   onUnitTypeChange,
   selectedMonth,
   onMonthSelect,
-  onMatrixMonthChange,
   startDate,
   endDate,
 }) => {
@@ -483,7 +482,6 @@ const AttendanceSummaryCard: React.FC<{
             endDate={endDate}
             year={new Date(startDate).getFullYear()}
             month={new Date(startDate).getMonth() + 1}
-            onMonthChange={onMatrixMonthChange}
             members={[{ memberId, memberName }]}
             attendances={attendances}
             loading={false}

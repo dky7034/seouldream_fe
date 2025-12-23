@@ -88,7 +88,6 @@ const AttendanceMatrixView: React.FC<{
   year,
   month,
   loading,
-  onMonthChange,
   limitStartDate,
   limitEndDate,
   filterMode,
@@ -220,7 +219,6 @@ const AttendanceMatrixView: React.FC<{
           month={month}
           members={matrixMembers}
           attendances={attendances}
-          onMonthChange={onMonthChange ?? (() => {})}
           loading={loading}
           limitStartDate={limitStartDate}
           limitEndDate={limitEndDate}

@@ -809,31 +809,31 @@ const CellLeaderDashboard: React.FC = () => {
     };
   }, [newsData, displayNameMap]);
 
-  const handleMatrixMonthChange = useCallback(
-    (increment: number) => {
-      if (unitType === "semester" || !activeSemester) return;
-      const newDate = new Date(matrixDate);
-      newDate.setMonth(newDate.getMonth() + increment);
-      const newYearMonth = new Date(
-        newDate.getFullYear(),
-        newDate.getMonth(),
-        1
-      );
-      const semStart = parseLocal(activeSemester.startDate);
-      const semEnd = parseLocal(activeSemester.endDate);
-      if (!semStart || !semEnd) return;
-      const startLimit = new Date(
-        semStart.getFullYear(),
-        semStart.getMonth(),
-        1
-      );
-      const endLimit = new Date(semEnd.getFullYear(), semEnd.getMonth(), 1);
-      if (newYearMonth < startLimit || newYearMonth > endLimit) return;
-      setMatrixDate(newDate);
-      setSelectedMonth(newDate.getMonth() + 1);
-    },
-    [unitType, activeSemester, matrixDate]
-  );
+  // const handleMatrixMonthChange = useCallback(
+  //   (increment: number) => {
+  //     if (unitType === "semester" || !activeSemester) return;
+  //     const newDate = new Date(matrixDate);
+  //     newDate.setMonth(newDate.getMonth() + increment);
+  //     const newYearMonth = new Date(
+  //       newDate.getFullYear(),
+  //       newDate.getMonth(),
+  //       1
+  //     );
+  //     const semStart = parseLocal(activeSemester.startDate);
+  //     const semEnd = parseLocal(activeSemester.endDate);
+  //     if (!semStart || !semEnd) return;
+  //     const startLimit = new Date(
+  //       semStart.getFullYear(),
+  //       semStart.getMonth(),
+  //       1
+  //     );
+  //     const endLimit = new Date(semEnd.getFullYear(), semEnd.getMonth(), 1);
+  //     if (newYearMonth < startLimit || newYearMonth > endLimit) return;
+  //     setMatrixDate(newDate);
+  //     setSelectedMonth(newDate.getMonth() + 1);
+  //   },
+  //   [unitType, activeSemester, matrixDate]
+  // );
 
   const handleUnitTypeClick = useCallback(
     (type: UnitType) => {
@@ -1119,7 +1119,6 @@ const CellLeaderDashboard: React.FC = () => {
                   endDate={periodRange.endDate}
                   year={matrixDate.getFullYear()}
                   month={matrixDate.getMonth() + 1}
-                  onMonthChange={handleMatrixMonthChange}
                   // [최적화] 매트릭스에는 필요한 정보만 Map에서 꺼내 전달
                   members={members.map((m) => ({
                     memberId: m.memberId,

@@ -687,7 +687,6 @@ const CellAttendanceMatrixCard: React.FC<{
             endDate={endDate}
             year={new Date(startDate).getFullYear()}
             month={new Date(startDate).getMonth() + 1}
-            onMonthChange={() => {}}
             members={matrixMembers}
             attendances={matrixAttendances}
             loading={false}
