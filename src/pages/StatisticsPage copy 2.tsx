@@ -166,63 +166,6 @@ const AgeGroupPieChart = React.memo(
   }
 );
 
-// ✅ [추가] 성별 비율 차트 (GenderRatioChart)
-const GenderRatioChart = React.memo(
-  ({ data }: { data: DashboardDemographicsDto }) => {
-    // distribution 배열에서 남/녀 합산 계산
-    const { male, female } = useMemo(() => {
-      let m = 0;
-      let f = 0;
-      data.distribution.forEach((item) => {
-        m += item.maleCount;
-        f += item.femaleCount;
-      });
-      return { male: m, female: f };
-    }, [data]);
-
-    const total = male + female;
-
-    if (total === 0) {
-      return (
-        <div className="h-[200px] w-full flex items-center justify-center text-gray-400 border border-dashed border-gray-200 rounded-lg">
-          데이터 없음
-        </div>
-      );
-    }
-
-    const chartData = [
-      { name: "남자", value: male, color: "#60a5fa" }, // Blue
-      { name: "여자", value: female, color: "#f472b6" }, // Pink
-    ];
-
-    return (
-      <div className="h-[200px] w-full flex items-center justify-center">
-        <div style={{ width: "100%", height: "100%" }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                innerRadius={50}
-                outerRadius={70}
-                paddingAngle={5}
-                dataKey="value"
-              >
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip />
-              <Legend iconType="circle" verticalAlign="bottom" height={36} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-    );
-  }
-);
-
 // --- 메인 페이지 ---
 const StatisticsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -342,6 +285,7 @@ const StatisticsPage: React.FC = () => {
     }));
   }, [unassignedList]);
 
+  // 스크롤 이동 핸들러 (DemographicsSection의 미배정 카드 클릭 시 호출)
   const scrollToUnassigned = () => {
     const element = document.getElementById("unassigned-section");
     if (element) {
@@ -470,60 +414,25 @@ const StatisticsPage: React.FC = () => {
             </div>
 
             <div className="space-y-6">
-              {/* ✅ [수정] 2개의 차트를 나란히 배치 (grid-cols-2) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* 1. 이번 학기 연령 구성비 (왼쪽) */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-between">
-                  <div className="w-full text-left mb-2">
-                    <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                      연령 구성비{" "}
-                      <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                        2030
-                      </span>
+              {/* 1. 이번 학기 연령 구성비 (단독 배치) */}
+              {semesterSummary && (
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center justify-around">
+                  <div className="text-center md:text-left mb-4 md:mb-0">
+                    <h3 className="text-lg font-bold text-gray-800 mb-2">
+                      이번 학기 연령 구성비
                     </h3>
-                    <p className="text-sm text-gray-500 mt-1">
-                      20대/30대 비율 분포
+                    <p className="text-sm text-gray-500">
+                      20대와 30대의 비율을 한눈에 확인하세요.
                     </p>
                   </div>
-                  {semesterSummary ? (
-                    <div className="w-full max-w-[300px]">
-                      <AgeGroupPieChart
-                        data={semesterSummary.ageGroupSummary}
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-[200px] w-full flex items-center justify-center text-gray-400">
-                      데이터 로딩 중...
-                    </div>
-                  )}
-                </div>
-
-                {/* 2. 성별 비율 (오른쪽 - 새로 추가됨) */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-between">
-                  <div className="w-full text-left mb-2">
-                    <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                      성별 비율{" "}
-                      <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                        전체
-                      </span>
-                    </h3>
-                    <p className="text-sm text-gray-500 mt-1">
-                      남자/여자 구성 분포
-                    </p>
+                  <div className="w-full md:w-1/2 max-w-[400px]">
+                    <AgeGroupPieChart data={semesterSummary.ageGroupSummary} />
                   </div>
-                  {detailDemographics ? (
-                    <div className="w-full max-w-[300px]">
-                      <GenderRatioChart data={detailDemographics} />
-                    </div>
-                  ) : (
-                    <div className="h-[200px] w-full flex items-center justify-center text-gray-400">
-                      데이터 없음
-                    </div>
-                  )}
                 </div>
-              </div>
+              )}
 
-              {/* 3. 상세 지표 (DemographicsSection) */}
+              {/* 2. 상세 지표 (DemographicsSection) */}
+              {/* 미배정, 전체, 임원 등을 포함하며 클릭 시 스크롤 이동 */}
               <div className="w-full">
                 {detailDemographics ? (
                   <DemographicsSection
