@@ -10,6 +10,7 @@ import type {
   User,
   ProcessAttendanceRequest,
   SemesterDto,
+  ProcessAttendanceWithPrayersRequest,
 } from "../../types";
 import StatusButton from "./StatusButton";
 import ConfirmationModal from "./ConfirmationModal";
@@ -358,18 +359,20 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
       const cellId = user.cellId;
       if (!cellId) throw new Error("셀 정보가 없습니다.");
 
+      // ✅ [수정] items 매핑 시 'date' 필드 제거 (백엔드 DTO 변경 반영)
+      // date는 최상위 meetingDate를 사용함
       const items = memberAttendances.map((att) => ({
-        id: att.id,
+        id: att.id, // 기존 출석 ID (업데이트 시)
         memberId: att.memberId,
         status: att.status,
-        attendanceDate: selectedDate,
-        date: selectedDate,
-        memo: undefined,
+        // date: selectedDate, // -> ❌ 삭제됨 (개별 날짜 전송 안 함)
+        memo: undefined, // 필요시 추가
         prayerContent: att.prayerContent?.trim() || undefined,
       }));
 
-      const payload: any = {
-        meetingDate: selectedDate,
+      // ✅ [수정] 타입 명시 (any 제거)
+      const payload: ProcessAttendanceWithPrayersRequest = {
+        meetingDate: selectedDate, // 최상위 필수 날짜
         cellShare: cellShare.trim(),
         specialNotes: specialNotes.trim(),
         items: items,
@@ -378,20 +381,12 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
       await attendanceService.processAttendanceWithPrayers(cellId, payload);
 
       setSubmitError(null);
-
-      // ✅ [변경] 기존 텍스트 메시지 대신 '알림창(Modal)' 호출
       showAlert("저장 완료", "출석 및 보고서가 성공적으로 저장되었습니다.");
-
-      // 기존 3초 뒤 사라지는 메시지는 제거하거나 유지해도 되지만, 모달이 뜨므로 제거해도 무방합니다.
       setSuccessMessage(null);
-
       setIsEditMode(true);
     } catch (err: any) {
       setSuccessMessage(null);
-      // 에러 발생 시에는 기존처럼 에러 알림창을 띄우거나 에러 메시지를 표시
       const errorMsg = err.response?.data?.message || "오류가 발생했습니다.";
-      // 에러도 모달로 띄우고 싶다면 아래 주석을 해제하세요.
-      // showAlert("저장 실패", errorMsg);
       setSubmitError(errorMsg);
     } finally {
       setLoading(false);

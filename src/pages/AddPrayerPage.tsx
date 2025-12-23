@@ -18,7 +18,7 @@ const AddPrayerPage: React.FC = () => {
   const { user } = useAuth();
 
   const [formData, setFormData] = useState<
-    Omit<CreatePrayerRequest, "weekOfMonth">
+    Omit<CreatePrayerRequest, "weekOfMonth" | "meetingDate"> // meetingDate는 별도 state로 관리
   >({
     memberId: 0,
     content: "",
@@ -26,6 +26,7 @@ const AddPrayerPage: React.FC = () => {
     createdById: 0,
   });
 
+  // ✅ 기본값: 오늘 날짜
   const [selectedDate, setSelectedDate] = useState<string>(
     format(new Date(), "yyyy-MM-dd")
   );
@@ -41,13 +42,11 @@ const AddPrayerPage: React.FC = () => {
     user && (user.role === "EXECUTIVE" || user.role === "CELL_LEADER");
 
   useEffect(() => {
-    // 로그인 안 되어 있으면 로그인 페이지로
     if (!user) {
       navigate("/login");
       return;
     }
 
-    // user 로드 후 formData에 기본값 주입
     setFormData((prev) => ({
       ...prev,
       memberId: user.memberId ?? 0,
@@ -61,7 +60,6 @@ const AddPrayerPage: React.FC = () => {
       setLoading(true);
       try {
         let memberData: MemberDto[] = [];
-
         if (user.role === "EXECUTIVE") {
           const allMembersPage = await memberService.getAllMembers({
             size: 1000,
@@ -71,7 +69,6 @@ const AddPrayerPage: React.FC = () => {
           const cell = await cellService.getCellById(user.cellId);
           memberData = cell.members;
         }
-
         setMembers(memberData);
       } catch (err) {
         console.error(err);
@@ -119,6 +116,7 @@ const AddPrayerPage: React.FC = () => {
     }
 
     if (!selectedDate) {
+      // DTO 상 meetingDate가 필수
       newErrors.createdAt = "날짜는 필수입니다.";
     }
 
@@ -146,9 +144,11 @@ const AddPrayerPage: React.FC = () => {
       const date = new Date(selectedDate);
       const weekOfMonth = Math.ceil(date.getDate() / 7);
 
+      // ✅ [수정] meetingDate 필드 포함하여 전송
       const payload: CreatePrayerRequest = {
         ...formData,
-        weekOfMonth,
+        meetingDate: selectedDate, // 필수 필드
+        weekOfMonth, // 백엔드 로직에 따라 선택사항 (DTO에 있다면 포함)
       };
 
       await prayerService.createPrayer(payload);
@@ -163,7 +163,6 @@ const AddPrayerPage: React.FC = () => {
     }
   };
 
-  // user 정보 아직 없을 때: 카드형 로딩 UI
   if (!user) {
     return (
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
@@ -176,7 +175,6 @@ const AddPrayerPage: React.FC = () => {
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-      {/* 헤더 영역 */}
       <div className="mb-4 sm:mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
           새 기도제목 추가
@@ -187,7 +185,6 @@ const AddPrayerPage: React.FC = () => {
         </p>
       </div>
 
-      {/* 카드 레이아웃 */}
       <form
         onSubmit={handleSubmit}
         className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 space-y-6"
@@ -198,20 +195,15 @@ const AddPrayerPage: React.FC = () => {
           </div>
         )}
 
-        {/* 셀원인 경우: 본인 기준으로 자동 등록 안내 (모바일 카드 느낌) */}
         {!isExecutiveOrLeader && (
           <div className="p-3 rounded-md bg-indigo-50 border border-indigo-100 text-xs sm:text-sm text-gray-700">
             <p className="font-medium">
               기도 대상: <span className="text-indigo-700">{user.name}</span>
             </p>
-            <p className="mt-1">
-              셀원은 본인 기도제목만 등록할 수 있습니다. 셀장/임원은 멤버를
-              선택하여 등록할 수 있습니다.
-            </p>
+            <p className="mt-1">셀원은 본인 기도제목만 등록할 수 있습니다.</p>
           </div>
         )}
 
-        {/* EXECUTIVE / CELL_LEADER 전용: 기도 대상 멤버 선택 */}
         {isExecutiveOrLeader && (
           <div>
             <label className="block text-sm font-medium text-gray-700">
@@ -236,10 +228,9 @@ const AddPrayerPage: React.FC = () => {
           </div>
         )}
 
-        {/* 날짜 선택 */}
         <div>
           <label className="block text-sm font-medium text-gray-700">
-            날짜 <span className="text-red-500">*</span>
+            모임(기도) 날짜 <span className="text-red-500">*</span>
           </label>
           <input
             type="date"
@@ -260,7 +251,6 @@ const AddPrayerPage: React.FC = () => {
           )}
         </div>
 
-        {/* 기도제목 내용 */}
         <div>
           <label className="block text-sm font-medium text-gray-700">
             기도제목 내용 <span className="text-red-500">*</span>
@@ -281,19 +271,18 @@ const AddPrayerPage: React.FC = () => {
           )}
         </div>
 
-        {/* 버튼 영역: 모바일 세로, 데스크탑 우측 정렬 */}
         <div className="pt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-800 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-800 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-60"
             disabled={loading}
           >
             취소
           </button>
           <button
             type="submit"
-            className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-60"
             disabled={loading}
           >
             {loading ? "저장 중..." : "저장"}

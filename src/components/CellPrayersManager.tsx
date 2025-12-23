@@ -13,46 +13,44 @@ import { normalizeNumberInput } from "../utils/numberUtils";
 import ConfirmModal from "../components/ConfirmModal";
 import Pagination from "../components/Pagination";
 import { semesterService } from "../services/semesterService";
-import { formatDisplayName } from "../utils/memberUtils"; // [추가]
+import { formatDisplayName } from "../utils/memberUtils";
 
-type SortKey = "createdAt" | "memberName" | "creatorName";
+// ✅ [확정] 정렬 기준: meetingDate
+type SortKey = "meetingDate" | "memberName" | "creatorName";
 
 type SortConfig = {
   key: SortKey;
   direction: "ascending" | "descending";
 };
 
+// ✅ [확정] 백엔드 정렬 필드명 매핑
 const sortKeyMap: Record<SortKey, string> = {
-  createdAt: "createdAt",
+  meetingDate: "meetingDate",
   memberName: "member.name",
   creatorName: "createdBy.name",
 };
 
-// [수정] Props 인터페이스: allMembers 추가
 interface CellPrayersManagerProps {
   user: User;
   allMembers: { id: number; name: string; birthDate?: string }[];
 }
 
-// ✅ 반기/분기 제거
 type UnitType = "year" | "month" | "semester";
 
 const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
   user,
-  allMembers, // [추가]
+  allMembers,
 }) => {
   const navigate = useNavigate();
 
-  // ✅ 현재 연도/월 상수
   const now = new Date();
   const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1; // 1 ~ 12
+  const currentMonth = now.getMonth() + 1;
 
   const [prayerPage, setPrayerPage] = useState<Page<PrayerDto> | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ 학기 목록 상태
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const [semestersLoading, setSemestersLoading] = useState(false);
   const [semestersError, setSemestersError] = useState<string | null>(null);
@@ -77,14 +75,14 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
     semesterId: "",
   });
 
+  // ✅ [확정] 기본 정렬: 최신 모임 날짜(meetingDate) 내림차순
   const [sortConfig, setSortConfig] = useState<SortConfig>({
-    key: "createdAt",
+    key: "meetingDate",
     direction: "descending",
   });
   const [currentPage, setCurrentPage] = useState(0);
   const [filterType, setFilterType] = useState<"unit" | "range">("unit");
 
-  // ✅ 기본 포커싱: 연간(year)
   const [unitType, setUnitType] = useState<UnitType>("year");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -92,7 +90,6 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
 
   const isCellLeader = user.role === "CELL_LEADER";
 
-  // [추가] 이름 포맷팅 헬퍼
   const getFormattedName = useCallback(
     (id: number, originalName: string) => {
       const found = allMembers.find((m) => m.id === id);
@@ -101,7 +98,6 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
     [allMembers]
   );
 
-  // ✅ 학기 목록 불러오기
   const loadSemesters = useCallback(async () => {
     try {
       setSemestersLoading(true);
@@ -116,7 +112,6 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
     }
   }, []);
 
-  // ✅ 학기 목록이 로드되고, 사용자가 '학기' 탭을 눌렀을 때만 자동 포커싱
   useEffect(() => {
     if (
       semesters.length > 0 &&
@@ -130,7 +125,6 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
         return today >= start && today <= end;
       });
 
-      // 현재 학기가 있으면 선택, 없으면 가장 최신 학기 선택
       const targetId = currentSemester
         ? currentSemester.id
         : semesters[semesters.length - 1].id;
@@ -150,11 +144,11 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
     setError(null);
 
     const sortField = sortKeyMap[sortConfig.key];
-
     const effectiveFilterType: "unit" | "range" = isCellLeader
       ? "unit"
       : filterType;
 
+    // ✅ 필터링 로직: startDate, endDate가 이제 meetingDate 기준이 됨 (백엔드 로직 변경 반영)
     let params: GetPrayersParams = {
       page: currentPage,
       size: 10,
@@ -166,21 +160,16 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
     };
 
     if (effectiveFilterType === "range") {
-      // 🔹 기간 직접 선택 (임원용)
       params = {
         ...params,
         startDate: filters.startDate,
         endDate: filters.endDate,
       };
     } else {
-      // 🔹 단위 기반 조회
-
       if (unitType === "semester" && filters.semesterId) {
-        // ✅ 학기 선택된 경우: 해당 학기의 startDate/endDate 사용
         const selected = semesters.find(
           (s) => s.id === Number(filters.semesterId)
         );
-
         if (selected) {
           params = {
             ...params,
@@ -189,8 +178,6 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
           };
         }
       } else {
-        // 🔹 연 / 월
-        // ✅ 셀장은 항상 현재 연도만 조회
         const yearParam = isCellLeader
           ? currentYear
           : normalizeNumberInput(filters.year);
@@ -230,7 +217,6 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
     currentYear,
   ]);
 
-  // ✅ 컴포넌트 마운트 시 한 번 학기 목록 불러오기
   useEffect(() => {
     loadSemesters();
   }, [loadSemesters]);
@@ -294,11 +280,9 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
     setCurrentPage(0);
   };
 
-  // ✅ 단위 선택 핸들러
   const handleUnitValueChange = (unit: UnitType, value: any) => {
     setFilters((prev) => {
       const next = { ...prev };
-
       if (unit === "year") {
         next.year = value;
         next.month = "";
@@ -311,15 +295,12 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
         next.semesterId = value;
         next.month = "";
       }
-
       return next;
     });
-
     setUnitType(unit);
     setCurrentPage(0);
   };
 
-  // ✅ "학기" 버튼 클릭 시 자동 포커싱 로직을 포함한 핸들러
   const handleSemesterButtonClick = () => {
     let targetId: number | string = "";
     if (semesters.length > 0) {
@@ -329,7 +310,6 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
         const end = new Date(s.endDate);
         return today >= start && today <= end;
       });
-      // 현재 날짜에 맞는 학기가 없으면 최신 학기 선택
       targetId = currentSemester
         ? currentSemester.id
         : semesters[semesters.length - 1].id;
@@ -377,8 +357,7 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
               ))}
               {semesters.length === 0 && !semestersLoading && (
                 <span className="text-xs text-gray-500 col-span-full">
-                  등록된 학기가 없습니다. (임원단에서 학기를 먼저 생성해야
-                  합니다.)
+                  등록된 학기가 없습니다.
                 </span>
               )}
             </div>
@@ -404,24 +383,21 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
         message="정말로 이 기도제목을 삭제하시겠습니까?"
       />
 
-      {/* 헤더 */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold text-gray-800">
             {user.cellName ? `${user.cellName} 기도제목` : "내 셀 기도제목"}
           </h2>
           <p className="mt-1 text-sm text-gray-500">
-            셀원들의 기도제목을 기간별로 조회하고 관리할 수 있습니다.
+            셀원들의 기도제목을 모임 날짜 기준으로 조회하고 관리합니다.
           </p>
         </div>
       </div>
 
-      {/* 필터 영역 */}
       <div className="p-4 bg-gray-50 rounded-lg mb-6 space-y-4">
+        {/* 필터 영역 (이전과 동일, 생략) */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 gap-2">
           <h3 className="text-lg font-semibold">조회 기간 설정</h3>
-
-          {/* ✅ 셀장은 기간/단위 토글 숨김, 항상 단위 기반 조회만 사용 */}
           {!isCellLeader && (
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -449,7 +425,6 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
         </div>
 
         {effectiveFilterType === "range" && !isCellLeader ? (
-          // 셀장은 이 블록이 아예 렌더되지 않음
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">
@@ -477,7 +452,6 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
             </div>
           </div>
         ) : (
-          // ✅ 단위 기반 조회
           <div className="space-y-4">
             <div
               className={`grid grid-cols-1 ${
@@ -511,7 +485,6 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
                   조회 단위
                 </label>
                 <div className="flex flex-wrap items-center gap-2 mt-1">
-                  {/* 월간 */}
                   <button
                     onClick={() => handleUnitValueChange("month", currentMonth)}
                     className={`px-3 py-1 text-sm rounded-full ${
@@ -522,8 +495,6 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
                   >
                     월간
                   </button>
-
-                  {/* 학기 */}
                   <button
                     onClick={handleSemesterButtonClick}
                     className={`px-3 py-1 text-sm rounded-full ${
@@ -535,8 +506,6 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
                   >
                     학기
                   </button>
-
-                  {/* 연간 */}
                   <button
                     onClick={() =>
                       handleUnitValueChange("year", filters.year || currentYear)
@@ -555,11 +524,9 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
             {renderUnitButtons()}
           </div>
         )}
-
         <hr />
       </div>
 
-      {/* 리스트/테이블 영역 */}
       {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
       {loading && (
         <p className="text-center text-sm text-gray-500">로딩 중...</p>
@@ -570,9 +537,9 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
           {/* ✅ 모바일: 카드형 리스트 */}
           <div className="sm:hidden space-y-3">
             {prayerPage.content.map((prayer) => {
-              const createdDate = new Date(
-                prayer.createdAt
-              ).toLocaleDateString();
+              // ✅ [수정] 작성일 대신 meetingDate 표시
+              // meetingDate는 "YYYY-MM-DD" 문자열로 옴.
+              const dateDisplay = prayer.meetingDate;
 
               return (
                 <div
@@ -581,18 +548,16 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
                     prayer.isDeleted ? "opacity-70 bg-gray-50" : ""
                   }`}
                 >
-                  {/* 상단: 멤버 이름 + 작성일 */}
                   <div className="flex items-center justify-between gap-2">
                     <div className="font-semibold text-gray-900 text-sm">
-                      {/* [수정] 멤버 이름 동명이인 처리 */}
                       {getFormattedName(prayer.member.id, prayer.member.name)}
                     </div>
+                    {/* 모임 날짜 표시 */}
                     <div className="text-[11px] text-gray-500">
-                      {createdDate}
+                      {dateDisplay}
                     </div>
                   </div>
 
-                  {/* 내용 */}
                   <button
                     type="button"
                     onClick={() => navigate(`/admin/prayers/${prayer.id}`)}
@@ -603,9 +568,7 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
                     </p>
                   </button>
 
-                  {/* 작성자 / 삭제 여부 */}
                   <div className="mt-2 flex items-center justify-between text-[11px] text-gray-600">
-                    {/* [수정] 작성자 이름 동명이인 처리 */}
                     <span>
                       작성자:{" "}
                       {getFormattedName(
@@ -620,7 +583,6 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
                     )}
                   </div>
 
-                  {/* 하단 버튼 */}
                   <div className="mt-3 flex justify-end gap-2">
                     <button
                       type="button"
@@ -672,11 +634,12 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
                   >
                     작성자{renderSortIndicator("creatorName")}
                   </th>
+                  {/* ✅ [수정] 작성일 -> 모임 날짜 컬럼 */}
                   <th
-                    onClick={() => requestSort("createdAt")}
+                    onClick={() => requestSort("meetingDate")}
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                   >
-                    작성일{renderSortIndicator("createdAt")}
+                    모임 날짜{renderSortIndicator("meetingDate")}
                   </th>
                   <th className="relative px-6 py-3">
                     <span className="sr-only">Actions</span>
@@ -692,7 +655,6 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
                     }
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      {/* [수정] 멤버 이름 동명이인 처리 */}
                       {getFormattedName(prayer.member.id, prayer.member.name)}
                     </td>
                     <td className="px-6 py-4 text-sm max-w-sm truncate">
@@ -704,14 +666,14 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
                       </Link>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {/* [수정] 작성자 이름 동명이인 처리 */}
                       {getFormattedName(
                         prayer.createdBy.id,
                         prayer.createdBy.name
                       )}
                     </td>
+                    {/* ✅ [수정] meetingDate 표시 */}
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {new Date(prayer.createdAt).toLocaleDateString()}
+                      {prayer.meetingDate}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button

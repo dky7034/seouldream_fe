@@ -21,22 +21,15 @@ const EditPrayerPage: React.FC = () => {
   const [prayer, setPrayer] = useState<PrayerDto | null>(null);
   const [formData, setFormData] = useState<UpdatePrayerRequest>({});
   const [formErrors, setFormErrors] = useState<PrayerFormErrors>({});
-  const [selectedDate, setSelectedDate] = useState<string>(""); // 표시용
+
+  // ✅ 표시용이 아닌 '수정용' State로 변경
+  const [selectedDate, setSelectedDate] = useState<string>("");
 
   useEffect(() => {
-    // user 로딩 중이면 일단 대기
     if (!user) return;
 
     const fetchPrayerData = async () => {
-      // ID 유효성 체크
-      if (!id) {
-        setError("유효하지 않은 기도제목 ID 입니다.");
-        setIsFetching(false);
-        return;
-      }
-
-      const prayerId = Number(id);
-      if (Number.isNaN(prayerId)) {
+      if (!id || Number.isNaN(Number(id))) {
         setError("유효하지 않은 기도제목 ID 입니다.");
         setIsFetching(false);
         return;
@@ -44,9 +37,8 @@ const EditPrayerPage: React.FC = () => {
 
       setIsFetching(true);
       try {
-        const prayerData = await prayerService.getPrayerById(prayerId);
+        const prayerData = await prayerService.getPrayerById(Number(id));
 
-        // 권한 체크
         const isExecutive = user.role === "EXECUTIVE";
         const isOwner = user.id === prayerData.createdBy.id;
         const isCellLeader =
@@ -65,8 +57,12 @@ const EditPrayerPage: React.FC = () => {
           visibility: prayerData.visibility,
         });
 
-        // 날짜는 "표시용"으로만 사용 (수정 불가)
-        setSelectedDate(format(new Date(prayerData.createdAt), "yyyy-MM-dd"));
+        // ✅ [수정] meetingDate를 초기값으로 설정 (없으면 createdAt Fallback)
+        // 백엔드에서 meetingDate는 YYYY-MM-DD 스트링으로 옴
+        setSelectedDate(
+          prayerData.meetingDate ||
+            format(new Date(prayerData.createdAt), "yyyy-MM-dd")
+        );
       } catch (err) {
         console.error(err);
         setError("기도제목 정보를 불러오는 데 실패했습니다.");
@@ -93,7 +89,10 @@ const EditPrayerPage: React.FC = () => {
     if (!formData.content?.trim()) {
       newErrors.content = "기도제목 내용은 필수입니다.";
     }
-    // 날짜(selectedDate)는 수정 불가 + 항상 존재하는 값이므로 검증 X
+    // 날짜 필수 체크
+    if (!selectedDate) {
+      newErrors.createdAt = "날짜는 필수입니다.";
+    }
     return newErrors;
   };
 
@@ -110,10 +109,9 @@ const EditPrayerPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      // 날짜/주차는 수정하지 않음
       const payload: UpdatePrayerRequest = {
         ...formData,
-        // createdAt, weekOfMonth 등은 보내지 않음 (불변)
+        meetingDate: selectedDate, // ✅ [수정] 수정된 날짜 전송
       };
 
       await prayerService.updatePrayer(prayer.id, payload);
@@ -129,8 +127,7 @@ const EditPrayerPage: React.FC = () => {
     }
   };
 
-  // auth 로딩 중
-  if (!user) {
+  if (!user || isFetching) {
     return (
       <p className="mt-4 text-gray-600">
         로딩 중입니다. 잠시만 기다려 주세요...
@@ -138,31 +135,16 @@ const EditPrayerPage: React.FC = () => {
     );
   }
 
-  if (isFetching) {
-    return (
-      <p className="mt-4 text-gray-600">
-        로딩 중입니다. 잠시만 기다려 주세요...
-      </p>
-    );
-  }
-
-  if (error) {
-    return <p className="mt-4 text-red-500">{error}</p>;
-  }
-
-  if (!prayer) {
-    return (
-      <p className="mt-4 text-red-600">기도제목 정보를 찾을 수 없습니다.</p>
-    );
-  }
+  if (error) return <p className="mt-4 text-red-500">{error}</p>;
+  if (!prayer) return <p className="mt-4 text-red-600">정보 없음</p>;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <h1 className="text-3xl font-bold text-gray-900 mb-2">기도제목 수정</h1>
       <p className="mb-6 text-sm text-gray-500">
-        기존 등록일:{" "}
+        작성자:{" "}
         <span className="font-medium text-gray-800">
-          {format(new Date(prayer.createdAt), "yyyy-MM-dd")}
+          {prayer.createdBy.name}
         </span>
       </p>
 
@@ -176,30 +158,32 @@ const EditPrayerPage: React.FC = () => {
         {/* 기도 대상 멤버 (읽기 전용) */}
         <div>
           <label className="block text-sm font-medium text-gray-700">
-            기도 대상 멤버 <span className="text-red-500">*</span>
+            기도 대상 멤버
           </label>
           <input
             type="text"
             readOnly
             value={prayer.member.name}
-            className="mt-1 block w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md shadow-sm"
+            className="mt-1 block w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md shadow-sm text-gray-600 cursor-not-allowed"
           />
         </div>
 
-        {/* 날짜 (수정 불가) */}
+        {/* ✅ [수정] 날짜 수정 가능하도록 변경 */}
         <div>
           <label className="block text-sm font-medium text-gray-700">
-            날짜
+            모임(기도) 날짜 <span className="text-red-500">*</span>
           </label>
           <input
             type="date"
             value={selectedDate}
-            disabled
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 text-gray-700 cursor-not-allowed"
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           />
+          {formErrors.createdAt && (
+            <p className="mt-1 text-sm text-red-600">{formErrors.createdAt}</p>
+          )}
           <p className="mt-1 text-xs text-gray-500">
-            기도 날짜는 수정할 수 없습니다. 날짜가 잘못된 경우, 새 기도제목을
-            다시 등록해 주세요.
+            실제 셀모임을 진행한 날짜로 수정할 수 있습니다.
           </p>
         </div>
 
@@ -214,26 +198,25 @@ const EditPrayerPage: React.FC = () => {
             required
             value={formData.content || ""}
             onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           />
           {formErrors.content && (
             <p className="mt-1 text-sm text-red-600">{formErrors.content}</p>
           )}
         </div>
 
-        {/* 버튼 영역 - 반응형 정렬 */}
         <div className="flex flex-col space-y-2 pt-4 sm:flex-row sm:justify-end sm:space-y-0 sm:space-x-2">
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="w-full sm:w-auto bg-gray-300 text-gray-800 px-4 py-2 rounded-md"
+            className="w-full sm:w-auto bg-gray-300 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-400 transition-colors"
             disabled={isSubmitting}
           >
             취소
           </button>
           <button
             type="submit"
-            className="w-full sm:w-auto bg-indigo-600 text-white px-4 py-2 rounded-md disabled:opacity-60"
+            className="w-full sm:w-auto bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-60"
             disabled={isSubmitting}
           >
             {isSubmitting ? "저장 중..." : "저장"}

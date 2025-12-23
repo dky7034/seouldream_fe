@@ -1,4 +1,5 @@
 // src/types.ts
+
 // As per the backend's CreateMemberRequest DTO
 export interface CreateMemberRequest {
   name: string;
@@ -26,7 +27,7 @@ export interface CellShortDto {
 export interface MemberDto {
   id: number;
   name: string;
-  username: string; // Added for user management display
+  username: string;
   gender: "MALE" | "FEMALE";
   birthDate: string; // LocalDate
   age: number;
@@ -36,7 +37,7 @@ export interface MemberDto {
     id: number;
     name: string;
   } | null;
-  cellAssignmentDate?: string; // 추가: YYYY-MM-DD 형식의 문자열
+  cellAssignmentDate?: string;
   role: UserRole;
   joinYear: number;
   active: boolean;
@@ -48,15 +49,15 @@ export interface MemberDto {
 
 // Assuming JWT payload structure from Spring Security JWT
 export interface JwtPayload {
-  userId: number; // The ID of the user
-  memberId: number | null; // The ID of the corresponding member, can be null
-  sub: string; // The username (subject)
-  name: string; // Added name field
+  userId: number;
+  memberId: number | null;
+  sub: string;
+  name: string;
   role: UserRole;
-  exp: number; // Expiration time
-  iat: number; // Issued at time
-  cellId: number | null; // Add cellId to JWT payload, can be null
-  cellName: string | null; // Add cellName to JWT payload, can be null
+  exp: number;
+  iat: number;
+  cellId: number | null;
+  cellName: string | null;
 }
 
 // Response from the login endpoint
@@ -68,7 +69,7 @@ export interface JwtAuthenticationResponse {
   role: UserRole;
   name: string;
   cellId: number | null;
-  cellName: string | null; // Add cellName to JwtAuthenticationResponse
+  cellName: string | null;
   memberId: number | null;
 }
 
@@ -78,7 +79,7 @@ export interface User {
   memberId: number | null;
   username: string;
   name: string;
-  role: UserRole; // ✅ string → UserRole
+  role: UserRole;
   cellId: number | null;
   cellName: string | null;
 }
@@ -110,7 +111,7 @@ export interface TeamDto {
   code: string;
   description?: string;
   active: boolean;
-  memberCount?: number; // Added to display member count in AdminTeamsPage
+  memberCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -150,7 +151,6 @@ export interface CellDto {
   updatedAt: string;
 }
 
-// ✅ [신규] 셀 보고서 조회 응답 DTO
 export interface CellReportDto {
   meetingDate: string; // LocalDate (YYYY-MM-DD)
   cellShare: string;
@@ -162,7 +162,7 @@ export interface CreateCellRequest {
   leaderId?: number;
   viceLeaderId?: number;
   description?: string;
-  memberIds?: number[]; // Added to support multiple members on cell creation
+  memberIds?: number[];
 }
 
 export interface UpdateCellRequest {
@@ -183,7 +183,7 @@ export interface AttendanceMemberInfo {
 export interface AttendanceUserInfo {
   id: number;
   username: string;
-  name: string; // Added name field
+  name: string;
 }
 
 export interface AttendanceDto {
@@ -193,7 +193,7 @@ export interface AttendanceDto {
   date: string; // LocalDate
   status: AttendanceStatus;
   memo?: string;
-  prayerContent?: string; // ✅ [추가] 저장된 기도제목
+  prayerContent?: string;
   createdBy: AttendanceUserInfo;
   createdAt: string; // LocalDateTime
 }
@@ -206,21 +206,18 @@ export interface ProcessAttendanceRequest {
   createdById: number;
 }
 
-// 1. [수정] 통합 저장 요청 DTO: 셀 보고서 필드 추가 및 meetingDate 최상위 이동
 export interface ProcessAttendanceWithPrayersRequest {
-  meetingDate: string; // LocalDate (YYYY-MM-DD) - 모든 아이템에 공통 적용
-  cellShare: string; // [신규] 셀 은혜나눔
-  specialNotes?: string; // [신규] 특이사항 (선택)
+  meetingDate: string; // LocalDate (YYYY-MM-DD)
+  cellShare: string;
+  specialNotes?: string;
   items: AttendanceAndPrayerItem[];
 }
 
-// 2. [수정] 개별 아이템: date 필드 제거 (상위 meetingDate 사용)
 export interface AttendanceAndPrayerItem {
   memberId: number;
-  // date: string; // -> 제거됨
   status: AttendanceStatus;
   memo?: string;
-  prayerContent?: string; // 값이 비어있으면 백엔드는 저장하지 않음
+  prayerContent?: string;
 }
 
 export type AttendanceSummaryGroupBy =
@@ -233,8 +230,8 @@ export type AttendanceSummaryGroupBy =
   | "SEMESTER";
 
 export interface AttendanceSummaryQueryParams {
-  startDate?: string; // YYYY-MM-DD
-  endDate?: string; // YYYY-MM-DD
+  startDate?: string;
+  endDate?: string;
   groupBy?: AttendanceSummaryGroupBy;
   year?: number;
   month?: number;
@@ -253,15 +250,12 @@ export interface SimpleAttendanceRateDto {
   endDate: string;
 }
 
-// New interface for overall attendance statistics, matching backend OverallAttendanceStatDto
 export interface OverallAttendanceStatDto {
-  totalRecords: number; // 기존
-  attendanceRate: number; // 기존
-
-  // ✅ [NEW] 백엔드에서 추가된 필드들
-  weeklyAverage: number; // 주간 평균 출석
-  zeroAttendanceCount: number; // 장기 결석(0회) 인원
-  attendanceTrend: number; // 전 기간 대비 증감률 (예: 5.0, -2.1)
+  totalRecords: number;
+  attendanceRate: number;
+  weeklyAverage: number;
+  zeroAttendanceCount: number;
+  attendanceTrend: number;
 }
 
 export interface TotalSummaryDto {
@@ -332,22 +326,20 @@ export interface IncompleteCheckReportDto {
   missedDates: string[];
 }
 
-// ✅ NEW: 셀 멤버별 출석 요약 DTO
 export interface CellMemberAttendanceSummaryDto {
   memberId: number;
   memberName: string;
-  gender: Gender; // "MALE" | "FEMALE"
-  birthDate: string; // LocalDate (YYYY-MM-DD)
+  gender: Gender;
+  birthDate: string;
   joinYear: number;
   active: boolean;
-  lastAttendanceDate: string | null; // 최근 PRESENT 날짜, 없으면 null
-  consecutiveAbsences: number; // 최근 출석 이후 연속 결석 횟수
+  lastAttendanceDate: string | null;
+  consecutiveAbsences: number;
   cellAssignmentDate?: string;
 }
 
-// Updated interface for aggregated attendance trend data, renamed from TrendItemDto
 export interface AggregatedTrendDto {
-  dateGroup: string; // Changed from 'date' to 'dateGroup'
+  dateGroup: string;
   totalRecords: number;
   presentRecords: number;
   attendanceRate: number;
@@ -366,56 +358,54 @@ export interface PrayerMemberInfo {
 export interface PrayerUserInfo {
   id: number;
   username: string;
-  name: string; // Added name field
+  name: string;
 }
 
+// ✅ [수정] PrayerDto: meetingDate 필드 추가
 export interface PrayerDto {
   id: number;
   member: PrayerMemberInfo;
   content: string;
+  meetingDate: string; // ✅ YYYY-MM-DD (필수)
   weekOfMonth?: number;
   visibility: PrayerVisibility;
   isDeleted: boolean;
-  deletedAt?: string; // LocalDateTime
+  deletedAt?: string;
   createdBy: PrayerUserInfo;
-  createdAt: string; // LocalDateTime
-  updatedAt: string; // LocalDateTime
+  createdAt: string; // 작성일
+  updatedAt: string; // 수정일
 }
 
-/**
- * EXECUTIVE용 멤버별 기도제목 요약
- * GET /api/admin/prayers/summary/members 응답 DTO
- */
 export interface PrayerMemberSummaryDto {
   memberId: number;
   memberName: string;
   cellId: number | null;
   cellName: string | null;
   totalCount: number;
-  latestCreatedAt: string; // LocalDateTime
+  latestCreatedAt: string;
 }
 
-/**
- * EXECUTIVE용 셀별 기도제목 요약
- * GET /api/admin/prayers/summary/cells 응답 DTO
- */
 export interface PrayerCellSummaryDto {
   cellId: number;
   cellName: string;
   totalCount: number;
-  latestCreatedAt: string; // LocalDateTime
+  latestCreatedAt: string;
 }
 
+// ✅ [수정] CreatePrayerRequest: meetingDate 추가
 export interface CreatePrayerRequest {
   memberId: number;
   content: string;
+  meetingDate: string; // ✅ YYYY-MM-DD (필수)
   weekOfMonth?: number;
   visibility: PrayerVisibility;
   createdById: number;
 }
 
+// ✅ [수정] UpdatePrayerRequest: meetingDate 추가
 export interface UpdatePrayerRequest {
   content?: string;
+  meetingDate?: string; // ✅ YYYY-MM-DD (선택)
   weekOfMonth?: number;
   createdAt?: string;
   visibility?: PrayerVisibility;
@@ -441,7 +431,7 @@ export interface NoticeCellInfo {
 export interface NoticeUserInfo {
   id: number;
   username: string;
-  name: string; // Added name field
+  name: string;
 }
 
 export interface NoticeDto {
@@ -451,12 +441,12 @@ export interface NoticeDto {
   target: NoticeTarget;
   targetCell: NoticeCellInfo | null;
   pinned: boolean;
-  publishAt?: string; // LocalDateTime
-  expireAt?: string; // LocalDateTime
+  publishAt?: string;
+  expireAt?: string;
   isDeleted: boolean;
   createdBy: NoticeUserInfo;
-  createdAt: string; // LocalDateTime
-  updatedAt: string; // LocalDateTime
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateNoticeRequest {
@@ -465,8 +455,8 @@ export interface CreateNoticeRequest {
   target: NoticeTarget;
   targetCellId?: number;
   pinned?: boolean;
-  publishAt?: string; // LocalDateTime
-  expireAt?: string; // LocalDateTime
+  publishAt?: string;
+  expireAt?: string;
   createdById: number;
 }
 
@@ -476,8 +466,8 @@ export interface UpdateNoticeRequest {
   target?: NoticeTarget;
   targetCellId?: number;
   pinned?: boolean;
-  publishAt?: string; // LocalDateTime
-  expireAt?: string; // LocalDateTime
+  publishAt?: string;
+  expireAt?: string;
 }
 
 export interface NoticeFormErrors {
@@ -507,7 +497,7 @@ export interface SuggestionCellInfo {
 export interface SuggestionUserInfo {
   id: number;
   username: string;
-  name: string; // Added name field
+  name: string;
 }
 
 export interface SuggestionStatusHistoryDto {
@@ -515,7 +505,7 @@ export interface SuggestionStatusHistoryDto {
   fromStatus: SuggestionStatus;
   toStatus: SuggestionStatus;
   changedBy: SuggestionUserInfo;
-  changedAt: string; // LocalDateTime
+  changedAt: string;
   note?: string;
 }
 
@@ -529,8 +519,8 @@ export interface SuggestionDto {
   handledBy: SuggestionUserInfo | null;
   createdBy: SuggestionUserInfo;
   statusHistories: SuggestionStatusHistoryDto[];
-  createdAt: string; // LocalDateTime
-  updatedAt: string; // LocalDateTime
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateSuggestionRequest {
@@ -601,7 +591,7 @@ export interface PasswordVerificationRequest {
 export interface BirthdayInfo {
   memberId: number;
   memberName: string;
-  birthDate: string; // LocalDate
+  birthDate: string;
 }
 
 export interface RecentPrayerInfo {
@@ -609,14 +599,14 @@ export interface RecentPrayerInfo {
   memberId: number;
   memberName: string;
   content: string;
-  createdAt: string; // LocalDateTime
+  createdAt: string;
 }
 
 export interface RecentNoticeInfo {
   noticeId: number;
   title: string;
-  createdAt: string; // LocalDateTime
-  pinned: boolean; // Add this field
+  createdAt: string;
+  pinned: boolean;
 }
 
 export interface CellLeaderDashboardDto {
@@ -632,31 +622,23 @@ export interface AttendanceKeyMetricsDto {
   lastYearPeriodAttendanceRate: number;
 }
 
-// ✅ [신규] 인구 통계 차트용 개별 데이터 (년도별)
 export interface DemographicsDistributionDto {
   birthYear: number;
   maleCount: number;
   femaleCount: number;
 }
 
-// ✅ [신규] 인구 통계 전체 DTO
 export interface DashboardDemographicsDto {
   totalCellCount: number;
   totalMemberCount: number;
   cellMemberCount: number;
   previousSemesterCount: number;
-
-  // ✅ [New] 추가 요청 필드
   executiveCount: number;
   cellLeaderCount: number;
-
-  // 연령대별 요약
   count10sAndUnder: number;
   count20s: number;
   count30s: number;
   count40sAndOver: number;
-
-  // 차트 데이터 리스트
   distribution: DemographicsDistributionDto[];
 }
 
@@ -667,12 +649,10 @@ export interface DashboardDto {
   totalTodayBirthdays: number;
   totalWeeklyBirthdays: number;
   totalMonthlyBirthdays: number;
-  // ✅ [기존] 장기 결석자
   totalLongTermAbsentees: number;
-  // ✅ [신규] 추가된 3종 지표 (건의사항 제외됨)
-  newcomerCount: number; // 이번 주 새가족
-  attendanceChange: number; // 전주 대비 출석 증감 (+/-)
-  unassignedMemberCount: number; // 미배정 성도 (임원용)
+  newcomerCount: number;
+  attendanceChange: number;
+  unassignedMemberCount: number;
   recentPrayers: RecentPrayerInfo[];
   recentNotices: RecentNoticeInfo[];
   weeklyPrayerCount: number;
@@ -683,8 +663,6 @@ export interface DashboardDto {
   cellAttendanceSummaries: CellAttendanceSummaryDto[];
   attendanceKeyMetrics: AttendanceKeyMetricsDto;
   attendanceTrend?: AggregatedTrendDto[];
-
-  // ✅ [추가] 인구 통계 필드 (nullable 가능성 고려하여 ? 처리하거나, 백엔드가 무조건 주면 ? 제거)
   demographics?: DashboardDemographicsDto;
 }
 
@@ -756,7 +734,7 @@ export interface GetAllMembersParams {
   page?: number;
   size?: number;
   sort?: string;
-  active?: boolean; // Added active filter
+  active?: boolean;
   month?: number;
 }
 
@@ -804,8 +782,8 @@ export interface GetPrayersParams {
   createdById?: number;
   isDeleted?: boolean;
   visibility?: PrayerVisibility;
-  startDate?: string; // Add startDate for date filtering
-  endDate?: string; // Add endDate for date filtering
+  startDate?: string; // 백엔드에서 meetingDate 필터링에 사용됨
+  endDate?: string; // 백엔드에서 meetingDate 필터링에 사용됨
   year?: number;
   month?: number;
   quarter?: number;
@@ -833,22 +811,22 @@ export interface GetAttendancesParams {
 export interface SemesterDto {
   id: number;
   name: string;
-  startDate: string; // LocalDate
-  endDate: string; // LocalDate
-  isActive: boolean; // Add isActive field
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
 }
 
 export interface CreateSemesterRequest {
   name: string;
-  startDate: string; // LocalDate
-  endDate: string; // LocalDate
+  startDate: string;
+  endDate: string;
 }
 
 export interface UpdateSemesterRequest {
   name?: string;
-  startDate?: string; // LocalDate
-  endDate?: string; // LocalDate
-  isActive?: boolean; // Add isActive field
+  startDate?: string;
+  endDate?: string;
+  isActive?: boolean;
 }
 
 export interface OptionType {
@@ -856,14 +834,12 @@ export interface OptionType {
   label: string;
 }
 
-// 1. 새가족 등록 추이
 export interface NewcomerStatDto {
-  label: string; // "2024-01"
-  count: number; // 등록 수
-  growthRate: number; // 전월 대비 증감률 (%)
+  label: string;
+  count: number;
+  growthRate: number;
 }
 
-// 2. 학기별 요약 (인구 통계용)
 export interface SemesterSummaryDto {
   semesterName: string;
   totalCellCount: number;
@@ -880,12 +856,11 @@ export interface SemesterSummaryDto {
   };
 }
 
-// 3. 미배정 성도
 export interface UnassignedMemberDto {
   id: number;
   name: string;
   birthYear?: string;
-  birthDate?: string; // ✅ 이 필드를 추가해주세요! (YYYY-MM-DD 형식)
+  birthDate?: string; // ✅ 추가됨
   age?: number;
   phone: string;
   registeredDate: string;
