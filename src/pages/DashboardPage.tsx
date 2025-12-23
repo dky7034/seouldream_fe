@@ -312,7 +312,7 @@ const TopSummaryChips: React.FC<{ data: DashboardDto }> = ({ data }) => {
         </div>
       )}
 
-      {/* ▼ [수정됨] 텍스트 변경: '지난주 대비' -> '지난주 대비 출석 인원' */}
+      {/* 출석 인원 증감 (텍스트 수정됨) */}
       <div
         className={`inline-flex items-center px-3 py-2 rounded-full text-xs sm:text-sm font-medium border ${attendanceChangeColor(
           data.attendanceChange
@@ -330,8 +330,6 @@ const TopSummaryChips: React.FC<{ data: DashboardDto }> = ({ data }) => {
           미배정 인원 {data.unassignedMemberCount}명
         </div>
       )}
-
-      {/* ▼ [삭제됨] 장기 결석 칩 부분 삭제 완료 */}
     </div>
   );
 };
@@ -524,6 +522,8 @@ const DashboardPage: React.FC = () => {
   const [loadingMain, setLoadingMain] = useState(true);
   const [loadingCharts, setLoadingCharts] = useState(true);
   const [loadingSub, setLoadingSub] = useState(true);
+  // ✅ [New] 출석 누락 리포트 전용 로딩
+  const [loadingIncomplete, setLoadingIncomplete] = useState(false);
 
   const [dashboardData, setDashboardData] = useState<DashboardDto | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -540,7 +540,6 @@ const DashboardPage: React.FC = () => {
   const [incompleteFilter, setIncompleteFilter] =
     useState<IncompleteFilter>("WEEK");
 
-  // ✅ useMemo로 기간 계산(상태 저장 금지)
   const incompleteDateRange = useMemo(() => {
     return computeIncompleteRange(
       incompleteFilter,
@@ -621,9 +620,10 @@ const DashboardPage: React.FC = () => {
   };
   const handleIncompleteFilterChange = (filter: IncompleteFilter) => {
     setIncompleteFilter(filter);
-    setLoadingSub(true);
+    // ✅ 여기서는 로딩을 켜지 않음 (useEffect가 처리)
   };
 
+  // ✅ 메인 Fetch Data (누락 리포트 제외)
   const fetchData = useCallback(async () => {
     if (!user) return;
     if (isExecutive && semesters.length === 0) return;
@@ -650,27 +650,22 @@ const DashboardPage: React.FC = () => {
       );
       setLoadingMain(false);
 
-      // 2) 차트 + Summary (임원/셀장 수 Fetch 포함)
+      // 2) 차트 + Summary
       setLoadingCharts(true);
-
       const chartPromise = statisticsService.getAttendanceTrend({
         startDate,
         endDate,
         groupBy,
       });
 
-      // ✅ [Modified] 통계 요약 가져오기 (차트용)
-      // * 상단 그리드는 제거되었으므로, 오직 차트의 OverallAttendanceSummary 만 챙기면 됩니다.
       const summaryPromise = (async () => {
         if (isExecutive && selectedSemesterId) {
-          // 차트용 전체 출석률 데이터
           if (summaryMode === "YEAR") {
             const currentYear = new Date().getFullYear();
             return await statisticsService.getOverallAttendance({
               year: currentYear,
             } as any);
           }
-          // 학기 모드면 기간으로 조회
           const sm = semesters.find((s) => s.id === selectedSemesterId);
           if (sm) {
             return await statisticsService.getOverallAttendance({
@@ -697,29 +692,20 @@ const DashboardPage: React.FC = () => {
             }
           : null
       );
-
       setLoadingCharts(false);
 
-      // 3) 부가
+      // 3) 부가 데이터 (Notices, Prayers, Unassigned) - 누락리포트 제거됨
       setLoadingSub(true);
-      const [noticesPage, prayersPage, incompleteData, unassignedData] =
-        await Promise.all([
-          noticeService.getAllNotices({ size: 1 }),
-          prayerService.getPrayers({ size: 1, sort: "createdAt,desc" }),
-          isExecutive
-            ? reportService.getIncompleteCheckReport({
-                startDate: incompleteDateRange.startDate,
-                endDate: incompleteDateRange.endDate,
-              })
-            : Promise.resolve([]),
-          isExecutive
-            ? statisticsService.getUnassignedMembers()
-            : Promise.resolve([]),
-        ]);
+      const [noticesPage, prayersPage, unassignedData] = await Promise.all([
+        noticeService.getAllNotices({ size: 1 }),
+        prayerService.getPrayers({ size: 1, sort: "createdAt,desc" }),
+        isExecutive
+          ? statisticsService.getUnassignedMembers()
+          : Promise.resolve([]),
+      ]);
 
       setTotalNotices(noticesPage.totalElements);
       setTotalPrayers(prayersPage.totalElements);
-      setIncompleteCheckData(incompleteData);
       setUnassignedList(unassignedData as UnassignedMemberDto[]);
       setLoadingSub(false);
     } catch (err) {
@@ -736,24 +722,42 @@ const DashboardPage: React.FC = () => {
     summaryMode,
     selectedSemesterId,
     semesters,
-    incompleteDateRange,
     isExecutive,
-  ]);
+  ]); // ⚠️ incompleteDateRange 의존성 제거됨
 
-  // ✅✅ 경고 해결 핵심: effect에서 fetchData를 “동기”로 바로 호출하지 않고 한 틱 미룸
+  // ✅ 초기 및 주요 필터 변경 시 메인 데이터 로딩
   useEffect(() => {
     let alive = true;
-
-    // 마이크로태스크로 미뤄서 “effect 내부 동기 setState” 경고를 회피
     Promise.resolve().then(() => {
       if (!alive) return;
       void fetchData();
     });
-
     return () => {
       alive = false;
     };
   }, [fetchData]);
+
+  // ✅ [New] 누락 리포트만 따로 로딩하는 Effect (깜빡임 방지)
+  useEffect(() => {
+    if (!isExecutive) return;
+
+    const fetchIncompleteReport = async () => {
+      setLoadingIncomplete(true);
+      try {
+        const data = await reportService.getIncompleteCheckReport({
+          startDate: incompleteDateRange.startDate,
+          endDate: incompleteDateRange.endDate,
+        });
+        setIncompleteCheckData(data);
+      } catch (e) {
+        console.error("누락 리포트 로딩 실패", e);
+      } finally {
+        setLoadingIncomplete(false);
+      }
+    };
+
+    fetchIncompleteReport();
+  }, [isExecutive, incompleteDateRange]);
 
   if (!user) return <div>로그인이 필요합니다.</div>;
   if (isCellLeader)
@@ -881,7 +885,8 @@ const DashboardPage: React.FC = () => {
                     </p>
                   )}
 
-                  {loadingSub ? (
+                  {/* ✅ 로딩 상태 분리 적용 */}
+                  {loadingIncomplete ? (
                     <div className="py-4 text-center text-xs text-gray-400">
                       데이터 불러오는 중...
                     </div>
@@ -892,7 +897,7 @@ const DashboardPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* ✅ [New] 공동체 구성 통계 (DemographicsSection)에서 임원/셀장/미배정 모두 보여줍니다. */}
+                {/* 공동체 구성 통계 */}
                 {loadingCharts
                   ? null
                   : dashboardData?.demographics && (
@@ -909,7 +914,7 @@ const DashboardPage: React.FC = () => {
                       </div>
                     )}
 
-                {/* 미배정 인원 상세 리스트 (아래 배치) */}
+                {/* 미배정 인원 상세 리스트 */}
                 <div id="unassigned-section" className="mt-8 border-t pt-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">

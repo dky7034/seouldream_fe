@@ -7,7 +7,6 @@ import {
   FaBullhorn,
   FaChartLine,
   FaExclamationTriangle,
-  FaHeartBroken,
   FaUserPlus,
   FaUserTag,
   FaArrowUp,
@@ -287,45 +286,52 @@ const TopSummaryChips: React.FC<{ data: DashboardDto }> = ({ data }) => {
 
   return (
     <div className="flex flex-wrap gap-2 sm:gap-3">
+      {/* 공지사항 */}
       <div className="inline-flex items-center px-3 py-2 rounded-full bg-yellow-50 text-yellow-700 text-xs sm:text-sm border border-yellow-100">
         <FaBullhorn className="mr-2" />
         이번 주 공지 {data.weeklyNoticeCount ?? 0}개
       </div>
+
+      {/* 기도제목 */}
       <div className="inline-flex items-center px-3 py-2 rounded-full bg-blue-50 text-blue-700 text-xs sm:text-sm border border-blue-100">
         <FaPrayingHands className="mr-2" />
         이번 주 기도제목 {data.weeklyPrayerCount ?? 0}개
       </div>
+
+      {/* 생일 */}
       <div className="inline-flex items-center px-3 py-2 rounded-full bg-pink-50 text-pink-700 text-xs sm:text-sm border border-pink-100">
         <FaBirthdayCake className="mr-2" />
         이번 주 생일 {data.totalWeeklyBirthdays}명
       </div>
+
+      {/* 새가족 */}
       {data.newcomerCount > 0 && (
         <div className="inline-flex items-center px-3 py-2 rounded-full bg-emerald-50 text-emerald-700 text-xs sm:text-sm font-medium border border-emerald-100">
           <FaUserPlus className="mr-2" />
           이번 주 새가족 {data.newcomerCount}명
         </div>
       )}
+
+      {/* ▼ [수정됨] 텍스트 변경: '지난주 대비' -> '지난주 대비 출석 인원' */}
       <div
         className={`inline-flex items-center px-3 py-2 rounded-full text-xs sm:text-sm font-medium border ${attendanceChangeColor(
           data.attendanceChange
         )}`}
       >
         {getAttendanceChangeIcon(data.attendanceChange)}
-        지난주 대비 {data.attendanceChange > 0 ? "+" : ""}
+        지난주 대비 출석 인원 {data.attendanceChange > 0 ? "+" : ""}
         {data.attendanceChange}명
       </div>
+
+      {/* 미배정 인원 */}
       {data.unassignedMemberCount > 0 && (
         <div className="inline-flex items-center px-3 py-2 rounded-full bg-orange-50 text-orange-700 text-xs sm:text-sm font-medium border border-orange-100">
           <FaUserTag className="mr-2" />
           미배정 인원 {data.unassignedMemberCount}명
         </div>
       )}
-      {data.totalLongTermAbsentees > 0 && (
-        <div className="inline-flex items-center px-3 py-2 rounded-full bg-rose-50 text-rose-700 text-xs sm:text-sm font-medium border border-rose-100">
-          <FaHeartBroken className="mr-2" />
-          장기 결석 {data.totalLongTermAbsentees}명
-        </div>
-      )}
+
+      {/* ▼ [삭제됨] 장기 결석 칩 부분 삭제 완료 */}
     </div>
   );
 };
