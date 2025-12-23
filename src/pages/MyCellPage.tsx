@@ -133,30 +133,35 @@ const MyCellPage: React.FC = () => {
           </p>
         </div>
 
-        {/* ✅ 탭 네비게이션 */}
+        {/* ✅ 탭 네비게이션 수정 */}
         <div className="border-b border-gray-200">
           <nav
             className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto"
             role="tablist"
             aria-label="내 셀 관리 탭"
           >
+            {/* 1. 출석 관리 -> 셀 보고서 (작성) */}
             {renderTabButton(
               "attendance",
-              "출석 관리",
+              "셀 보고서", // ✨ 변경: 포괄적인 입력 업무임을 명시
               CalendarDaysIcon,
               "tab-attendance",
               "panel-attendance"
             )}
+
+            {/* 2. 기도제목 관리 -> 기도제목 목록 */}
             {renderTabButton(
               "prayers",
-              "기도제목 관리",
+              "기도제목 목록", // ✨ 변경: 조회가 주 목적임을 명시
               ChatBubbleBottomCenterTextIcon,
               "tab-prayers",
               "panel-prayers"
             )}
+
+            {/* 3. 셀원 관리 -> 셀원 정보 */}
             {renderTabButton(
               "members",
-              "셀원 관리",
+              "셀원 정보", // ✨ 변경: 정보 확인용임을 명시
               UsersIcon,
               "tab-members",
               "panel-members"
