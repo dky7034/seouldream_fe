@@ -16,7 +16,6 @@ import { formatDisplayName } from "../utils/memberUtils";
 import { memberService } from "../services/memberService";
 import { semesterService } from "../services/semesterService";
 import type { SemesterDto } from "../types";
-// ✅ [추가] 달력 컴포넌트 import
 import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
 
 type SortKey =
@@ -34,7 +33,7 @@ type SortConfig = {
   direction: "ascending" | "descending";
 };
 
-// ✅ 기간 계산용 유틸
+// 기간 계산용 유틸
 const pad = (n: number) => n.toString().padStart(2, "0");
 
 // month: 1~12, 결과는 해당 달의 마지막 날
@@ -42,7 +41,7 @@ const lastDayOfMonth = (year: number, month: number) => {
   return new Date(year, month, 0).getDate();
 };
 
-// ✅ 필터 타입 정의
+// 필터 타입 정의
 type Filters = {
   name: string;
   active: "all" | "true" | "false";
@@ -60,7 +59,6 @@ const AdminCellsPage: React.FC = () => {
 
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const hasActiveSemesters = semesters.length > 0;
-  // ✅ 초기 진입 시 자동 학기 선택 여부
   const [hasAutoSelectedSemester, setHasAutoSelectedSemester] = useState(false);
 
   const [cellPage, setCellPage] = useState<Page<CellDto> | null>(null);
@@ -80,7 +78,7 @@ const AdminCellsPage: React.FC = () => {
   const now = new Date();
   const currentYear = now.getFullYear();
 
-  // ✅ 초기 필터 설정
+  // 초기 필터 설정
   const [filters, setFilters] = useState<Filters>({
     name: "",
     active: "all",
@@ -92,7 +90,6 @@ const AdminCellsPage: React.FC = () => {
   });
 
   const [filterType, setFilterType] = useState<"unit" | "range">("unit");
-  // ✅ 기본값 'semester'로 변경
   const [unitType, setUnitType] = useState<"year" | "month" | "semester">(
     "semester"
   );
@@ -104,7 +101,7 @@ const AdminCellsPage: React.FC = () => {
 
   const debouncedNameFilter = useDebounce(filters.name, 500);
 
-  // 🔹 URL에서 유효한 sortKey 파싱
+  // URL에서 유효한 sortKey 파싱
   const getValidSortKey = (value: string | null): SortKey => {
     if (value === "name") return "name";
     if (value === "leaderName") return "leaderName";
@@ -117,12 +114,9 @@ const AdminCellsPage: React.FC = () => {
     return "name";
   };
 
-  // 🔹 URL에서 초기 정렬/페이지 읽기
-  // [수정 후] ✅
   const [sortConfig, setSortConfig] = useState<SortConfig>(() => {
     const key = getValidSortKey(searchParams.get("sortKey"));
     const dirParam = searchParams.get("sortDir");
-    // URL 파라미터가 'descending'이라고 명시되지 않은 이상 무조건 'ascending' (기본값)
     const direction: SortConfig["direction"] =
       dirParam === "descending" ? "descending" : "ascending";
     return { key, direction };
@@ -134,12 +128,10 @@ const AdminCellsPage: React.FC = () => {
     return Number.isNaN(pageNum) || pageNum < 0 ? 0 : pageNum;
   });
 
-  // 🔹 브라우저 뒤로가기/앞으로가기 동기화
-  // [수정 후] ✅
+  // 브라우저 뒤로가기/앞으로가기 동기화
   useEffect(() => {
     const key = getValidSortKey(searchParams.get("sortKey"));
     const dirParam = searchParams.get("sortDir");
-    // 여기도 동일하게 로직 변경
     const direction: SortConfig["direction"] =
       dirParam === "descending" ? "descending" : "ascending";
 
@@ -155,7 +147,7 @@ const AdminCellsPage: React.FC = () => {
     setCurrentPage((prev) => (prev === safePage ? prev : safePage));
   }, [searchParams]);
 
-  // ✅ 학기 자동 선택 로직
+  // 학기 자동 선택 로직
   useEffect(() => {
     if (semesters.length > 0 && !hasAutoSelectedSemester) {
       const now = new Date();
@@ -197,7 +189,7 @@ const AdminCellsPage: React.FC = () => {
     }
   }, [semesters, hasAutoSelectedSemester]);
 
-  // ✅ 데이터 Fetch
+  // 데이터 Fetch
   const fetchAvailableYears = useCallback(async () => {
     try {
       const years = await attendanceService.getAvailableYears();
@@ -218,7 +210,7 @@ const AdminCellsPage: React.FC = () => {
     }
   }, []);
 
-  // ✅ DateRange 계산
+  // DateRange 계산
   const getDateRangeFromFilters = useCallback((): {
     startDate: string;
     endDate: string;
@@ -262,15 +254,9 @@ const AdminCellsPage: React.FC = () => {
     };
   }, [filterType, filters, semesters]);
 
-  // ✅ 셀 목록 조회
-  // ✅ [수정] fetchCells 함수
   const fetchCells = useCallback(async () => {
     if (!user || user.role !== "EXECUTIVE") return;
 
-    // 🔴 [Bug Fix] Race Condition 방지
-    // 조회 단위가 '학기(semester)'인데, 아직 semesterId가 설정되지 않았다면(초기 로딩 중이라면)
-    // API 요청을 보내지 않고 중단합니다.
-    // (이후 semesters가 로드되고 자동 선택 로직이 실행되면, 그때 다시 이 함수가 호출됩니다.)
     if (unitType === "semester" && !filters.semesterId) {
       return;
     }
@@ -325,8 +311,8 @@ const AdminCellsPage: React.FC = () => {
     debouncedNameFilter,
     filters.active,
     getDateRangeFromFilters,
-    unitType, // 의존성 추가
-    filters.semesterId, // 의존성 추가
+    unitType,
+    filters.semesterId,
   ]);
 
   useEffect(() => {
@@ -637,7 +623,7 @@ const AdminCellsPage: React.FC = () => {
               셀 관리
             </h1>
             <p className="mt-1 text-sm text-gray-600">
-              셀 조직과 셀장 정보를 관리하고, 기간별 출석률을 확인합니다.
+              셀과 셀장 정보를 관리하고, 기간별 출석률을 확인합니다.
             </p>
           </div>
         </div>
@@ -679,7 +665,6 @@ const AdminCellsPage: React.FC = () => {
 
           {filterType === "range" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* ✅ [수정] 기본 input -> KoreanCalendarPicker로 교체 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   기간 시작
@@ -869,18 +854,18 @@ const AdminCellsPage: React.FC = () => {
                   return (
                     <div
                       key={cell.id}
-                      className={`bg-white rounded-lg shadow border border-gray-100 p-4 text-xs space-y-2 ${
+                      // ✅ [변경] 모바일 카드 전체 클릭 시 상세 이동
+                      onClick={() => navigate(`/admin/cells/${cell.id}`)}
+                      className={`bg-white rounded-lg shadow border border-gray-100 p-4 text-xs space-y-2 cursor-pointer hover:bg-gray-50 transition-colors ${
                         !cell.active ? "bg-gray-100 text-gray-500" : ""
                       }`}
                     >
                       <div className="flex justify-between items-start gap-2">
                         <div>
-                          <button
-                            onClick={() => navigate(`/admin/cells/${cell.id}`)}
-                            className="text-sm font-semibold text-indigo-600 hover:text-indigo-800"
-                          >
+                          {/* ✅ [변경] button 대신 span 사용 (중복 클릭 방지) */}
+                          <span className="text-sm font-semibold text-indigo-600">
                             {cell.name}
-                          </button>
+                          </span>
                           <p className="mt-1 text-[11px] text-gray-500">
                             셀장:{" "}
                             <span className="font-medium text-gray-700">
@@ -922,16 +907,22 @@ const AdminCellsPage: React.FC = () => {
 
                       <div className="pt-2 flex justify-end gap-2">
                         <button
-                          onClick={() =>
-                            navigate(`/admin/cells/${cell.id}/edit`)
-                          }
-                          className="text-[11px] font-medium text-indigo-600 hover:text-indigo-900"
+                          // ✅ [중요] 이벤트 버블링 방지
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/admin/cells/${cell.id}/edit`);
+                          }}
+                          className="text-[11px] font-medium text-indigo-600 hover:text-indigo-900 px-2 py-1"
                         >
                           수정
                         </button>
                         <button
-                          onClick={() => handleDelete(cell)}
-                          className="text-[11px] font-medium text-red-600 hover:text-red-800"
+                          // ✅ [중요] 이벤트 버블링 방지
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(cell);
+                          }}
+                          className="text-[11px] font-medium text-red-600 hover:text-red-800 px-2 py-1"
                         >
                           삭제
                         </button>
@@ -1009,19 +1000,17 @@ const AdminCellsPage: React.FC = () => {
                       return (
                         <tr
                           key={cell.id}
-                          className={
+                          // ✅ [변경] 데스크톱 행 클릭 시 상세 이동
+                          onClick={() => navigate(`/admin/cells/${cell.id}`)}
+                          className={`cursor-pointer hover:bg-indigo-50 transition-colors ${
                             !cell.active ? "bg-gray-100 text-gray-500" : ""
-                          }
+                          }`}
                         >
                           <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
-                            <button
-                              onClick={() =>
-                                navigate(`/admin/cells/${cell.id}`)
-                              }
-                              className="text-indigo-600 hover:text-indigo-900"
-                            >
+                            {/* ✅ [변경] button 대신 span 사용 */}
+                            <span className="text-indigo-600 font-medium">
                               {cell.name}
-                            </button>
+                            </span>
                           </td>
                           <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
                             {cell.leader
@@ -1064,15 +1053,21 @@ const AdminCellsPage: React.FC = () => {
 
                           <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
                             <button
-                              onClick={() =>
-                                navigate(`/admin/cells/${cell.id}/edit`)
-                              }
+                              // ✅ [중요] 이벤트 버블링 방지
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/admin/cells/${cell.id}/edit`);
+                              }}
                               className="text-indigo-600 hover:text-indigo-900 mr-3 sm:mr-4"
                             >
                               수정
                             </button>
                             <button
-                              onClick={() => handleDelete(cell)}
+                              // ✅ [중요] 이벤트 버블링 방지
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(cell);
+                              }}
                               className="text-red-600 hover:text-red-900"
                             >
                               삭제

@@ -263,8 +263,17 @@ const AdminCellsPage: React.FC = () => {
   }, [filterType, filters, semesters]);
 
   // ✅ 셀 목록 조회
+  // ✅ [수정] fetchCells 함수
   const fetchCells = useCallback(async () => {
     if (!user || user.role !== "EXECUTIVE") return;
+
+    // 🔴 [Bug Fix] Race Condition 방지
+    // 조회 단위가 '학기(semester)'인데, 아직 semesterId가 설정되지 않았다면(초기 로딩 중이라면)
+    // API 요청을 보내지 않고 중단합니다.
+    // (이후 semesters가 로드되고 자동 선택 로직이 실행되면, 그때 다시 이 함수가 호출됩니다.)
+    if (unitType === "semester" && !filters.semesterId) {
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -316,6 +325,8 @@ const AdminCellsPage: React.FC = () => {
     debouncedNameFilter,
     filters.active,
     getDateRangeFromFilters,
+    unitType, // 의존성 추가
+    filters.semesterId, // 의존성 추가
   ]);
 
   useEffect(() => {
@@ -626,7 +637,7 @@ const AdminCellsPage: React.FC = () => {
               셀 관리
             </h1>
             <p className="mt-1 text-sm text-gray-600">
-              셀 조직과 셀장 정보를 관리하고, 기간별 출석률을 확인합니다.
+              셀과 셀장 정보를 관리하고, 기간별 출석률을 확인합니다.
             </p>
           </div>
         </div>

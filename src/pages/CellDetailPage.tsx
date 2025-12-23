@@ -357,7 +357,7 @@ const CellReportHistoryItem: React.FC<{
                               )}
                               {att.memo && att.memo !== att.prayerContent && (
                                 <div className="mt-2 text-xs text-gray-500 bg-white p-2 rounded border border-gray-100">
-                                  <span className="font-bold mr-1">MEMO:</span>
+                                  <span className="font-bold mr-1">메모:</span>
                                   {att.memo}
                                 </div>
                               )}
