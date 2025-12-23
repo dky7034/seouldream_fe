@@ -30,7 +30,6 @@ import type {
 
 import {
   FaUsers,
-  FaHeartBroken,
   FaExclamationTriangle,
   FaInfoCircle,
   FaCalendarAlt,
@@ -809,32 +808,6 @@ const CellLeaderDashboard: React.FC = () => {
     };
   }, [newsData, displayNameMap]);
 
-  // const handleMatrixMonthChange = useCallback(
-  //   (increment: number) => {
-  //     if (unitType === "semester" || !activeSemester) return;
-  //     const newDate = new Date(matrixDate);
-  //     newDate.setMonth(newDate.getMonth() + increment);
-  //     const newYearMonth = new Date(
-  //       newDate.getFullYear(),
-  //       newDate.getMonth(),
-  //       1
-  //     );
-  //     const semStart = parseLocal(activeSemester.startDate);
-  //     const semEnd = parseLocal(activeSemester.endDate);
-  //     if (!semStart || !semEnd) return;
-  //     const startLimit = new Date(
-  //       semStart.getFullYear(),
-  //       semStart.getMonth(),
-  //       1
-  //     );
-  //     const endLimit = new Date(semEnd.getFullYear(), semEnd.getMonth(), 1);
-  //     if (newYearMonth < startLimit || newYearMonth > endLimit) return;
-  //     setMatrixDate(newDate);
-  //     setSelectedMonth(newDate.getMonth() + 1);
-  //   },
-  //   [unitType, activeSemester, matrixDate]
-  // );
-
   const handleUnitTypeClick = useCallback(
     (type: UnitType) => {
       setUnitType(type);
@@ -946,11 +919,6 @@ const CellLeaderDashboard: React.FC = () => {
     }
     return incompleteWeeks;
   }, [periodRange.startDate, periodRange.endDate, members, matrixAttendances]);
-
-  const longTermAbsenteesCount = useMemo(() => {
-    if (!members) return 0;
-    return members.filter((m) => m.consecutiveAbsences >= 3).length;
-  }, [members]);
 
   // Render
   if (!user) return <div className="p-4">로그인 정보가 없습니다.</div>;
@@ -1081,21 +1049,7 @@ const CellLeaderDashboard: React.FC = () => {
         {/* Left Column */}
         <div className="xl:col-span-2 space-y-6">
           {dashboardSummary && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <StatCard
-                title="관심 요망 (3주↑ 결석)"
-                value={`${longTermAbsenteesCount}명`}
-                icon={
-                  <FaHeartBroken
-                    size={20}
-                    className={
-                      longTermAbsenteesCount > 0
-                        ? "text-rose-500"
-                        : "text-gray-400"
-                    }
-                  />
-                }
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <StatCard
                 title="현재 셀 멤버"
                 value={`${members.length.toLocaleString()}명`}
