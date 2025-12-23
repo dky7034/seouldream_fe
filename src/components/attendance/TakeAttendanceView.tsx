@@ -41,6 +41,7 @@ const AlertModal: React.FC<{
         </div>
         <div className="bg-gray-50 px-4 py-3 flex justify-end">
           <button
+            type="button"
             onClick={onClose}
             className="w-full sm:w-auto inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm"
           >
@@ -74,7 +75,6 @@ const toISODate = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-// 오늘 기준 가장 최근 일요일 구하기
 const getMostRecentSunday = (): Date => {
   const now = new Date();
   const dayOfWeek = now.getDay();
@@ -83,24 +83,7 @@ const getMostRecentSunday = (): Date => {
   return sunday;
 };
 
-// 최근 N주간의 일요일 리스트 생성
-const getRecentSundays = (count: number = 5) => {
-  const sundays: { dateStr: string; label: string }[] = [];
-  const latest = getMostRecentSunday();
-
-  for (let i = 0; i < count; i++) {
-    const d = new Date(latest);
-    d.setDate(latest.getDate() - i * 7);
-    const dateStr = toISODate(d);
-
-    let label = `${d.getMonth() + 1}/${d.getDate()} (이번 주)`;
-    if (i === 1) label = `${d.getMonth() + 1}/${d.getDate()} (지난주)`;
-    else if (i > 1) label = `${d.getMonth() + 1}/${d.getDate()} (${i}주 전)`;
-
-    sundays.push({ dateStr, label });
-  }
-  return sundays;
-};
+// 🗑️ getRecentSundays 함수 삭제됨 (더 이상 사용 안 함)
 
 // ─────────────────────────────────────────────────────────────
 // [Component] Main
@@ -131,17 +114,26 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
     isOpen: boolean;
     title: string;
     message: string;
+    onConfirm?: () => void;
   }>({ isOpen: false, title: "", message: "" });
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // ── Helpers ──
-  const showAlert = (title: string, message: string) => {
-    setAlertState({ isOpen: true, title, message });
+  const showAlert = (
+    title: string,
+    message: string,
+    onConfirm?: () => void
+  ) => {
+    setAlertState({ isOpen: true, title, message, onConfirm });
   };
+
   const closeAlert = () => {
-    setAlertState((prev) => ({ ...prev, isOpen: false }));
+    if (alertState.onConfirm) {
+      alertState.onConfirm();
+    }
+    setAlertState((prev) => ({ ...prev, isOpen: false, onConfirm: undefined }));
   };
 
   // ── 1. 학기 목록 로드 ──
@@ -233,6 +225,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
         const existingAttendances = existingAttendancesPage.content;
         const hasExistingData =
           existingAttendances.length > 0 || !!cellReportData;
+
         setIsEditMode(hasExistingData);
 
         const initialAttendances = relevantMembers.map((member) => {
@@ -270,7 +263,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
     fetchData();
   }, [selectedDate, user]);
 
-  const recentSundays = useMemo(() => getRecentSundays(5), []);
+  // 🗑️ useMemo(recentSundays) 삭제됨
 
   // ── Handlers ──
   const onDateSelect = (newDateStr: string) => {
@@ -316,6 +309,8 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isEditMode) return;
+
     if (!selectedDate) return setSubmitError("출석 날짜를 선택해 주세요.");
 
     if (allSemesters.length > 0) {
@@ -351,7 +346,6 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
     setIsConfirmModalOpen(true);
   };
 
-  // [수정된 부분] 저장 로직
   const handleConfirmSubmit = async () => {
     setIsConfirmModalOpen(false);
     setLoading(true);
@@ -359,20 +353,16 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
       const cellId = user.cellId;
       if (!cellId) throw new Error("셀 정보가 없습니다.");
 
-      // ✅ [수정] items 매핑 시 'date' 필드 제거 (백엔드 DTO 변경 반영)
-      // date는 최상위 meetingDate를 사용함
       const items = memberAttendances.map((att) => ({
-        id: att.id, // 기존 출석 ID (업데이트 시)
+        id: att.id,
         memberId: att.memberId,
         status: att.status,
-        // date: selectedDate, // -> ❌ 삭제됨 (개별 날짜 전송 안 함)
-        memo: undefined, // 필요시 추가
+        memo: undefined,
         prayerContent: att.prayerContent?.trim() || undefined,
       }));
 
-      // ✅ [수정] 타입 명시 (any 제거)
       const payload: ProcessAttendanceWithPrayersRequest = {
-        meetingDate: selectedDate, // 최상위 필수 날짜
+        meetingDate: selectedDate,
         cellShare: cellShare.trim(),
         specialNotes: specialNotes.trim(),
         items: items,
@@ -381,11 +371,19 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
       await attendanceService.processAttendanceWithPrayers(cellId, payload);
 
       setSubmitError(null);
-      showAlert("저장 완료", "출석 및 보고서가 성공적으로 저장되었습니다.");
       setSuccessMessage(null);
+
+      // 모드 변경 (읽기 전용)
       setIsEditMode(true);
+
+      showAlert(
+        "저장 완료",
+        "출석 및 보고서가 성공적으로 저장되었습니다.",
+        () => {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      );
     } catch (err: any) {
-      setSuccessMessage(null);
       const errorMsg = err.response?.data?.message || "오류가 발생했습니다.";
       setSubmitError(errorMsg);
     } finally {
@@ -416,15 +414,19 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
           <div className="flex justify-between items-center mb-3">
             <label className="text-sm font-bold text-gray-800">날짜 선택</label>
             {!loading && selectedDate && (
-              <span
-                className={`px-2.5 py-1 text-xs font-bold rounded-full ${
-                  isEditMode
-                    ? "bg-blue-100 text-blue-700 border border-blue-200"
-                    : "bg-orange-100 text-orange-700 border border-orange-200"
-                }`}
-              >
-                {isEditMode ? "✍ 기존 내용 수정" : "✨ 신규 작성"}
-              </span>
+              <>
+                {isEditMode ? (
+                  // 수정 모드: 단순 텍스트 경고
+                  <span className="text-xs font-bold text-red-600">
+                    ⚠ 기존 내용 수정이 불가합니다
+                  </span>
+                ) : (
+                  // 신규 모드: 기존 배지 유지
+                  <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-orange-100 text-orange-700 border border-orange-200">
+                    ✨ 신규 작성
+                  </span>
+                )}
+              </>
             )}
           </div>
 
@@ -437,46 +439,13 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
             </div>
           ) : (
             <>
-              {/* 퀵 선택 버튼 */}
-              <div className="flex gap-2 mb-4 overflow-x-auto pb-2 no-scrollbar -mx-1 px-1">
-                {recentSundays.map((sunday) => {
-                  const isValid = allSemesters.some(
-                    (s) =>
-                      sunday.dateStr >= s.startDate &&
-                      sunday.dateStr <= s.endDate
-                  );
-                  return (
-                    <button
-                      key={sunday.dateStr}
-                      type="button"
-                      onClick={() => onDateSelect(sunday.dateStr)}
-                      className={`flex-shrink-0 px-3.5 py-2 text-xs sm:text-sm rounded-lg border font-medium transition-all active:scale-95 ${
-                        selectedDate === sunday.dateStr
-                          ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
-                          : isValid
-                          ? "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                          : "bg-gray-100 text-gray-400 border-gray-200 opacity-60"
-                      }`}
-                    >
-                      {sunday.label}
-                    </button>
-                  );
-                })}
-              </div>
+              {/* 🗑️ 퀵 선택 버튼 및 '또는' 구분선 삭제됨 */}
 
-              {/* 달력 */}
-              <div className="relative flex py-3 items-center">
-                <div className="flex-grow border-t border-gray-200"></div>
-                <span className="flex-shrink-0 mx-3 text-gray-400 text-xs font-medium">
-                  또는
-                </span>
-                <div className="flex-grow border-t border-gray-200"></div>
-              </div>
-
+              {/* 달력 선택만 남김 */}
               <div className="relative">
                 <label className="mb-2 text-xs font-bold text-gray-600 flex items-center gap-1.5">
                   <FaCalendarAlt className="text-indigo-500 text-sm" />
-                  <span>달력에서 직접 선택</span>
+                  <span>달력에서 날짜 선택</span>
                 </label>
 
                 <KoreanCalendarPicker
@@ -523,16 +492,16 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                 <button
                   type="button"
                   onClick={() => handleBulkChange("PRESENT")}
-                  className="px-3 py-1.5 text-xs border border-green-500 text-green-600 rounded-md hover:bg-green-50 font-medium active:bg-green-100"
-                  disabled={loading}
+                  className="px-3 py-1.5 text-xs border border-green-500 text-green-600 rounded-md hover:bg-green-50 font-medium active:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading || isEditMode}
                 >
                   모두 출석
                 </button>
                 <button
                   type="button"
                   onClick={() => handleBulkChange("ABSENT")}
-                  className="px-3 py-1.5 text-xs border border-red-500 text-red-600 rounded-md hover:bg-red-50 font-medium active:bg-red-100"
-                  disabled={loading}
+                  className="px-3 py-1.5 text-xs border border-red-500 text-red-600 rounded-md hover:bg-red-50 font-medium active:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading || isEditMode}
                 >
                   모두 결석
                 </button>
@@ -550,16 +519,11 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                     key={member.id}
                     className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 space-y-3"
                   >
-                    <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
+                    {/* 🔹 수정됨: flex justify-between 및 파란 점 로직 삭제 */}
+                    <div className="border-b border-gray-100 pb-2 mb-2">
                       <span className="text-base font-bold text-gray-800 break-keep">
                         {formatDisplayName(member, allMembers)}
                       </span>
-                      {attendance.isExistingData && (
-                        <span
-                          className="h-2.5 w-2.5 rounded-full bg-blue-500 ring-2 ring-blue-100"
-                          title="저장된 데이터 있음"
-                        ></span>
-                      )}
                     </div>
 
                     <div className="flex flex-wrap gap-2 items-center justify-start">
@@ -572,7 +536,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                             onClick={(s) =>
                               handleAttendanceChange(member.id, "status", s)
                             }
-                            disabled={loading}
+                            disabled={loading || isEditMode}
                             small
                           />
                         )
@@ -581,8 +545,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
 
                     <div className="space-y-1.5 pt-1">
                       <label className="text-xs font-semibold text-gray-700 flex items-center">
-                        기도제목 및 특이사항{" "}
-                        <span className="text-red-500 ml-0.5">*</span>
+                        기도제목 및 특이사항
                       </label>
                       <textarea
                         placeholder="상세 내용을 기록해 주세요."
@@ -595,9 +558,15 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                             e.target.value
                           )
                         }
-                        className="block w-full text-sm p-3 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-y min-h-[100px]"
-                        rows={3}
+                        readOnly={isEditMode}
                         disabled={loading}
+                        className={`block w-full text-sm p-3 rounded-md shadow-sm resize-y min-h-[100px] 
+                        ${
+                          isEditMode
+                            ? "bg-gray-100 text-gray-800 border-transparent focus:ring-0"
+                            : "border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                        }`}
+                        rows={3}
                       />
                     </div>
                   </div>
@@ -632,17 +601,9 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                         className="hover:bg-gray-50 transition-colors"
                       >
                         <td className="w-[15%] px-6 py-4 font-medium text-gray-900 align-top pt-5">
-                          {/* ★ [FIX] Flex로 감싸서 이름과 점을 같은 줄에 배치 */}
-                          <div className="flex items-center gap-2">
-                            <span className="break-keep">
-                              {formatDisplayName(member, allMembers)}
-                            </span>
-                            {attendance.isExistingData && (
-                              <span
-                                className="flex-shrink-0 h-1.5 w-1.5 rounded-full bg-blue-400"
-                                title="저장된 데이터 있음"
-                              ></span>
-                            )}
+                          {/* 🔹 수정됨: flex, gap, 파란 점 로직 삭제하고 이름만 출력 */}
+                          <div className="break-keep">
+                            {formatDisplayName(member, allMembers)}
                           </div>
                         </td>
                         <td className="w-[20%] px-6 py-4 align-top pt-5">
@@ -660,7 +621,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                                       s
                                     )
                                   }
-                                  disabled={loading}
+                                  disabled={loading || isEditMode}
                                   small
                                 />
                               )
@@ -679,9 +640,15 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                                 e.target.value
                               )
                             }
-                            className="mt-1 block w-full text-sm p-3 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-y min-h-[80px]"
-                            rows={2}
+                            readOnly={isEditMode}
                             disabled={loading}
+                            className={`mt-1 block w-full text-sm p-3 rounded-md shadow-sm resize-y min-h-[80px]
+                            ${
+                              isEditMode
+                                ? "bg-gray-100 text-gray-800 border-transparent focus:ring-0"
+                                : "border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                            }`}
+                            rows={2}
                           />
                         </td>
                       </tr>
@@ -704,47 +671,63 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
               <div className="p-4 sm:p-6 space-y-5">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    셀 은혜나눔 <span className="text-red-500 ml-0.5">*</span>
+                    셀 은혜나눔
                   </label>
                   <textarea
                     required
                     value={cellShare}
                     onChange={(e) => setCellShare(e.target.value)}
+                    readOnly={isEditMode}
                     placeholder="셀 나눔 내용과 은혜를 나눠주세요. (필수)"
                     rows={4}
-                    className="w-full text-sm p-3 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 min-h-[100px]"
+                    className={`w-full text-sm p-3 rounded-md shadow-sm min-h-[100px]
+                    ${
+                      isEditMode
+                        ? "bg-gray-100 text-gray-800 border-transparent focus:ring-0"
+                        : "border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                    }`}
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    셀 특이사항 <span className="text-red-500 ml-0.5">*</span>
+                    셀 특이사항
                   </label>
                   <textarea
                     required
                     value={specialNotes}
                     onChange={(e) => setSpecialNotes(e.target.value)}
+                    readOnly={isEditMode}
                     placeholder="공유할 내용을 적어주세요. (필수)"
                     rows={3}
-                    className="w-full text-sm p-3 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 min-h-[80px]"
+                    className={`w-full text-sm p-3 rounded-md shadow-sm min-h-[80px]
+                    ${
+                      isEditMode
+                        ? "bg-gray-100 text-gray-800 border-transparent focus:ring-0"
+                        : "border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                    }`}
                   />
                 </div>
               </div>
             </div>
 
-            {/* 저장 버튼 */}
-            <div className="flex justify-center md:justify-end pt-6 pb-8 sticky bottom-0 bg-gray-50 p-4 -mx-4 sm:static sm:bg-transparent sm:p-0 sm:mx-0 border-t sm:border-t-0 border-gray-200 z-10">
-              <button
-                type="submit"
-                className="w-full sm:w-auto bg-indigo-600 text-white px-8 py-3 rounded-md hover:bg-indigo-700 disabled:bg-indigo-300 text-base font-bold shadow-md transition-all active:scale-95"
-                disabled={loading || memberAttendances.length === 0}
-              >
-                {loading
-                  ? "저장 중..."
-                  : isEditMode
-                  ? "수정사항 저장"
-                  : "보고서 및 출석 저장"}
-              </button>
-            </div>
+            {/* 저장 버튼 영역 */}
+            {!isEditMode ? (
+              <div className="flex justify-center md:justify-end pt-6 pb-8 sticky bottom-0 bg-gray-50 p-4 -mx-4 sm:static sm:bg-transparent sm:p-0 sm:mx-0 border-t sm:border-t-0 border-gray-200 z-10">
+                <button
+                  type="submit"
+                  className="w-full sm:w-auto bg-indigo-600 text-white px-8 py-3 rounded-md hover:bg-indigo-700 disabled:bg-indigo-300 text-base font-bold shadow-md transition-all active:scale-95"
+                  disabled={loading || memberAttendances.length === 0}
+                >
+                  {loading ? "저장 중..." : "보고서 및 출석 저장"}
+                </button>
+              </div>
+            ) : (
+              <div className="flex justify-center md:justify-end pt-6 pb-8 sticky bottom-0 bg-gray-50 p-4 -mx-4 sm:static sm:bg-transparent sm:p-0 sm:mx-0 border-t sm:border-t-0 border-gray-200 z-10">
+                <div className="w-full sm:w-auto px-8 py-3 rounded-md bg-gray-200 text-gray-500 font-bold border border-gray-300 text-center cursor-not-allowed flex items-center justify-center gap-2 shadow-sm">
+                  <span>✅ 이미 제출 완료된 보고서입니다</span>
+                </div>
+              </div>
+            )}
           </>
         )}
       </form>

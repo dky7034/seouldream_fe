@@ -1,9 +1,7 @@
-// src/components/CellAttendanceManager.tsx
 import React, { useState } from "react";
 import type { User } from "../types";
 import TakeAttendanceView from "./attendance/TakeAttendanceView";
 import AttendanceLogView from "./attendance/AttendanceLogView";
-import AttendanceStatisticsView from "./attendance/AttendanceStatisticsView";
 
 interface CellAttendanceManagerProps {
   user: User;
@@ -14,13 +12,13 @@ const CellAttendanceManager: React.FC<CellAttendanceManagerProps> = ({
   user,
   allMembers,
 }) => {
-  const [viewMode, setViewMode] = useState<"check" | "log" | "stats">("check");
+  // ✅ [수정] 'stats' 상태 제거
+  const [viewMode, setViewMode] = useState<"check" | "log">("check");
 
-  // ✅ [수정] 탭 네이밍 변경
-  const tabs: { id: "check" | "log" | "stats"; label: string }[] = [
-    { id: "check", label: "출석/기도제목/보고서 작성" }, // ✨ 출석+기도+보고서를 모두 포함하는 포괄적 단어
-    { id: "log", label: "출석 기록" }, // ✨ 단순히 '출석' 기록이 아닌 전체 보고서 내역임
-    { id: "stats", label: "출석 통계" }, // 그대로 유지
+  // ✅ [수정] 탭 목록에서 '출석 통계' 제거
+  const tabs: { id: "check" | "log"; label: string }[] = [
+    { id: "check", label: "출석/기도제목/보고서 작성" },
+    { id: "log", label: "출석 기록" },
   ];
 
   return (
@@ -59,9 +57,6 @@ const CellAttendanceManager: React.FC<CellAttendanceManagerProps> = ({
         )}
         {viewMode === "log" && (
           <AttendanceLogView user={user} allMembers={allMembers} />
-        )}
-        {viewMode === "stats" && (
-          <AttendanceStatisticsView user={user} allMembers={allMembers} />
         )}
       </div>
     </div>

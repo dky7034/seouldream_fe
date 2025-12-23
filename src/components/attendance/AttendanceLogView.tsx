@@ -582,7 +582,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
           <div className="flex items-center gap-2">
             <FaChartBar className="text-indigo-500" />
             <h3 className="text-lg font-semibold text-gray-800 break-keep">
-              출석부 조회
+              출석 기록 조회
             </h3>
           </div>
 

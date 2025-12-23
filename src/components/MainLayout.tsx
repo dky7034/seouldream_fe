@@ -57,7 +57,7 @@ const MainLayout: React.FC = () => {
   ) => {
     if (!user) return null;
 
-    // ✅ 1) 임원단 메뉴 구성 (요청 순서 적용)
+    // ✅ 1) 임원단 메뉴 구성
     if (isExecutive) {
       return (
         <>
@@ -161,19 +161,9 @@ const MainLayout: React.FC = () => {
             기도제목
           </Link>
 
-          {/* 11. 생일자 */}
-          <Link
-            to="/birthdays"
-            className={getNavLinkClass("/birthdays", {
-              exact: true,
-              variant,
-            })}
-            onClick={onLinkClick}
-          >
-            생일자
-          </Link>
+          {/* ✅ 생일자 링크 제거됨 */}
 
-          {/* 12. 공지사항 */}
+          {/* 11. 공지사항 */}
           <Link
             to="/admin/notices"
             className={getNavLinkClass("/admin/notices", { variant })}
@@ -185,7 +175,7 @@ const MainLayout: React.FC = () => {
       );
     }
 
-    // ✅ 2) 셀장 메뉴 구성 (기존 유지)
+    // ✅ 2) 셀장 메뉴 구성
     if (isCellLeader) {
       return (
         <>
@@ -221,16 +211,8 @@ const MainLayout: React.FC = () => {
             결석 관리
           </Link>
 
-          <Link
-            to="/birthdays"
-            className={getNavLinkClass("/birthdays", {
-              exact: true,
-              variant,
-            })}
-            onClick={onLinkClick}
-          >
-            생일자
-          </Link>
+          {/* ✅ 생일자 링크 제거됨 */}
+
           <Link
             to="/admin/notices"
             className={getNavLinkClass("/admin/notices", { variant })}
@@ -242,21 +224,9 @@ const MainLayout: React.FC = () => {
       );
     }
 
-    // ✅ 3) 일반 셀원 (기존 유지)
-    return (
-      <>
-        <Link
-          to="/birthdays"
-          className={getNavLinkClass("/birthdays", {
-            exact: true,
-            variant,
-          })}
-          onClick={onLinkClick}
-        >
-          생일자
-        </Link>
-      </>
-    );
+    // ✅ 3) 일반 셀원
+    // 생일자가 유일한 메뉴였으므로, 이제 아무 메뉴도 표시하지 않음 (또는 공지사항 등을 추가 가능)
+    return null;
   };
 
   return (

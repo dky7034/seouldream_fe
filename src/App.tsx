@@ -34,7 +34,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import ExecOnlyRoute from "./components/ExecOnlyRoute";
 import AdminSemestersPage from "./pages/AdminSemestersPage";
 import AdminIncompleteChecksReportPage from "./pages/AdminIncompleteChecksReportPage";
-import BirthdaysPage from "./pages/BirthdaysPage";
+// ✅ BirthdaysPage import 제거됨
 import MemberPrayersPage from "./pages/MemberPrayersPage";
 import CellPrayersPage from "./pages/CellPrayersPage";
 import AdminPrayerSummaryPage from "./pages/AdminPrayerSummaryPage";
@@ -59,7 +59,8 @@ function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
 
             <Route path="/my-cell" element={<MyCellPage />} />
-            <Route path="/birthdays" element={<BirthdaysPage />} />
+            {/* ✅ /birthdays 라우트 제거됨 */}
+
             {/* 셀장 전용 대시보드 컴포넌트 직접 접근용 (필요시 사용) */}
             <Route path="/cell-dashboard" element={<CellLeaderDashboard />} />
 

@@ -1,4 +1,3 @@
-// src/pages/CellLeaderDashboard.tsx
 import React, {
   useState,
   useEffect,
@@ -23,7 +22,6 @@ import type {
   CellMemberAttendanceSummaryDto,
   SemesterDto,
   DashboardDto,
-  BirthdayInfo,
   RecentNoticeInfo,
   RecentPrayerInfo,
 } from "../types";
@@ -34,8 +32,6 @@ import {
   FaInfoCircle,
   FaCalendarAlt,
   FaBullhorn,
-  FaPrayingHands,
-  FaBirthdayCake,
 } from "react-icons/fa";
 
 type UnitType = "semester" | "month";
@@ -99,7 +95,6 @@ const getAttendanceMemberId = (att: any): string | number | null => {
   return null;
 };
 
-// [최적화] 통계 계산 로직을 순수 함수로 분리
 const calculateMemberStats = (
   member: CellMemberAttendanceSummaryDto,
   attendanceMap: Map<string, "PRESENT" | "ABSENT">,
@@ -127,7 +122,6 @@ const calculateMemberStats = (
 
   if (effectiveStart <= effectiveEnd) {
     const current = new Date(effectiveStart);
-    // 날짜 루프 최적화를 위해 TimeValue 사용
     const endTimeValue = effectiveEnd.getTime();
 
     while (current.getTime() <= endTimeValue) {
@@ -146,71 +140,6 @@ const calculateMemberStats = (
     present: presentCount,
     absent: absentCount,
     unchecked: uncheckedCount,
-  };
-};
-
-const calculateBirthdays = (members: CellMemberAttendanceSummaryDto[]) => {
-  const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth();
-  const currentDate = today.getDate();
-
-  const dayOfWeek = today.getDay();
-  const startOfWeek = new Date(today);
-  startOfWeek.setDate(currentDate - dayOfWeek);
-  startOfWeek.setHours(0, 0, 0, 0);
-
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 6);
-  endOfWeek.setHours(23, 59, 59, 999);
-
-  const todayBirthdays: BirthdayInfo[] = [];
-  const weeklyBirthdays: BirthdayInfo[] = [];
-  const monthlyBirthdays: BirthdayInfo[] = [];
-
-  members.forEach((m) => {
-    if (!m.birthDate) return;
-    const birthDate = new Date(m.birthDate);
-    const mMonth = birthDate.getMonth();
-    const mDate = birthDate.getDate();
-
-    if (mMonth === currentMonth) {
-      monthlyBirthdays.push({
-        memberId: m.memberId,
-        memberName: m.memberName,
-        birthDate: m.birthDate,
-      } as BirthdayInfo);
-    }
-
-    if (mMonth === currentMonth && mDate === currentDate) {
-      todayBirthdays.push({
-        memberId: m.memberId,
-        memberName: m.memberName,
-        birthDate: m.birthDate,
-      } as BirthdayInfo);
-    }
-
-    const thisYearBirthday = new Date(currentYear, mMonth, mDate);
-    if (thisYearBirthday >= startOfWeek && thisYearBirthday <= endOfWeek) {
-      weeklyBirthdays.push({
-        memberId: m.memberId,
-        memberName: m.memberName,
-        birthDate: m.birthDate,
-      } as BirthdayInfo);
-    }
-  });
-
-  const sortFn = (a: BirthdayInfo, b: BirthdayInfo) => {
-    const da = new Date(a.birthDate);
-    const db = new Date(b.birthDate);
-    if (da.getMonth() !== db.getMonth()) return da.getMonth() - db.getMonth();
-    return da.getDate() - db.getDate();
-  };
-
-  return {
-    today: todayBirthdays,
-    weekly: weeklyBirthdays.sort(sortFn),
-    monthly: monthlyBirthdays.sort(sortFn),
   };
 };
 
@@ -243,45 +172,26 @@ const SummaryChips: React.FC<{
   memberCount: number;
   weeklyNoticeCount: number;
   weeklyPrayerCount: number;
-  weeklyBirthdayCount: number;
-}> = React.memo(
-  ({
-    incompleteCount,
-    memberCount,
-    weeklyNoticeCount,
-    weeklyPrayerCount,
-    weeklyBirthdayCount,
-  }) => (
-    <div className="flex flex-wrap gap-2 sm:gap-3 mt-1 sm:mt-2">
-      <div className="inline-flex items-center px-3 py-2 rounded-full bg-amber-50 text-amber-700 text-xs sm:text-sm font-medium border border-amber-100">
-        <FaUsers className="mr-2" />
-        {memberCount > 0 ? `셀원 ${memberCount}명` : `셀원 없음`}
-      </div>
-
-      {incompleteCount > 0 && (
-        <div className="inline-flex items-center px-3 py-2 rounded-full bg-rose-50 text-rose-700 text-xs sm:text-sm font-medium border border-rose-100">
-          <FaExclamationTriangle className="mr-2" />
-          출석 체크 누락 {incompleteCount}주
-        </div>
-      )}
-
-      <div className="inline-flex items-center px-3 py-2 rounded-full bg-yellow-50 text-yellow-700 text-xs sm:text-sm font-medium border border-yellow-100">
-        <FaBullhorn className="mr-2" />
-        이번 주 공지 {weeklyNoticeCount}개
-      </div>
-
-      <div className="inline-flex items-center px-3 py-2 rounded-full bg-blue-50 text-blue-700 text-xs sm:text-sm font-medium border border-blue-100">
-        <FaPrayingHands className="mr-2" />
-        이번 주 기도제목 {weeklyPrayerCount}개
-      </div>
-
-      <div className="inline-flex items-center px-3 py-2 rounded-full bg-pink-50 text-pink-700 text-xs sm:text-sm font-medium border border-pink-100">
-        <FaBirthdayCake className="mr-2" />
-        이번 주 생일 {weeklyBirthdayCount}명
-      </div>
+}> = React.memo(({ incompleteCount, memberCount, weeklyNoticeCount }) => (
+  <div className="flex flex-wrap gap-2 sm:gap-3 mt-1 sm:mt-2">
+    <div className="inline-flex items-center px-3 py-2 rounded-full bg-amber-50 text-amber-700 text-xs sm:text-sm font-medium border border-amber-100">
+      <FaUsers className="mr-2" />
+      {memberCount > 0 ? `셀원 ${memberCount}명` : `셀원 없음`}
     </div>
-  )
-);
+
+    {incompleteCount > 0 && (
+      <div className="inline-flex items-center px-3 py-2 rounded-full bg-rose-50 text-rose-700 text-xs sm:text-sm font-medium border border-rose-100">
+        <FaExclamationTriangle className="mr-2" />
+        출석 체크 누락 {incompleteCount}주
+      </div>
+    )}
+
+    <div className="inline-flex items-center px-3 py-2 rounded-full bg-yellow-50 text-yellow-700 text-xs sm:text-sm font-medium border border-yellow-100">
+      <FaBullhorn className="mr-2" />
+      이번 주 공지 {weeklyNoticeCount}개
+    </div>
+  </div>
+));
 
 const MatrixStatusLegend: React.FC<{ label: string }> = React.memo(
   ({ label }) => (
@@ -315,7 +225,7 @@ const CellMemberList: React.FC<{
   attendances: AttendanceDto[];
   startDate: string;
   endDate: string;
-  displayNameMap: Map<number, string>; // [최적화] 배열 대신 Map 사용
+  displayNameMap: Map<number, string>;
 }> = React.memo(
   ({ members, attendances, startDate, endDate, displayNameMap }) => {
     const sortedMembers = useMemo(
@@ -340,8 +250,6 @@ const CellMemberList: React.FC<{
       return map;
     }, [attendances]);
 
-    // [최적화] 모든 멤버의 통계를 한 번에 계산 (useMemo)
-    // 렌더링 시마다 getMemberStats를 호출하는 비용을 제거
     const memberStatsMap = useMemo(() => {
       const statsMap = new Map<
         number,
@@ -408,7 +316,6 @@ const CellMemberList: React.FC<{
             </thead>
             <tbody>
               {sortedMembers.map((m) => {
-                // [최적화] Map에서 O(1)로 조회
                 const displayName =
                   displayNameMap.get(m.memberId) || m.memberName;
                 const stats = memberStatsMap.get(m.memberId) || {
@@ -701,8 +608,6 @@ const CellLeaderDashboard: React.FC = () => {
       );
       setMembers(sortedMembers);
 
-      const birthdays = calculateBirthdays(sortedMembers);
-
       const thisWeekNoticeCount = noticesPage.content.filter((n: any) =>
         isDateInThisWeek(n.createdAt)
       ).length;
@@ -733,12 +638,12 @@ const CellLeaderDashboard: React.FC = () => {
       const fakeDashboardData: DashboardDto = {
         recentNotices: mappedNotices,
         recentPrayers: mappedPrayers,
-        todayBirthdays: birthdays.today,
-        weeklyBirthdays: birthdays.weekly,
-        monthlyBirthdays: birthdays.monthly,
-        totalTodayBirthdays: birthdays.today.length,
-        totalWeeklyBirthdays: birthdays.weekly.length,
-        totalMonthlyBirthdays: birthdays.monthly.length,
+        todayBirthdays: [],
+        weeklyBirthdays: [],
+        monthlyBirthdays: [],
+        totalTodayBirthdays: 0,
+        totalWeeklyBirthdays: 0,
+        totalMonthlyBirthdays: 0,
         weeklyNoticeCount: thisWeekNoticeCount,
         weeklyPrayerCount: thisWeekPrayerCount,
         overallAttendanceSummary: null as any,
@@ -777,7 +682,6 @@ const CellLeaderDashboard: React.FC = () => {
     fetchMembersAndNews();
   }, [fetchMembersAndNews]);
 
-  // [최적화] 뉴스 센터 데이터에 Map 기반 이름 포맷팅 적용 (O(N) -> O(1) 조회)
   const formattedNewsData = useMemo(() => {
     if (!newsData) return null;
     if (displayNameMap.size === 0) return newsData;
@@ -793,18 +697,12 @@ const CellLeaderDashboard: React.FC = () => {
       memberName: formatName(p.memberId, p.memberName),
     }));
 
-    const formatBirthdays = (list: BirthdayInfo[]) =>
-      list.map((b) => ({
-        ...b,
-        memberName: formatName(b.memberId, b.memberName),
-      }));
-
     return {
       ...newsData,
       recentPrayers: formattedPrayers,
-      todayBirthdays: formatBirthdays(newsData.todayBirthdays),
-      weeklyBirthdays: formatBirthdays(newsData.weeklyBirthdays),
-      monthlyBirthdays: formatBirthdays(newsData.monthlyBirthdays),
+      todayBirthdays: [],
+      weeklyBirthdays: [],
+      monthlyBirthdays: [],
     };
   }, [newsData, displayNameMap]);
 
@@ -862,7 +760,6 @@ const CellLeaderDashboard: React.FC = () => {
     return months;
   }, [activeSemester]);
 
-  // [최적화] realIncompleteCheckCount는 계산량이 많으므로 useMemo 유지 + 내부 로직 최적화
   const realIncompleteCheckCount = useMemo(() => {
     if (!periodRange.startDate || !periodRange.endDate) return 0;
     if (!members || members.length === 0) return 0;
@@ -883,7 +780,7 @@ const CellLeaderDashboard: React.FC = () => {
     }
     if (sundays.length === 0) return 0;
 
-    // 2. 출석 데이터를 Set으로 변환 (O(1) lookup)
+    // 2. 출석 데이터를 Set으로 변환
     const attendanceSet = new Set<string>();
     for (const att of matrixAttendances) {
       const mId = getAttendanceMemberId(att);
@@ -898,7 +795,6 @@ const CellLeaderDashboard: React.FC = () => {
       const sundayDate = parseLocal(sundayStr);
       if (!sundayDate) continue;
 
-      // 해당 일요일 기준 유효한 멤버 필터링
       const activeMembers = members.filter((m) => {
         const baseDateStr = normalizeISODate(
           m.cellAssignmentDate || `${m.joinYear}-01-01`
@@ -1041,7 +937,6 @@ const CellLeaderDashboard: React.FC = () => {
           memberCount={members.length}
           weeklyNoticeCount={formattedNewsData?.weeklyNoticeCount ?? 0}
           weeklyPrayerCount={formattedNewsData?.weeklyPrayerCount ?? 0}
-          weeklyBirthdayCount={formattedNewsData?.totalWeeklyBirthdays ?? 0}
         />
       </div>
 
@@ -1073,7 +968,6 @@ const CellLeaderDashboard: React.FC = () => {
                   endDate={periodRange.endDate}
                   year={matrixDate.getFullYear()}
                   month={matrixDate.getMonth() + 1}
-                  // [최적화] 매트릭스에는 필요한 정보만 Map에서 꺼내 전달
                   members={members.map((m) => ({
                     memberId: m.memberId,
                     memberName: displayNameMap.get(m.memberId) || m.memberName,
@@ -1102,7 +996,7 @@ const CellLeaderDashboard: React.FC = () => {
               attendances={matrixAttendances}
               startDate={periodRange.startDate}
               endDate={periodRange.endDate}
-              displayNameMap={displayNameMap} // [최적화] Map 전달
+              displayNameMap={displayNameMap}
             />
           )}
         </div>
@@ -1115,9 +1009,6 @@ const CellLeaderDashboard: React.FC = () => {
               canManageNotices={false}
               totalNotices={totalNotices}
               totalPrayers={totalPrayers}
-              totalTodayBirthdays={formattedNewsData.totalTodayBirthdays}
-              totalWeeklyBirthdays={formattedNewsData.totalWeeklyBirthdays}
-              totalMonthlyBirthdays={formattedNewsData.totalMonthlyBirthdays}
               baseRoute="cell"
             />
           )}

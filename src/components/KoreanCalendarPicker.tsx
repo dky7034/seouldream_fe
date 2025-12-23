@@ -25,14 +25,12 @@ const parseLocalDate = (yyyyMMdd: string): Date | null => {
 
 const formatLocalDate = (date: Date): string => format(date, "yyyy-MM-dd");
 
-// react-datepicker의 12개 그리드 로직에 맞춰 범위 텍스트 계산
 const getDecadeRangeText = (year: number) => {
   const start = Math.floor((year - 1) / 12) * 12 + 1;
   const end = start + 11;
   return `${start}-${end}`;
 };
 
-// 공휴일 체크 로직
 const isPublicHoliday = (date: Date) => {
   const month = date.getMonth() + 1;
   const day = date.getDate();
@@ -69,23 +67,20 @@ const KoreanCalendarPicker: React.FC<Props> = ({
     const day = date.getDay();
     const isHoliday = isPublicHoliday(date);
 
-    if (isHoliday || day === 0) {
-      return "day-sunday";
-    }
-    if (day === 6) {
-      return "day-saturday";
-    }
+    if (isHoliday || day === 0) return "day-sunday";
+    if (day === 6) return "day-saturday";
     return "";
   };
 
   return (
     <div className={wrapperClass}>
       <style>{`
-        /* 기존 스타일 (색상) */
+        /* ─── 색상 커스텀 (기존 동일) ─── */
         .react-datepicker__day-name:first-child { color: #dc2626; }
         .react-datepicker__day-name:last-child { color: #2563eb; }
         .react-datepicker__day.day-sunday { color: #dc2626 !important; }
         .react-datepicker__day.day-saturday { color: #2563eb !important; }
+        
         .react-datepicker__day--selected.day-sunday,
         .react-datepicker__day--selected.day-saturday,
         .react-datepicker__day--keyboard-selected.day-sunday,
@@ -93,24 +88,56 @@ const KoreanCalendarPicker: React.FC<Props> = ({
           color: #ffffff !important;
         }
 
-        /* 모바일(640px 이하) 반응형 크기 조절 */
+        /* ─── 크기 조절 (Desktop 기본) ─── */
+        .react-datepicker {
+          font-family: inherit; /* 폰트 상속 */
+          font-size: 0.85rem;   /* 기본 폰트 줄임 */
+          border: 1px solid #e5e7eb;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* 헤더 높이 줄이기 */
+        .react-datepicker__header {
+          padding-top: 0.4rem;
+          padding-bottom: 0.4rem;
+        }
+
+        /* 날짜 셀 크기 (정사각형 유지) */
+        .react-datepicker__day-name, 
+        .react-datepicker__day, 
+        .react-datepicker__time-name {
+          width: 2rem;        /* 32px */
+          line-height: 2rem;  /* 32px */
+          margin: 0.1rem;
+        }
+        
+        /* 현재 월 표시 텍스트 크기 */
+        .react-datepicker__current-month {
+          font-size: 0.95rem;
+          margin-bottom: 0.2rem;
+        }
+
+        /* ─── 크기 조절 (Mobile 반응형) ─── */
         @media (max-width: 640px) {
           .react-datepicker {
-            font-size: 0.8rem;
+            font-size: 0.75rem; /* 모바일에서 폰트 더 작게 */
           }
+          
           .react-datepicker__header {
-            padding-top: 0.5rem;
+            padding-top: 0.3rem;
+            padding-bottom: 0.2rem;
           }
+
+          /* 모바일 셀 크기 대폭 축소 */
           .react-datepicker__day-name, 
-          .react-datepicker__day, 
-          .react-datepicker__time-name {
-            width: 1.9rem;
-            line-height: 1.9rem;
-            margin: 0.1rem;
+          .react-datepicker__day {
+            width: 1.7rem;       /* 약 27px */
+            line-height: 1.7rem; /* 약 27px */
+            margin: 0;           /* 마진 제거로 밀집도 높임 */
           }
-          .react-datepicker__current-month {
-            font-size: 1rem;
-            margin-bottom: 0.5rem;
+          
+          .react-datepicker__month {
+            margin: 0.2rem 0.4rem; /* 전체 월 마진 축소 */
           }
         }
       `}</style>
@@ -133,7 +160,8 @@ const KoreanCalendarPicker: React.FC<Props> = ({
         maxDate={maxDate}
         showPopperArrow={false}
         placeholderText="YYYY-MM-DD"
-        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+        // 입력 필드 스타일
+        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer caret-transparent"
         dayClassName={getDayClassName}
         showYearPicker={mode === "year"}
         showMonthYearPicker={mode === "month"}
@@ -173,7 +201,6 @@ const KoreanCalendarPicker: React.FC<Props> = ({
               ? `${year}년`
               : getDecadeRangeText(year);
 
-          // ✅ 단일 이동 로직만 남김
           const goPrev = () => {
             if (mode === "day") decreaseMonth();
             if (mode === "month") decreaseYear();
@@ -192,26 +219,24 @@ const KoreanCalendarPicker: React.FC<Props> = ({
             else setMode("year");
           };
 
+          // 버튼 크기도 함께 축소
           const btnClass =
-            "w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 active:bg-gray-100";
+            "w-7 h-7 flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 active:bg-gray-100 transition-colors";
           const titleClass =
-            "text-sm sm:text-base font-semibold text-gray-900 px-2 py-1 rounded-md active:bg-gray-100 cursor-pointer";
+            "text-sm font-bold text-gray-800 px-2 py-1 rounded-md hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition-colors";
 
           return (
-            <div className="flex items-center justify-between px-1 sm:px-3 pb-2">
-              {/* 왼쪽 화살표 (하나만 남김) */}
+            <div className="flex items-center justify-between px-2 pb-2 mt-1">
               <div className="flex items-center">
                 <button type="button" onClick={goPrev} className={btnClass}>
                   ‹
                 </button>
               </div>
 
-              {/* 중앙 타이틀 (클릭 시 모드 변경) */}
               <button type="button" onClick={toggleMode} className={titleClass}>
                 {title}
               </button>
 
-              {/* 오른쪽 화살표 (하나만 남김) */}
               <div className="flex items-center">
                 <button type="button" onClick={goNext} className={btnClass}>
                   ›

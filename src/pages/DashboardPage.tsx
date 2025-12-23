@@ -326,8 +326,8 @@ const TopSummaryChips: React.FC<{ data: DashboardDto }> = ({ data }) => {
       {/* 미배정 인원 */}
       {data.unassignedMemberCount > 0 && (
         <div className="inline-flex items-center px-3 py-2 rounded-full bg-orange-50 text-orange-700 text-xs sm:text-sm font-medium border border-orange-100">
-          <FaUserTag className="mr-2" />
-          미배정 인원 {data.unassignedMemberCount}명
+          <FaUserTag className="mr-2" />셀 미배정 인원{" "}
+          {data.unassignedMemberCount}명
         </div>
       )}
     </div>
@@ -1174,9 +1174,6 @@ const DashboardPage: React.FC = () => {
                   canManageNotices={isExecutive}
                   totalNotices={totalNotices}
                   totalPrayers={totalPrayers}
-                  totalTodayBirthdays={dashboardData.totalTodayBirthdays}
-                  totalWeeklyBirthdays={dashboardData.totalWeeklyBirthdays}
-                  totalMonthlyBirthdays={dashboardData.totalMonthlyBirthdays}
                   baseRoute="admin"
                 />
               )

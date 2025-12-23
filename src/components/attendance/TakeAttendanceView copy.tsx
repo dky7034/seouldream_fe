@@ -1,5 +1,6 @@
 // src/components/attendance/TakeAttendanceView.tsx
 import React, { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom"; // ✅ [추가] 네비게이션 훅 임포트
 import { attendanceService } from "../../services/attendanceService";
 import { memberService } from "../../services/memberService";
 import { semesterService } from "../../services/semesterService";
@@ -9,8 +10,8 @@ import type {
   AttendanceStatus,
   User,
   ProcessAttendanceRequest,
-  AttendanceAndPrayerItem,
   SemesterDto,
+  ProcessAttendanceWithPrayersRequest,
 } from "../../types";
 import StatusButton from "./StatusButton";
 import ConfirmationModal from "./ConfirmationModal";
@@ -110,6 +111,8 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
   user,
   allMembers,
 }) => {
+  const navigate = useNavigate(); // ✅ [추가] navigate 훅 사용
+
   // ── Data State ──
   const [members, setMembers] = useState<MemberDto[]>([]);
   const [memberAttendances, setMemberAttendances] = useState<
@@ -118,9 +121,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
   const [allSemesters, setAllSemesters] = useState<SemesterDto[]>([]);
 
   // ── UI State ──
-  // 초기값을 빈 문자열로 두어, 학기 데이터 로드 및 스마트 설정 전까지 달력을 숨김
   const [selectedDate, setSelectedDate] = useState<string>("");
-
   const [cellShare, setCellShare] = useState("");
   const [specialNotes, setSpecialNotes] = useState("");
   const [isEditMode, setIsEditMode] = useState(false);
@@ -129,21 +130,33 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
   const [loading, setLoading] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
+  // ✅ [수정] 알림창 닫힘 후 동작(callback)을 지원하도록 상태 변경
   const [alertState, setAlertState] = useState<{
     isOpen: boolean;
     title: string;
     message: string;
+    onConfirm?: () => void; // 확인 버튼 클릭 시 실행할 함수
   }>({ isOpen: false, title: "", message: "" });
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // ── Helpers ──
-  const showAlert = (title: string, message: string) => {
-    setAlertState({ isOpen: true, title, message });
+  // ✅ [수정] 콜백 함수를 받을 수 있도록 수정
+  const showAlert = (
+    title: string,
+    message: string,
+    onConfirm?: () => void
+  ) => {
+    setAlertState({ isOpen: true, title, message, onConfirm });
   };
+
   const closeAlert = () => {
-    setAlertState((prev) => ({ ...prev, isOpen: false }));
+    // ✅ 알림창 닫을 때 콜백이 있으면 실행 (예: 대시보드 이동)
+    if (alertState.onConfirm) {
+      alertState.onConfirm();
+    }
+    setAlertState((prev) => ({ ...prev, isOpen: false, onConfirm: undefined }));
   };
 
   // ── 1. 학기 목록 로드 ──
@@ -151,7 +164,6 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
     const fetchSemesters = async () => {
       try {
         const semesters = await semesterService.getAllSemesters(true);
-        // 날짜 비교를 위해 정렬 (필요 시)
         setAllSemesters(semesters);
       } catch (e) {
         console.error("학기 정보 로드 실패", e);
@@ -160,18 +172,11 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
     fetchSemesters();
   }, []);
 
-  // ─────────────────────────────────────────────────────────────
-  // [NEW] 스마트 초기 날짜 설정
-  // 학기 정보가 로드되면, 오늘 날짜가 학기 내인지 확인하고
-  // 아니라면 가장 최근 학기의 종료일을 기본값으로 잡음.
-  // ─────────────────────────────────────────────────────────────
+  // ── 스마트 초기 날짜 설정 ──
   useEffect(() => {
-    // 이미 날짜가 설정되어 있거나 학기 정보가 없으면 패스
     if (selectedDate || allSemesters.length === 0) return;
 
     const defaultSunday = toISODate(getMostRecentSunday());
-
-    // 1. 오늘 기준 최근 일요일이 학기 기간 내인지 확인
     const isValidDate = allSemesters.some(
       (s) => defaultSunday >= s.startDate && defaultSunday <= s.endDate
     );
@@ -179,23 +184,19 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
     if (isValidDate) {
       setSelectedDate(defaultSunday);
     } else {
-      // 2. 학기 기간 밖(방학 등)이라면, 가장 최근 학기의 종료일을 찾음
       const sortedSemesters = [...allSemesters].sort((a, b) =>
         b.endDate.localeCompare(a.endDate)
       );
       const latestSemester = sortedSemesters[0];
-
       if (latestSemester) {
         setSelectedDate(latestSemester.endDate);
       } else {
-        // 만약 학기 정보가 하나도 없다면 어쩔 수 없이 오늘 날짜
         setSelectedDate(defaultSunday);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allSemesters]);
 
-  // [Memo] 선택된 날짜에 해당하는 학기
   const semesterForSelectedDate = useMemo(() => {
     if (!selectedDate || allSemesters.length === 0) return null;
     return allSemesters.find(
@@ -203,11 +204,9 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
     );
   }, [selectedDate, allSemesters]);
 
-  // ── 2. 데이터 불러오기 (날짜 변경 시) ──
+  // ── 2. 데이터 불러오기 ──
   useEffect(() => {
     const cellId = user.cellId;
-
-    // 날짜가 아직 세팅되지 않았으면 로드하지 않음
     if (!selectedDate) return;
 
     if (!cellId) {
@@ -289,19 +288,14 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
   const recentSundays = useMemo(() => getRecentSundays(5), []);
 
   // ── Handlers ──
-
-  // 날짜 선택 핸들러 (엄격한 제한 적용)
   const onDateSelect = (newDateStr: string) => {
     if (!newDateStr) return;
-
-    // [검증 1] 일요일 체크
     const selected = new Date(newDateStr + "T00:00:00");
     if (selected.getDay() !== 0) {
       showAlert("날짜 선택 불가", "출석 체크는 일요일만 선택 가능합니다.");
       return;
     }
 
-    // [검증 2] 학기 범위 포함 여부 체크
     if (allSemesters.length > 0) {
       const belongsToAnySemester = allSemesters.some(
         (s) => newDateStr >= s.startDate && newDateStr <= s.endDate
@@ -315,8 +309,6 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
         return;
       }
     }
-
-    // 통과 시 날짜 변경
     setSubmitError(null);
     setSelectedDate(newDateStr);
   };
@@ -341,7 +333,6 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
     e.preventDefault();
     if (!selectedDate) return setSubmitError("출석 날짜를 선택해 주세요.");
 
-    // 최종 제출 시 학기 체크 (이중 방어)
     if (allSemesters.length > 0) {
       const belongsToAnySemester = allSemesters.some(
         (s) => selectedDate >= s.startDate && selectedDate <= s.endDate
@@ -382,14 +373,15 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
       const cellId = user.cellId;
       if (!cellId) throw new Error("셀 정보가 없습니다.");
 
-      const items: AttendanceAndPrayerItem[] = memberAttendances.map((att) => ({
+      const items = memberAttendances.map((att) => ({
+        id: att.id,
         memberId: att.memberId,
         status: att.status,
         memo: undefined,
         prayerContent: att.prayerContent?.trim() || undefined,
       }));
 
-      const payload: any = {
+      const payload: ProcessAttendanceWithPrayersRequest = {
         meetingDate: selectedDate,
         cellShare: cellShare.trim(),
         specialNotes: specialNotes.trim(),
@@ -397,13 +389,24 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
       };
 
       await attendanceService.processAttendanceWithPrayers(cellId, payload);
+
       setSubmitError(null);
-      setSuccessMessage("저장되었습니다.");
-      setTimeout(() => setSuccessMessage(null), 3000);
+
+      // ✅ [수정] 저장 성공 시 알림 후 대시보드로 이동
+      showAlert(
+        "저장 완료",
+        "출석 및 보고서가 성공적으로 저장되었습니다.\n확인을 누르면 대시보드로 이동합니다.",
+        () => {
+          navigate("/"); // 대시보드 경로로 이동 (기본값 '/')
+        }
+      );
+
+      setSuccessMessage(null);
       setIsEditMode(true);
     } catch (err: any) {
       setSuccessMessage(null);
-      setSubmitError(err.response?.data?.message || "오류가 발생했습니다.");
+      const errorMsg = err.response?.data?.message || "오류가 발생했습니다.";
+      setSubmitError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -427,31 +430,12 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
           </div>
         )}
 
-        {/* ─────────────────────────────────────────────────────────────
-          [날짜 선택 영역]
-         ───────────────────────────────────────────────────────────── */}
+        {/* 날짜 선택 영역 */}
         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
           <div className="flex justify-between items-center mb-3">
-            <label className="text-sm font-bold text-gray-800">
-              모임 날짜 선택
-            </label>
-            {!loading && selectedDate && (
-              <span
-                className={`px-2.5 py-1 text-xs font-bold rounded-full ${
-                  isEditMode
-                    ? "bg-blue-100 text-blue-700 border border-blue-200"
-                    : "bg-orange-100 text-orange-700 border border-orange-200"
-                }`}
-              >
-                {isEditMode ? "✍ 기존 내용 수정" : "✨ 신규 작성"}
-              </span>
-            )}
+            <label className="text-sm font-bold text-gray-800">날짜 선택</label>
           </div>
 
-          {/* [조건부 렌더링] 
-            selectedDate가 결정되지 않았다면(초기 로딩중) 달력을 보여주지 않음.
-            이로 인해 '오늘 날짜'가 잠깐 보이는 현상을 방지함.
-          */}
           {!selectedDate ? (
             <div className="flex justify-center items-center py-10 text-gray-500 text-sm">
               <div className="flex flex-col items-center">
@@ -461,7 +445,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
             </div>
           ) : (
             <>
-              {/* 1. 퀵 선택 버튼 */}
+              {/* 퀵 선택 버튼 */}
               <div className="flex gap-2 mb-4 overflow-x-auto pb-2 no-scrollbar -mx-1 px-1">
                 {recentSundays.map((sunday) => {
                   const isValid = allSemesters.some(
@@ -469,20 +453,17 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                       sunday.dateStr >= s.startDate &&
                       sunday.dateStr <= s.endDate
                   );
-
                   return (
                     <button
                       key={sunday.dateStr}
                       type="button"
-                      // [수정] 유효하지 않은 날짜는 버튼 자체를 비활성화할지, 아니면 Alert를 띄울지 결정.
-                      // 여기서는 Alert를 띄우기 위해 disable은 안 하되 스타일로 구분함.
                       onClick={() => onDateSelect(sunday.dateStr)}
                       className={`flex-shrink-0 px-3.5 py-2 text-xs sm:text-sm rounded-lg border font-medium transition-all active:scale-95 ${
                         selectedDate === sunday.dateStr
                           ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
                           : isValid
                           ? "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                          : "bg-gray-100 text-gray-400 border-gray-200 opacity-60" // 비활성 느낌 추가
+                          : "bg-gray-100 text-gray-400 border-gray-200 opacity-60"
                       }`}
                     >
                       {sunday.label}
@@ -491,8 +472,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                 })}
               </div>
 
-              {/* 2. KoreanCalendarPicker */}
-              {/* [추가] 시각적 구분선 (버튼 vs 달력) */}
+              {/* 달력 */}
               <div className="relative flex py-3 items-center">
                 <div className="flex-grow border-t border-gray-200"></div>
                 <span className="flex-shrink-0 mx-3 text-gray-400 text-xs font-medium">
@@ -501,21 +481,17 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                 <div className="flex-grow border-t border-gray-200"></div>
               </div>
 
-              {/* 2. KoreanCalendarPicker (아이콘 및 라벨 추가) */}
               <div className="relative">
-                {/* 안내 라벨 추가 */}
                 <label className="mb-2 text-xs font-bold text-gray-600 flex items-center gap-1.5">
                   <FaCalendarAlt className="text-indigo-500 text-sm" />
                   <span>달력에서 직접 선택</span>
                 </label>
 
-                {/* 캘린더 컴포넌트 */}
                 <KoreanCalendarPicker
                   value={selectedDate}
                   onChange={onDateSelect}
                 />
 
-                {/* 학기 정보 표시 */}
                 {semesterForSelectedDate ? (
                   <p className="mt-2 text-xs text-gray-500 text-right break-keep flex justify-end items-center gap-1">
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500"></span>
@@ -594,7 +570,6 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                       )}
                     </div>
 
-                    {/* [유지] 모바일 출석/결석 버튼 좌측 정렬 (justify-start) */}
                     <div className="flex flex-wrap gap-2 items-center justify-start">
                       {(["PRESENT", "ABSENT"] as AttendanceStatus[]).map(
                         (status) => (
@@ -665,10 +640,17 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                         className="hover:bg-gray-50 transition-colors"
                       >
                         <td className="w-[15%] px-6 py-4 font-medium text-gray-900 align-top pt-5">
-                          {formatDisplayName(member, allMembers)}
-                          {attendance.isExistingData && (
-                            <span className="ml-2 inline-block h-1.5 w-1.5 rounded-full bg-blue-400 align-middle"></span>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <span className="break-keep">
+                              {formatDisplayName(member, allMembers)}
+                            </span>
+                            {attendance.isExistingData && (
+                              <span
+                                className="flex-shrink-0 h-1.5 w-1.5 rounded-full bg-blue-400"
+                                title="저장된 데이터 있음"
+                              ></span>
+                            )}
+                          </div>
                         </td>
                         <td className="w-[20%] px-6 py-4 align-top pt-5">
                           <div className="flex gap-2">

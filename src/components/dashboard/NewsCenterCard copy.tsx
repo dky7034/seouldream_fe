@@ -8,7 +8,7 @@ import type {
   RecentPrayerInfo,
 } from "../../types";
 
-// --- 공용 Card 컴포넌트 (변경 없음) ---
+// --- 공용 Card 컴포넌트 (파일 내 포함) ---
 interface CardProps {
   icon?: React.ReactNode;
   title: string;
@@ -49,9 +49,10 @@ interface NewsCenterCardProps {
   canManageNotices: boolean;
   totalNotices: number;
   totalPrayers: number;
-  baseRoute?: "admin" | "cell"; // 경로 분기용 Prop
+  baseRoute?: "admin" | "cell"; // 경로 분기용 Prop (기본값: admin)
 }
 
+// ✅ [수정] 생일 탭 제거
 type NewsTab = "notices" | "prayers";
 
 const MAX_NEWS_ITEMS = 5;
@@ -65,21 +66,22 @@ const NewsCenterCard: React.FC<NewsCenterCardProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<NewsTab>("notices");
 
-  // ✅ [수정 1] 셀장 모드인지 확인
-  const isCellMode = baseRoute === "cell";
-
-  // ✅ [수정 2] 제목 분기 처리 (셀장이면 '공지사항', 관리자는 '공동체 소식')
-  const cardTitle = isCellMode ? "공지사항" : "공동체 소식";
-
+  // ✅ 링크 경로 생성 로직 (관리자 vs 셀 리더 분기 처리)
   const getLinkPath = (type: "notice" | "prayer", id?: number) => {
     if (type === "notice") {
+      // 공지사항은 보통 관리자 경로 사용 (셀장도 볼 수 있다고 가정)
       return id ? `/admin/notices/${id}` : `/admin/notices`;
     }
 
     if (type === "prayer") {
       if (baseRoute === "cell") {
+        // 셀장인 경우: 내 셀 페이지의 기도제목 탭이 삭제되었으므로
+        // 전체 목록을 보는 별도 페이지가 없다면 dashboard나 my-cell 메인으로 유도하거나,
+        // (기존 요청에서 기도제목 탭을 없앴으므로 링크를 비활성화하거나 수정해야 함)
+        // 일단은 #으로 처리하거나 my-cell로 보냅니다.
         return `/my-cell`;
       } else {
+        // 관리자인 경우: 기도제목 관리 페이지로 이동
         return id ? `/admin/prayers/${id}` : `/admin/prayers`;
       }
     }
@@ -90,7 +92,7 @@ const NewsCenterCard: React.FC<NewsCenterCardProps> = ({
   const prayers: RecentPrayerInfo[] = data.recentPrayers;
 
   const renderContent = () => {
-    // 1. 공지사항 탭 (셀장은 항상 이 내용만 보게 됨)
+    // 1. 공지사항 탭
     if (activeTab === "notices") {
       const items = notices.slice(0, MAX_NEWS_ITEMS);
       return notices.length > 0 ? (
@@ -142,6 +144,10 @@ const NewsCenterCard: React.FC<NewsCenterCardProps> = ({
           <ul className="divide-y divide-gray-100">
             {items.map((p) => (
               <li key={p.prayerId} className="py-2">
+                {/* 셀장의 경우, 기도제목 목록 페이지가 없으므로 
+                  상세 링크 클릭 시 이동할 곳이 애매할 수 있습니다.
+                  관리자는 정상 이동합니다.
+                */}
                 <Link
                   to={getLinkPath("prayer", p.prayerId)}
                   className={`block hover:bg-gray-50 p-2 rounded-md group ${
@@ -186,7 +192,7 @@ const NewsCenterCard: React.FC<NewsCenterCardProps> = ({
   return (
     <Card
       icon={<FaBullhorn className="text-yellow-500" />}
-      title={cardTitle} // ✅ 변경된 제목 적용
+      title="공동체 소식"
       actions={
         activeTab === "notices" && canManageNotices ? (
           <Link
@@ -198,37 +204,31 @@ const NewsCenterCard: React.FC<NewsCenterCardProps> = ({
         ) : null
       }
     >
-      {/* ✅ [수정 3] 셀장이 아닐 때(관리자일 때)만 탭 버튼 노출 */}
-      {!isCellMode && (
-        <div className="mb-4">
-          <div className="inline-flex flex-wrap gap-1 bg-gray-100 p-1 rounded-lg">
-            <button
-              onClick={() => setActiveTab("notices")}
-              className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${
-                activeTab === "notices"
-                  ? "bg-white text-indigo-700 shadow"
-                  : "text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              공지사항
-            </button>
-            <button
-              onClick={() => setActiveTab("prayers")}
-              className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${
-                activeTab === "prayers"
-                  ? "bg-white text-indigo-700 shadow"
-                  : "text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              기도제목
-            </button>
-          </div>
+      <div className="mb-4">
+        <div className="inline-flex flex-wrap gap-1 bg-gray-100 p-1 rounded-lg">
+          <button
+            onClick={() => setActiveTab("notices")}
+            className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${
+              activeTab === "notices"
+                ? "bg-white text-indigo-700 shadow"
+                : "text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            공지사항
+          </button>
+          <button
+            onClick={() => setActiveTab("prayers")}
+            className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${
+              activeTab === "prayers"
+                ? "bg-white text-indigo-700 shadow"
+                : "text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            기도제목
+          </button>
+          {/* ✅ 생일 탭 버튼 제거됨 */}
         </div>
-      )}
-
-      {/* isCellMode가 true면 탭 버튼이 사라지지만, 
-        activeTab의 초기값은 "notices"이므로 자동으로 공지사항만 렌더링됩니다. 
-      */}
+      </div>
       {renderContent()}
     </Card>
   );

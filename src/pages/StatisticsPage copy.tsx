@@ -23,8 +23,6 @@ import {
   FaArrowDown,
   FaMinus,
   FaChevronRight,
-  FaCrown,
-  FaUserTie,
 } from "react-icons/fa";
 
 import { statisticsService } from "../services/statisticsService";
@@ -40,7 +38,7 @@ import type {
   DashboardDemographicsDto,
 } from "../types";
 
-// ✅ [유지] 만 나이 계산 헬퍼 함수
+// ✅ 만 나이 계산 헬퍼 함수
 const calculateAge = (member: UnassignedMemberDto): number | null => {
   if (member.age !== undefined && member.age !== null && member.age !== 0) {
     return member.age;
@@ -61,7 +59,7 @@ const calculateAge = (member: UnassignedMemberDto): number | null => {
   return null;
 };
 
-// ✅ [유지] 차트 컴포넌트
+// ✅ 새가족 성장 차트
 const NewcomerGrowthChart = React.memo(
   ({ data }: { data: NewcomerStatDto[] }) => {
     if (!data || data.length === 0) {
@@ -122,7 +120,7 @@ const NewcomerGrowthChart = React.memo(
   }
 );
 
-// ✅ [수정] 높이를 250px -> 200px로 줄임
+// ✅ 연령대(2030) 파이 차트
 const AgeGroupPieChart = React.memo(
   ({ data }: { data: SemesterSummaryDto["ageGroupSummary"] }) => {
     const total = data.twenties + data.thirties;
@@ -141,16 +139,72 @@ const AgeGroupPieChart = React.memo(
     ];
 
     return (
-      // 높이 축소 (h-[200px])
       <div className="h-[200px] w-full flex items-center justify-center">
-        <div style={{ width: "100%", height: "100%", minHeight: "160px" }}>
+        <div style={{ width: "100%", height: "100%" }}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
                 data={chartData}
                 cx="50%"
                 cy="50%"
-                innerRadius={50} // 반지름도 살짝 조정
+                innerRadius={50}
+                outerRadius={70}
+                paddingAngle={5}
+                dataKey="value"
+              >
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip />
+              <Legend iconType="circle" verticalAlign="bottom" height={36} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    );
+  }
+);
+
+// ✅ [추가] 성별 비율 차트 (GenderRatioChart)
+const GenderRatioChart = React.memo(
+  ({ data }: { data: DashboardDemographicsDto }) => {
+    // distribution 배열에서 남/녀 합산 계산
+    const { male, female } = useMemo(() => {
+      let m = 0;
+      let f = 0;
+      data.distribution.forEach((item) => {
+        m += item.maleCount;
+        f += item.femaleCount;
+      });
+      return { male: m, female: f };
+    }, [data]);
+
+    const total = male + female;
+
+    if (total === 0) {
+      return (
+        <div className="h-[200px] w-full flex items-center justify-center text-gray-400 border border-dashed border-gray-200 rounded-lg">
+          데이터 없음
+        </div>
+      );
+    }
+
+    const chartData = [
+      { name: "남자", value: male, color: "#60a5fa" }, // Blue
+      { name: "여자", value: female, color: "#f472b6" }, // Pink
+    ];
+
+    return (
+      <div className="h-[200px] w-full flex items-center justify-center">
+        <div style={{ width: "100%", height: "100%" }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={chartData}
+                cx="50%"
+                cy="50%"
+                innerRadius={50}
                 outerRadius={70}
                 paddingAngle={5}
                 dataKey="value"
@@ -191,7 +245,7 @@ const StatisticsPage: React.FC = () => {
     []
   );
 
-  // 1. 학기 목록 불러오기
+  // 1. 학기 목록 불러오기 및 기본 학기 설정
   useEffect(() => {
     semesterService.getAllSemesters().then((list) => {
       const activeSemesters = list.filter((s) => s.isActive);
@@ -338,7 +392,7 @@ const StatisticsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 메인 컨텐츠 */}
+        {/* 메인 컨텐츠 영역 */}
         <div
           className={`space-y-8 transition-opacity duration-200 ${
             isRefetching ? "opacity-50 pointer-events-none" : "opacity-100"
@@ -404,7 +458,7 @@ const StatisticsPage: React.FC = () => {
             </div>
           </section>
 
-          {/* 섹션 2: 구성원 통계 분석 (레이아웃 변경됨) */}
+          {/* 섹션 2: 구성원 통계 분석 */}
           <section>
             <div className="flex items-center gap-2 mb-4">
               <div className="p-2 bg-green-100 rounded-lg text-green-600">
@@ -415,79 +469,77 @@ const StatisticsPage: React.FC = () => {
               </h2>
             </div>
 
-            {/* ✅ [수정] 상단 Row: 파이차트와 핵심 지표를 2단 그리드로 분리 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              {/* 1. 연령대별 파이 차트 */}
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <h3 className="font-semibold text-gray-700 mb-2">
-                  연령대별 구성비
-                </h3>
-                {semesterSummary && (
-                  <AgeGroupPieChart data={semesterSummary.ageGroupSummary} />
+            <div className="space-y-6">
+              {/* ✅ [수정] 2개의 차트를 나란히 배치 (grid-cols-2) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* 1. 이번 학기 연령 구성비 (왼쪽) */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-between">
+                  <div className="w-full text-left mb-2">
+                    <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                      연령 구성비{" "}
+                      <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                        2030
+                      </span>
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      20대/30대 비율 분포
+                    </p>
+                  </div>
+                  {semesterSummary ? (
+                    <div className="w-full max-w-[300px]">
+                      <AgeGroupPieChart
+                        data={semesterSummary.ageGroupSummary}
+                      />
+                    </div>
+                  ) : (
+                    <div className="h-[200px] w-full flex items-center justify-center text-gray-400">
+                      데이터 로딩 중...
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. 성별 비율 (오른쪽 - 새로 추가됨) */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-between">
+                  <div className="w-full text-left mb-2">
+                    <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                      성별 비율{" "}
+                      <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                        전체
+                      </span>
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      남자/여자 구성 분포
+                    </p>
+                  </div>
+                  {detailDemographics ? (
+                    <div className="w-full max-w-[300px]">
+                      <GenderRatioChart data={detailDemographics} />
+                    </div>
+                  ) : (
+                    <div className="h-[200px] w-full flex items-center justify-center text-gray-400">
+                      데이터 없음
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 3. 상세 지표 (DemographicsSection) */}
+              <div className="w-full">
+                {detailDemographics ? (
+                  <DemographicsSection
+                    data={detailDemographics}
+                    onUnassignedClick={scrollToUnassigned}
+                  />
+                ) : (
+                  <div className="h-[200px] flex items-center justify-center bg-white rounded-lg border border-gray-100 text-gray-400">
+                    데이터 로딩 중...
+                  </div>
                 )}
               </div>
-
-              {/* 2. 핵심 지표 카드 모음 */}
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center">
-                <h3 className="font-semibold text-gray-700 mb-4">핵심 현황</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  {/* 전체 인원 */}
-                  <div className="bg-gray-50 p-4 rounded-lg text-center">
-                    <div className="text-xs text-gray-500 mb-1">전체 인원</div>
-                    <div className="font-bold text-gray-800 text-2xl">
-                      {semesterSummary?.totalMemberCount}명
-                    </div>
-                  </div>
-
-                  {/* 미배정 인원 */}
-                  <div
-                    className="bg-orange-50 p-4 rounded-lg text-center border border-orange-100 cursor-pointer hover:bg-orange-100 transition-colors"
-                    onClick={scrollToUnassigned}
-                  >
-                    <div className="text-xs text-orange-600 mb-1 flex justify-center items-center gap-1">
-                      <FaUserSlash size={10} /> 미배정
-                    </div>
-                    <div className="font-bold text-orange-800 text-2xl">
-                      {semesterSummary?.unassignedCount ?? 0}명
-                    </div>
-                  </div>
-
-                  {/* 임원단 */}
-                  <div className="bg-purple-50 p-4 rounded-lg text-center border border-purple-100">
-                    <div className="text-xs text-purple-600 mb-1 flex justify-center items-center gap-1">
-                      <FaCrown size={10} /> 임원단
-                    </div>
-                    <div className="font-bold text-purple-800 text-2xl">
-                      {semesterSummary?.executiveCount ?? 0}명
-                    </div>
-                  </div>
-
-                  {/* 셀장 */}
-                  <div className="bg-blue-50 p-4 rounded-lg text-center border border-blue-100">
-                    <div className="text-xs text-blue-600 mb-1 flex justify-center items-center gap-1">
-                      <FaUserTie size={10} /> 셀장
-                    </div>
-                    <div className="font-bold text-blue-800 text-2xl">
-                      {semesterSummary?.cellLeaderCount ?? 0}명
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* ✅ [수정] 하단 Row: 상세 분포 (Demographics) - 전체 너비 사용 */}
-            <div className="w-full">
-              {detailDemographics ? (
-                <DemographicsSection data={detailDemographics} />
-              ) : (
-                <div className="h-[350px] flex items-center justify-center bg-white rounded-lg border border-gray-100 text-gray-400">
-                  데이터 로딩 중...
-                </div>
-              )}
             </div>
           </section>
 
-          {/* 섹션 3: 셀 미배정 인원 관리 (유지) */}
+          {/* 섹션 3: 셀 미배정 인원 관리 */}
           <section id="unassigned-section">
             <div className="flex items-center gap-2 mb-4">
               <div className="p-2 bg-orange-100 rounded-lg text-orange-600">
@@ -505,7 +557,7 @@ const StatisticsPage: React.FC = () => {
                 </h3>
               </div>
 
-              {/* [모바일] */}
+              {/* [모바일] 리스트 뷰 */}
               <div className="block md:hidden bg-gray-50 p-3 space-y-3">
                 {processedUnassignedList.map((member) => (
                   <div
@@ -570,7 +622,7 @@ const StatisticsPage: React.FC = () => {
                 )}
               </div>
 
-              {/* [데스크탑] */}
+              {/* [데스크탑] 테이블 뷰 */}
               <div className="hidden md:block overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">

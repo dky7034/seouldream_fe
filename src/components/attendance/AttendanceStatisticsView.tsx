@@ -333,7 +333,7 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
       <div className="p-3 sm:p-4 bg-gray-50 rounded-lg space-y-4 border border-gray-200">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h3 className="text-lg font-semibold text-gray-800 break-keep">
-            통계 조회
+            출석 통계 조회
           </h3>
 
           {!isCellLeader && (
