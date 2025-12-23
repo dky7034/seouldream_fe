@@ -524,7 +524,7 @@ const CellPrayersPage: React.FC = () => {
         {/* 데이터 리스트 */}
         {!loading && pageData && !error && (
           <>
-            {/* 📱 모바일: 카드 리스트 */}
+            {/* 📱 모바일: 카드 리스트 (수정됨) */}
             <div className="space-y-3 md:hidden mb-4">
               {pageData.content.length === 0 ? (
                 <div className="bg-white rounded-lg shadow border border-gray-100 p-8 text-center text-sm text-gray-500">
@@ -534,41 +534,45 @@ const CellPrayersPage: React.FC = () => {
                 pageData.content.map((prayer) => (
                   <div
                     key={prayer.id}
-                    className="bg-white rounded-lg shadow border border-gray-100 p-4 text-xs"
+                    className="bg-white rounded-lg shadow border border-gray-100 p-4 text-xs flex flex-col gap-3"
                   >
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="flex-1">
-                        {/* 멤버 (기도 대상) */}
-                        <div className="text-[11px] font-medium text-gray-500 mb-1">
-                          멤버:{" "}
-                          <span className="font-semibold text-gray-800">
-                            {getFormattedName(
-                              prayer.member?.id,
-                              prayer.member?.name
-                            )}
-                          </span>
-                        </div>
-                        {/* 내용 */}
-                        <Link
-                          to={`/admin/prayers/${prayer.id}`}
-                          className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 break-words"
-                        >
-                          {prayer.content}
-                        </Link>
-                        {/* 작성자 */}
-                        <p className="mt-2 text-[11px] text-gray-500">
-                          작성자(셀장):{" "}
-                          <span className="font-semibold text-gray-800">
-                            {getFormattedName(
-                              prayer.createdBy?.id,
-                              prayer.createdBy?.name
-                            )}
-                          </span>
-                        </p>
+                    {/* 1. 상단: 멤버 이름과 날짜를 양쪽 끝으로 배치 */}
+                    <div className="flex justify-between items-center border-b border-gray-50 pb-2">
+                      <div className="text-[11px] text-gray-500">
+                        멤버:{" "}
+                        <span className="font-semibold text-gray-800 text-sm ml-1">
+                          {getFormattedName(
+                            prayer.member?.id,
+                            prayer.member?.name
+                          )}
+                        </span>
                       </div>
-                      <span className="px-2 py-1 inline-flex text-[11px] font-semibold rounded-full bg-gray-100 text-gray-700 whitespace-nowrap">
+                      <span className="text-[11px] text-gray-400">
                         {new Date(prayer.createdAt).toLocaleDateString()}
                       </span>
+                    </div>
+
+                    {/* 2. 중단: 내용 (꽉 찬 너비 사용) */}
+                    <div>
+                      <Link
+                        to={`/admin/prayers/${prayer.id}`}
+                        className="block text-sm font-semibold text-indigo-600 hover:text-indigo-800 leading-relaxed break-keep"
+                      >
+                        {prayer.content}
+                      </Link>
+                    </div>
+
+                    {/* 3. 하단: 작성자 정보 (우측 정렬) */}
+                    <div className="text-right">
+                      <p className="text-[11px] text-gray-400 bg-gray-50 inline-block px-2 py-1 rounded">
+                        작성:{" "}
+                        <span className="font-medium text-gray-600">
+                          {getFormattedName(
+                            prayer.createdBy?.id,
+                            prayer.createdBy?.name
+                          )}
+                        </span>
+                      </p>
                     </div>
                   </div>
                 ))

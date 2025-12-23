@@ -358,13 +358,12 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
       const cellId = user.cellId;
       if (!cellId) throw new Error("셀 정보가 없습니다.");
 
-      // ★ [FIX] 개별 아이템에 id와 attendanceDate(selectedDate)를 명시적으로 포함
       const items = memberAttendances.map((att) => ({
-        id: att.id, // 기존 ID (수정 시 필수)
+        id: att.id,
         memberId: att.memberId,
         status: att.status,
-        attendanceDate: selectedDate, // ★ 선택된 날짜 강제 주입
-        date: selectedDate, // (백엔드 호환성 위해 추가)
+        attendanceDate: selectedDate,
+        date: selectedDate,
         memo: undefined,
         prayerContent: att.prayerContent?.trim() || undefined,
       }));
@@ -377,13 +376,23 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
       };
 
       await attendanceService.processAttendanceWithPrayers(cellId, payload);
+
       setSubmitError(null);
-      setSuccessMessage("저장되었습니다.");
-      setTimeout(() => setSuccessMessage(null), 3000);
+
+      // ✅ [변경] 기존 텍스트 메시지 대신 '알림창(Modal)' 호출
+      showAlert("저장 완료", "출석 및 보고서가 성공적으로 저장되었습니다.");
+
+      // 기존 3초 뒤 사라지는 메시지는 제거하거나 유지해도 되지만, 모달이 뜨므로 제거해도 무방합니다.
+      setSuccessMessage(null);
+
       setIsEditMode(true);
     } catch (err: any) {
       setSuccessMessage(null);
-      setSubmitError(err.response?.data?.message || "오류가 발생했습니다.");
+      // 에러 발생 시에는 기존처럼 에러 알림창을 띄우거나 에러 메시지를 표시
+      const errorMsg = err.response?.data?.message || "오류가 발생했습니다.";
+      // 에러도 모달로 띄우고 싶다면 아래 주석을 해제하세요.
+      // showAlert("저장 실패", errorMsg);
+      setSubmitError(errorMsg);
     } finally {
       setLoading(false);
     }

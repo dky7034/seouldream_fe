@@ -11,6 +11,7 @@ type SortConfig = {
   direction: "ascending" | "descending";
 };
 
+// [수정] Props 인터페이스: allMembers 추가
 interface CellMembersManagerProps {
   user: User;
   allMembers: { id: number; name: string; birthDate?: string }[];
@@ -31,7 +32,7 @@ const calculateAge = (birthDateString: string): number | null => {
 
 const CellMembersManager: React.FC<CellMembersManagerProps> = ({
   user,
-  allMembers,
+  allMembers, // [추가]
 }) => {
   const navigate = useNavigate();
   const [members, setMembers] = useState<MemberDto[]>([]);
@@ -77,6 +78,7 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
       const aVal = a[sortConfig.key];
       const bVal = b[sortConfig.key];
 
+      // null / undefined 처리: 항상 뒤로
       if (aVal == null && bVal == null) return 0;
       if (aVal == null) return 1;
       if (bVal == null) return -1;
@@ -149,6 +151,7 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                 member.birthDate && calculateAge(member.birthDate || "");
               const isMe = user.memberId === member.id;
 
+              // [수정] 동명이인 처리: 전체 리스트(allMembers)를 기준 비교
               const found = allMembers.find((am) => am.id === member.id);
               const displayName = found
                 ? formatDisplayName(found, allMembers)
@@ -203,7 +206,22 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                     </div>
                   </div>
 
-                  {/* 하단 수정 버튼 영역 제거됨 */}
+                  {/* 하단: 내 정보 수정 버튼 (경로 수정됨) */}
+                  {isMe && (
+                    <div className="mt-3 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // ✅ 수정 페이지로 바로 이동하도록 변경
+                          navigate(`/admin/users/${member.id}/edit`);
+                        }}
+                        className="text-[11px] px-3 py-1 rounded-md border border-indigo-500 text-indigo-600 hover:bg-indigo-50"
+                      >
+                        내 정보 수정
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -262,6 +280,7 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {sortedMembers.map((member) => {
+                  // [수정] 동명이인 처리
                   const found = allMembers.find((am) => am.id === member.id);
                   const displayName = found
                     ? formatDisplayName(found, allMembers)
@@ -311,7 +330,17 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                         {member.cellAssignmentDate || "미배정"}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        {/* 수정 버튼 로직 제거됨 */}
+                        {/* 내 정보일 때만 수정 버튼 보임 */}
+                        {user.memberId === member.id && (
+                          <button
+                            onClick={() =>
+                              navigate(`/admin/users/${member.id}/edit`)
+                            }
+                            className="text-indigo-600 hover:text-indigo-900 mr-2 sm:mr-4"
+                          >
+                            수정
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -319,7 +348,7 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                 {sortedMembers.length === 0 && (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={5}
                       className="px-6 py-4 text-center text-sm text-gray-500"
                     >
                       셀에 등록된 멤버가 없습니다.
