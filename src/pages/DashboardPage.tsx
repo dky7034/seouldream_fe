@@ -173,6 +173,7 @@ const calculateAge = (member: UnassignedMemberDto): number | null => {
 };
 
 // --- Sub Components ---
+
 const DashboardFilterToolbar: React.FC<{
   summaryMode: SummaryMode;
   onSummaryModeChange: (m: SummaryMode) => void;
@@ -316,7 +317,7 @@ const TopSummaryChips: React.FC<{ data: DashboardDto }> = ({ data }) => {
       {data.unassignedMemberCount > 0 && (
         <div className="inline-flex items-center px-3 py-2 rounded-full bg-orange-50 text-orange-700 text-xs sm:text-sm font-medium border border-orange-100">
           <FaUserTag className="mr-2" />
-          미배정 성도 {data.unassignedMemberCount}명
+          미배정 인원 {data.unassignedMemberCount}명
         </div>
       )}
       {data.totalLongTermAbsentees > 0 && (
@@ -595,7 +596,7 @@ const DashboardPage: React.FC = () => {
     };
   }, [isExecutive]);
 
-  // 핸들러(사용자 액션에서 로딩 켜기)
+  // 핸들러
   const handleSummaryModeChange = (mode: SummaryMode) => {
     setSummaryMode(mode);
     setLoadingMain(true);
@@ -621,8 +622,6 @@ const DashboardPage: React.FC = () => {
     if (!user) return;
     if (isExecutive && semesters.length === 0) return;
 
-    // ⚠️ 여기서 setState를 “즉시” 여러개 치면 React 19에서 경고가 날 수 있음
-    // -> 실제 호출 자체를 effect에서 한 틱 미루어 해결(아래 useEffect에서 처리)
     setError(null);
 
     const { startDate, endDate } = computeTrendRange(
@@ -634,19 +633,18 @@ const DashboardPage: React.FC = () => {
     );
 
     try {
-      // 1) 메인
+      // 1) 메인 (DashboardDto)
       const mainData = await dashboardService.getDashboardData(period, {
         startDate,
         endDate,
       });
 
-      // ✅ prev가 null이어도 안전하게 합치기
       setDashboardData((prev) =>
         prev ? { ...prev, ...mainData } : { ...(mainData as DashboardDto) }
       );
       setLoadingMain(false);
 
-      // 2) 차트 + summary
+      // 2) 차트 + Summary (임원/셀장 수 Fetch 포함)
       setLoadingCharts(true);
 
       const chartPromise = statisticsService.getAttendanceTrend({
@@ -655,22 +653,24 @@ const DashboardPage: React.FC = () => {
         groupBy,
       });
 
+      // ✅ [Modified] 통계 요약 가져오기 (차트용)
+      // * 상단 그리드는 제거되었으므로, 오직 차트의 OverallAttendanceSummary 만 챙기면 됩니다.
       const summaryPromise = (async () => {
-        if (isExecutive) {
+        if (isExecutive && selectedSemesterId) {
+          // 차트용 전체 출석률 데이터
           if (summaryMode === "YEAR") {
             const currentYear = new Date().getFullYear();
             return await statisticsService.getOverallAttendance({
               year: currentYear,
             } as any);
           }
-          if (summaryMode === "SEMESTER" && selectedSemesterId) {
-            const sm = semesters.find((s) => s.id === selectedSemesterId);
-            if (sm) {
-              return await statisticsService.getOverallAttendance({
-                startDate: sm.startDate,
-                endDate: sm.endDate,
-              } as any);
-            }
+          // 학기 모드면 기간으로 조회
+          const sm = semesters.find((s) => s.id === selectedSemesterId);
+          if (sm) {
+            return await statisticsService.getOverallAttendance({
+              startDate: sm.startDate,
+              endDate: sm.endDate,
+            } as any);
           }
         }
         return mainData.overallAttendanceSummary;
@@ -803,6 +803,7 @@ const DashboardPage: React.FC = () => {
           </div>
         </div>
 
+        {/* 메인 레이아웃 */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="xl:col-span-2 space-y-6">
             {isExecutive && (
@@ -885,6 +886,7 @@ const DashboardPage: React.FC = () => {
                   )}
                 </div>
 
+                {/* ✅ [New] 공동체 구성 통계 (DemographicsSection)에서 임원/셀장/미배정 모두 보여줍니다. */}
                 {loadingCharts
                   ? null
                   : dashboardData?.demographics && (
@@ -901,12 +903,13 @@ const DashboardPage: React.FC = () => {
                       </div>
                     )}
 
-                <div className="mt-8 border-t pt-6">
+                {/* 미배정 인원 상세 리스트 (아래 배치) */}
+                <div id="unassigned-section" className="mt-8 border-t pt-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <FaUserTag className="text-orange-500 text-lg" />
                       <h4 className="font-semibold text-gray-800">
-                        미배정 성도 목록 ({unassignedList.length}명)
+                        미배정 인원 목록 ({unassignedList.length}명)
                       </h4>
                     </div>
                   </div>
@@ -987,7 +990,7 @@ const DashboardPage: React.FC = () => {
 
                         {unassignedList.length === 0 && (
                           <div className="text-center py-4 text-xs text-gray-500">
-                            미배정 성도가 없습니다.
+                            미배정 인원이 없습니다.
                           </div>
                         )}
 
@@ -1097,7 +1100,7 @@ const DashboardPage: React.FC = () => {
                                   colSpan={6}
                                   className="px-4 py-6 text-center text-xs text-gray-500"
                                 >
-                                  미배정 성도가 없습니다.
+                                  미배정 인원이 없습니다.
                                 </td>
                               </tr>
                             )}

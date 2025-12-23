@@ -1,5 +1,5 @@
 // src/pages/DashboardPage.tsx
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   FaBirthdayCake,
@@ -16,7 +16,6 @@ import {
   FaUserFriends,
   FaChevronRight,
   FaCalendarAlt,
-  // FaListUl 제거됨 (사용안함)
 } from "react-icons/fa";
 
 import { dashboardService } from "../services/dashboardService";
@@ -29,7 +28,7 @@ import { semesterService } from "../services/semesterService";
 import { useAuth } from "../hooks/useAuth";
 import { translateRole } from "../utils/roleUtils";
 import {
-  getPeriodDates, // ✅ 다시 필요해서 추가 (셀리더용)
+  getPeriodDates,
   getThisWeekRange,
   formatDateKorean,
   toISODateString,
@@ -57,15 +56,13 @@ type SummaryMode = "SEMESTER" | "YEAR";
 type IncompleteFilter = "WEEK" | "MONTH" | "SEMESTER";
 
 // --- Helper Functions ---
-
 const computeTrendRange = (
   isExecutive: boolean,
   summaryMode: SummaryMode,
-  period: string, // ✅ period 인자 부활
+  period: string,
   semesters: SemesterDto[],
   selectedSemesterId: number | null
 ) => {
-  // ✅ [수정] 비임원(셀리더)인 경우 기존 period(1m, 3m 등) 로직 사용
   if (!isExecutive) return getPeriodDates(period);
 
   const currentYear = new Date().getFullYear();
@@ -85,7 +82,6 @@ const computeTrendRange = (
       range = { startDate: semester.startDate, endDate: semester.endDate };
     }
   }
-
   return range;
 };
 
@@ -220,7 +216,6 @@ const DashboardFilterToolbar: React.FC<{
           >
             {semesters.map((s) => (
               <option key={s.id} value={s.id}>
-                {/* ✅ [수정] s.year 대신 s.startDate의 앞 4자리 사용 */}
                 {s.name} ({s.startDate.substring(0, 4)})
               </option>
             ))}
@@ -322,7 +317,7 @@ const TopSummaryChips: React.FC<{ data: DashboardDto }> = ({ data }) => {
       {data.unassignedMemberCount > 0 && (
         <div className="inline-flex items-center px-3 py-2 rounded-full bg-orange-50 text-orange-700 text-xs sm:text-sm font-medium border border-orange-100">
           <FaUserTag className="mr-2" />
-          미배정 성도 {data.unassignedMemberCount}명
+          미배정 인원 {data.unassignedMemberCount}명
         </div>
       )}
       {data.totalLongTermAbsentees > 0 && (
@@ -519,12 +514,15 @@ const IncompleteFilterTabs: React.FC<{
 const DashboardPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  const [loadingMain, setLoadingMain] = useState(true);
+  const [loadingCharts, setLoadingCharts] = useState(true);
+  const [loadingSub, setLoadingSub] = useState(true);
+
   const [dashboardData, setDashboardData] = useState<DashboardDto | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   // Filters
-  // ✅ [수정] period 상태 부활 (셀리더/일반멤버 화면용)
   const [period, setPeriod] = useState("3m");
   const [groupBy, setGroupBy] = useState<AttendanceSummaryGroupBy>("MONTH");
   const [summaryMode, setSummaryMode] = useState<SummaryMode>("SEMESTER");
@@ -533,15 +531,18 @@ const DashboardPage: React.FC = () => {
     null
   );
 
-  // Incomplete Report Filters
   const [incompleteFilter, setIncompleteFilter] =
     useState<IncompleteFilter>("WEEK");
-  const [incompleteDateRange, setIncompleteDateRange] = useState<{
-    startDate: string;
-    endDate: string;
-  } | null>(null);
 
-  // Counters
+  // ✅ useMemo로 기간 계산(상태 저장 금지)
+  const incompleteDateRange = useMemo(() => {
+    return computeIncompleteRange(
+      incompleteFilter,
+      semesters,
+      selectedSemesterId
+    );
+  }, [incompleteFilter, semesters, selectedSemesterId]);
+
   const [totalNotices, setTotalNotices] = useState(0);
   const [totalPrayers, setTotalPrayers] = useState(0);
   const [incompleteCheckData, setIncompleteCheckData] = useState<
@@ -554,178 +555,219 @@ const DashboardPage: React.FC = () => {
   const isExecutive = user?.role === "EXECUTIVE";
   const isCellLeader = user?.role === "CELL_LEADER";
 
-  const trendRange = computeTrendRange(
-    isExecutive,
-    summaryMode,
-    period, // ✅ 복구된 period 전달
-    semesters,
-    selectedSemesterId
-  );
-
-  // 활성화된 학기만 로드 및 선택
+  // 학기 목록 로딩
   useEffect(() => {
+    let alive = true;
     if (!isExecutive) return;
-    semesterService.getAllSemesters().then((fullList) => {
-      const activeList = fullList.filter((s) => s.isActive);
-      setSemesters(activeList);
 
-      const today = new Date();
-      const currentMonthTotal =
-        today.getFullYear() * 12 + (today.getMonth() + 1);
+    (async () => {
+      try {
+        const fullList = await semesterService.getAllSemesters();
+        if (!alive) return;
 
-      const currentSemester = activeList.find((s) => {
-        const start = new Date(s.startDate);
-        const end = new Date(s.endDate);
+        const activeList = fullList.filter((s) => s.isActive);
+        setSemesters(activeList);
 
-        const startMonthTotal =
-          start.getFullYear() * 12 + (start.getMonth() + 1);
-        const endMonthTotal = end.getFullYear() * 12 + (end.getMonth() + 1);
+        const today = new Date();
+        const currentMonthTotal =
+          today.getFullYear() * 12 + (today.getMonth() + 1);
 
-        return (
-          currentMonthTotal >= startMonthTotal &&
-          currentMonthTotal <= endMonthTotal
-        );
-      });
+        const currentSemester = activeList.find((s) => {
+          const start = new Date(s.startDate);
+          const end = new Date(s.endDate);
+          const startMonthTotal =
+            start.getFullYear() * 12 + (start.getMonth() + 1);
+          const endMonthTotal = end.getFullYear() * 12 + (end.getMonth() + 1);
+          return (
+            currentMonthTotal >= startMonthTotal &&
+            currentMonthTotal <= endMonthTotal
+          );
+        });
 
-      const targetSemester = currentSemester || activeList[0];
-      if (targetSemester) setSelectedSemesterId(targetSemester.id);
-    });
+        const targetSemester = currentSemester || activeList[0];
+        if (targetSemester) setSelectedSemesterId(targetSemester.id);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
   }, [isExecutive]);
+
+  // 핸들러
+  const handleSummaryModeChange = (mode: SummaryMode) => {
+    setSummaryMode(mode);
+    setLoadingMain(true);
+  };
+  const handleSemesterChange = (id: number) => {
+    setSelectedSemesterId(id);
+    setLoadingMain(true);
+  };
+  const handleGroupByChange = (g: AttendanceSummaryGroupBy) => {
+    setGroupBy(g);
+    setLoadingCharts(true);
+  };
+  const handlePeriodChange = (newPeriod: string) => {
+    setPeriod(newPeriod);
+    setLoadingMain(true);
+  };
+  const handleIncompleteFilterChange = (filter: IncompleteFilter) => {
+    setIncompleteFilter(filter);
+    setLoadingSub(true);
+  };
 
   const fetchData = useCallback(async () => {
     if (!user) return;
+    if (isExecutive && semesters.length === 0) return;
 
-    // ✅ [수정] 깜빡임 방지 코드 추가
-    // 임원(EXECUTIVE)인데 아직 학기 목록(semesters)이 로드되지 않았다면
-    // 잘못된 기간으로 조회되는 것을 막기 위해 중단합니다.
-    // (학기 로딩이 완료되면 useEffect에 의해 이 함수가 다시 실행됩니다.)
-    if (isExecutive && semesters.length === 0) {
-      return;
-    }
-
-    setLoading(true);
     setError(null);
 
+    const { startDate, endDate } = computeTrendRange(
+      isExecutive,
+      summaryMode,
+      period,
+      semesters,
+      selectedSemesterId
+    );
+
     try {
-      const isExec = user.role === "EXECUTIVE";
+      // 1) 메인 (DashboardDto)
+      const mainData = await dashboardService.getDashboardData(period, {
+        startDate,
+        endDate,
+      });
 
-      const { startDate, endDate } = computeTrendRange(
-        isExec,
-        summaryMode,
-        period, // ✅ 복구된 period 전달
-        semesters,
-        selectedSemesterId
+      setDashboardData((prev) =>
+        prev ? { ...prev, ...mainData } : { ...(mainData as DashboardDto) }
       );
+      setLoadingMain(false);
 
-      const incRange = computeIncompleteRange(
-        incompleteFilter,
-        semesters,
-        selectedSemesterId
-      );
-      setIncompleteDateRange(incRange);
+      // 2) 차트 + Summary (임원/셀장 수 Fetch 포함)
+      setLoadingCharts(true);
 
-      const [
-        mainData,
-        noticesPage,
-        prayersPage,
-        trendData,
-        incompleteData,
-        unassignedData,
-      ] = await Promise.all([
-        dashboardService.getDashboardData(period, { startDate, endDate }), // ✅ period 전달
-        noticeService.getAllNotices({ size: 1 }),
-        prayerService.getPrayers({ size: 1, sort: "createdAt,desc" }),
-        statisticsService.getAttendanceTrend({ startDate, endDate, groupBy }),
-        isExec
-          ? reportService.getIncompleteCheckReport({
-              startDate: incRange.startDate,
-              endDate: incRange.endDate,
-            })
-          : Promise.resolve([]),
-        isExec ? statisticsService.getUnassignedMembers() : Promise.resolve([]),
-      ]);
+      const chartPromise = statisticsService.getAttendanceTrend({
+        startDate,
+        endDate,
+        groupBy,
+      });
 
-      let summaryToUse = mainData.overallAttendanceSummary;
-
-      if (isExec) {
-        try {
+      // ✅ [Modified] 통계 요약 가져오기 (차트용)
+      // * 상단 그리드는 제거되었으므로, 오직 차트의 OverallAttendanceSummary 만 챙기면 됩니다.
+      const summaryPromise = (async () => {
+        if (isExecutive && selectedSemesterId) {
+          // 차트용 전체 출석률 데이터
           if (summaryMode === "YEAR") {
             const currentYear = new Date().getFullYear();
-            summaryToUse = await statisticsService.getOverallAttendance({
+            return await statisticsService.getOverallAttendance({
               year: currentYear,
             } as any);
-          } else if (summaryMode === "SEMESTER" && selectedSemesterId) {
-            const sm = semesters.find((s) => s.id === selectedSemesterId);
-            if (sm)
-              summaryToUse = await statisticsService.getOverallAttendance({
-                startDate: sm.startDate,
-                endDate: sm.endDate,
-              } as any);
           }
-        } catch (e) {
-          console.error("요약 통계 재조회 실패", e);
+          // 학기 모드면 기간으로 조회
+          const sm = semesters.find((s) => s.id === selectedSemesterId);
+          if (sm) {
+            return await statisticsService.getOverallAttendance({
+              startDate: sm.startDate,
+              endDate: sm.endDate,
+            } as any);
+          }
         }
-      }
+        return mainData.overallAttendanceSummary;
+      })();
 
-      setDashboardData({
-        ...mainData,
-        overallAttendanceSummary:
-          summaryToUse ?? mainData.overallAttendanceSummary,
-        attendanceTrend: trendData,
-      });
+      const [trendData, finalSummary] = await Promise.all([
+        chartPromise,
+        summaryPromise,
+      ]);
+
+      setDashboardData((prev) =>
+        prev
+          ? {
+              ...prev,
+              overallAttendanceSummary:
+                finalSummary ?? prev.overallAttendanceSummary,
+              attendanceTrend: trendData,
+            }
+          : null
+      );
+
+      setLoadingCharts(false);
+
+      // 3) 부가
+      setLoadingSub(true);
+      const [noticesPage, prayersPage, incompleteData, unassignedData] =
+        await Promise.all([
+          noticeService.getAllNotices({ size: 1 }),
+          prayerService.getPrayers({ size: 1, sort: "createdAt,desc" }),
+          isExecutive
+            ? reportService.getIncompleteCheckReport({
+                startDate: incompleteDateRange.startDate,
+                endDate: incompleteDateRange.endDate,
+              })
+            : Promise.resolve([]),
+          isExecutive
+            ? statisticsService.getUnassignedMembers()
+            : Promise.resolve([]),
+        ]);
+
       setTotalNotices(noticesPage.totalElements);
       setTotalPrayers(prayersPage.totalElements);
       setIncompleteCheckData(incompleteData);
       setUnassignedList(unassignedData as UnassignedMemberDto[]);
+      setLoadingSub(false);
     } catch (err) {
       console.error(err);
-      setError("데이터를 불러오지 못했습니다.");
-    } finally {
-      setLoading(false);
+      setError("데이터 일부를 불러오지 못했습니다.");
+      setLoadingMain(false);
+      setLoadingCharts(false);
+      setLoadingSub(false);
     }
   }, [
     user,
-    period, // ✅ dependency 추가
+    period,
     groupBy,
     summaryMode,
     selectedSemesterId,
     semesters,
-    incompleteFilter,
+    incompleteDateRange,
+    isExecutive,
   ]);
 
+  // ✅✅ 경고 해결 핵심: effect에서 fetchData를 “동기”로 바로 호출하지 않고 한 틱 미룸
   useEffect(() => {
-    fetchData();
+    let alive = true;
+
+    // 마이크로태스크로 미뤄서 “effect 내부 동기 setState” 경고를 회피
+    Promise.resolve().then(() => {
+      if (!alive) return;
+      void fetchData();
+    });
+
+    return () => {
+      alive = false;
+    };
   }, [fetchData]);
 
-  const handleSummaryModeChange = (mode: SummaryMode) => {
-    setSummaryMode(mode);
-  };
-
   if (!user) return <div>로그인이 필요합니다.</div>;
-  if (loading)
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-indigo-500" />
-      </div>
-    );
-  if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
-
   if (isCellLeader)
     return (
       <div className="bg-gray-50 min-h-screen p-4 sm:p-8">
         <CellLeaderDashboard />
       </div>
     );
-  if (!dashboardData) return <div>데이터 없음</div>;
+
+  if (error && !dashboardData)
+    return <div className="p-8 text-center text-red-500">{error}</div>;
 
   const summaryLabel = (() => {
     if (!isExecutive) return "기간 총 출석률";
     if (summaryMode === "YEAR")
       return `${new Date().getFullYear()}년 전체 출석률`;
-    if (summaryMode === "SEMESTER")
-      return semesters.find((s) => s.id === selectedSemesterId)?.name
-        ? `${semesters.find((s) => s.id === selectedSemesterId)?.name} 출석률`
-        : "학기별";
+    if (summaryMode === "SEMESTER") {
+      const s = semesters.find((x) => x.id === selectedSemesterId);
+      return s?.name ? `${s.name} 출석률` : "학기별";
+    }
     return "기간별 출석률";
   })();
 
@@ -738,6 +780,7 @@ const DashboardPage: React.FC = () => {
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
+        {/* 헤더 섹션 */}
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800">
             대시보드
@@ -746,14 +789,24 @@ const DashboardPage: React.FC = () => {
             <span className="font-semibold text-indigo-600">{user.name}</span>
             님({translateRole(user.role)}) 환영합니다.
           </p>
-          <div className="mt-4">
-            <TopSummaryChips data={dashboardData} />
+
+          <div className="mt-4 min-h-[40px]">
+            {loadingMain ? (
+              <div className="flex gap-2 animate-pulse">
+                <div className="h-8 w-32 bg-gray-200 rounded-full"></div>
+                <div className="h-8 w-32 bg-gray-200 rounded-full"></div>
+                <div className="h-8 w-32 bg-gray-200 rounded-full"></div>
+              </div>
+            ) : (
+              dashboardData && <TopSummaryChips data={dashboardData} />
+            )}
           </div>
         </div>
 
+        {/* 메인 레이아웃 */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="xl:col-span-2 space-y-6">
-            {isExecutive && dashboardData.overallAttendanceSummary && (
+            {isExecutive && (
               <Card
                 title="출석 통계"
                 icon={<FaChartLine className="text-teal-500" />}
@@ -763,29 +816,42 @@ const DashboardPage: React.FC = () => {
                     summaryMode={summaryMode}
                     onSummaryModeChange={handleSummaryModeChange}
                     groupBy={groupBy}
-                    onGroupByChange={setGroupBy}
+                    onGroupByChange={handleGroupByChange}
                     semesters={semesters}
                     selectedSemesterId={selectedSemesterId}
-                    onSemesterChange={setSelectedSemesterId}
+                    onSemesterChange={handleSemesterChange}
                   />
                 </div>
 
-                <OverallAttendanceSummaryCard
-                  summary={dashboardData.overallAttendanceSummary}
-                  label={summaryLabel}
-                />
-
-                <AttendanceTrend
-                  data={dashboardData.attendanceTrend}
-                  selectedGroupBy={groupBy}
-                  title="출석률 추이"
-                  dateRange={trendRange}
-                />
-
-                {dashboardData.cellAttendanceSummaries && (
-                  <CellStatusMap
-                    cellSummaries={dashboardData.cellAttendanceSummaries}
-                  />
+                {loadingCharts ? (
+                  <div className="h-64 flex flex-col items-center justify-center text-gray-400">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500 mb-2" />
+                    <span className="text-xs">데이터 분석 중...</span>
+                  </div>
+                ) : (
+                  <>
+                    <OverallAttendanceSummaryCard
+                      summary={dashboardData?.overallAttendanceSummary || null}
+                      label={summaryLabel}
+                    />
+                    <AttendanceTrend
+                      data={dashboardData?.attendanceTrend}
+                      selectedGroupBy={groupBy}
+                      title="출석률 추이"
+                      dateRange={computeTrendRange(
+                        isExecutive,
+                        summaryMode,
+                        period,
+                        semesters,
+                        selectedSemesterId
+                      )}
+                    />
+                    {dashboardData?.cellAttendanceSummaries && (
+                      <CellStatusMap
+                        cellSummaries={dashboardData.cellAttendanceSummaries}
+                      />
+                    )}
+                  </>
                 )}
 
                 <div className="mt-8 border-t pt-6">
@@ -798,223 +864,262 @@ const DashboardPage: React.FC = () => {
                     </div>
                     <IncompleteFilterTabs
                       value={incompleteFilter}
-                      onChange={setIncompleteFilter}
+                      onChange={handleIncompleteFilterChange}
                       disableSemester={semesters.length === 0}
                     />
                   </div>
-                  <div className="flex flex-col md:flex-row md:justify-between gap-2 mb-2">
-                    {incompleteDateRange && (
-                      <p className="text-[11px] text-gray-400 self-end md:self-auto ml-auto">
-                        조회 기간: {incompleteRangeLabel}
-                      </p>
-                    )}
-                  </div>
-                  <IncompleteAttendanceSection reports={incompleteCheckData} />
+
+                  {incompleteDateRange && (
+                    <p className="text-[11px] text-gray-400 text-right mb-2">
+                      조회 기간: {incompleteRangeLabel}
+                    </p>
+                  )}
+
+                  {loadingSub ? (
+                    <div className="py-4 text-center text-xs text-gray-400">
+                      데이터 불러오는 중...
+                    </div>
+                  ) : (
+                    <IncompleteAttendanceSection
+                      reports={incompleteCheckData}
+                    />
+                  )}
                 </div>
 
-                {dashboardData.demographics && (
-                  <div className="mt-8 border-t pt-6">
-                    <div className="flex items-center gap-2 mb-4">
-                      <FaUserFriends className="text-blue-500 text-lg" />
-                      <h4 className="font-semibold text-gray-800">
-                        공동체 구성 통계
-                      </h4>
-                    </div>
-                    <DemographicsSection data={dashboardData.demographics} />
-                  </div>
-                )}
+                {/* ✅ [New] 공동체 구성 통계 (DemographicsSection)에서 임원/셀장/미배정 모두 보여줍니다. */}
+                {loadingCharts
+                  ? null
+                  : dashboardData?.demographics && (
+                      <div className="mt-8 border-t pt-6">
+                        <div className="flex items-center gap-2 mb-4">
+                          <FaUserFriends className="text-blue-500 text-lg" />
+                          <h4 className="font-semibold text-gray-800">
+                            공동체 구성 통계
+                          </h4>
+                        </div>
+                        <DemographicsSection
+                          data={dashboardData.demographics}
+                        />
+                      </div>
+                    )}
 
-                <div className="mt-8 border-t pt-6">
+                {/* 미배정 인원 상세 리스트 (아래 배치) */}
+                <div id="unassigned-section" className="mt-8 border-t pt-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <FaUserTag className="text-orange-500 text-lg" />
                       <h4 className="font-semibold text-gray-800">
-                        미배정 성도 목록 ({unassignedList.length}명)
+                        미배정 인원 목록 ({unassignedList.length}명)
                       </h4>
                     </div>
                   </div>
 
-                  {/* 모바일 뷰 */}
-                  <div className="block md:hidden bg-gray-50 p-3 space-y-3 rounded-lg">
-                    {unassignedList.slice(0, 5).map((member) => {
-                      const displayAge = calculateAge(member);
-                      return (
-                        <div
-                          key={member.id}
-                          className="bg-white p-4 rounded-lg shadow-sm border border-gray-200"
-                        >
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <button
-                                onClick={() =>
-                                  navigate(`/admin/users/${member.id}`)
-                                }
-                                className="text-base font-bold text-indigo-600 hover:underline flex items-center gap-1"
-                              >
-                                {member.name}
-                                <FaChevronRight
-                                  size={10}
-                                  className="opacity-50"
-                                />
-                              </button>
-                              <div className="mt-1 flex items-center gap-2">
-                                <span
-                                  className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${
-                                    member.gender === "MALE"
-                                      ? "bg-blue-50 text-blue-700"
-                                      : "bg-pink-50 text-pink-700"
-                                  }`}
-                                >
-                                  {member.gender === "MALE" ? "남자" : "여자"}
-                                </span>
-                                <span className="text-xs text-gray-500">
-                                  {displayAge !== null &&
-                                    `(만 ${displayAge}세)`}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-3">
-                            <div>
-                              <span className="text-gray-400 block">
-                                연락처
-                              </span>
-                              {member.phone}
-                            </div>
-                            <div>
-                              <span className="text-gray-400 block">등록</span>
-                              {member.registeredDate?.substring(0, 4) || "-"}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() =>
-                              navigate(`/admin/users/${member.id}/edit`)
-                            }
-                            className="w-full py-1.5 bg-indigo-50 text-indigo-600 rounded text-xs font-semibold hover:bg-indigo-100"
-                          >
-                            셀 배정하기
-                          </button>
-                        </div>
-                      );
-                    })}
-                    {unassignedList.length === 0 && (
-                      <div className="text-center py-4 text-xs text-gray-500">
-                        미배정 성도가 없습니다.
-                      </div>
-                    )}
-                    {unassignedList.length > 5 && (
-                      <div className="text-center pt-2">
-                        <Link
-                          to="/admin/statistics"
-                          className="text-xs text-indigo-500 hover:underline"
-                        >
-                          전체 보기
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 데스크탑 뷰 */}
-                  <div className="hidden md:block overflow-x-auto border border-gray-100 rounded-lg">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
-                            이름
-                          </th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
-                            성별
-                          </th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
-                            생년월일
-                          </th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
-                            연락처
-                          </th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
-                            등록 연도
-                          </th>
-                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">
-                            관리
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
+                  {loadingSub ? (
+                    <div className="py-8 text-center bg-gray-50 rounded-lg animate-pulse">
+                      목록을 불러오고 있습니다...
+                    </div>
+                  ) : (
+                    <>
+                      <div className="block md:hidden bg-gray-50 p-3 space-y-3 rounded-lg">
                         {unassignedList.slice(0, 5).map((member) => {
                           const displayAge = calculateAge(member);
                           return (
-                            <tr key={member.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 whitespace-nowrap text-xs font-medium text-gray-900">
-                                <button
-                                  onClick={() =>
-                                    navigate(`/admin/users/${member.id}`)
-                                  }
-                                  className="text-indigo-600 hover:underline"
-                                >
-                                  {member.name}
-                                </button>
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-xs">
-                                <span
-                                  className={`px-2 py-0.5 rounded ${
-                                    member.gender === "MALE"
-                                      ? "bg-blue-50 text-blue-700"
-                                      : "bg-pink-50 text-pink-700"
-                                  }`}
-                                >
-                                  {member.gender === "MALE" ? "남자" : "여자"}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
-                                {member.birthDate || member.birthYear || "-"}
-                                {displayAge !== null && (
-                                  <span className="ml-1 text-gray-400">
-                                    (만 {displayAge}세)
+                            <div
+                              key={member.id}
+                              className="bg-white p-4 rounded-lg shadow-sm border border-gray-200"
+                            >
+                              <div className="flex justify-between items-start mb-2">
+                                <div>
+                                  <button
+                                    onClick={() =>
+                                      navigate(`/admin/users/${member.id}`)
+                                    }
+                                    className="text-base font-bold text-indigo-600 hover:underline flex items-center gap-1"
+                                  >
+                                    {member.name}
+                                    <FaChevronRight
+                                      size={10}
+                                      className="opacity-50"
+                                    />
+                                  </button>
+                                  <div className="mt-1 flex items-center gap-2">
+                                    <span
+                                      className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${
+                                        member.gender === "MALE"
+                                          ? "bg-blue-50 text-blue-700"
+                                          : "bg-pink-50 text-pink-700"
+                                      }`}
+                                    >
+                                      {member.gender === "MALE"
+                                        ? "남자"
+                                        : "여자"}
+                                    </span>
+                                    <span className="text-xs text-gray-500">
+                                      {displayAge !== null &&
+                                        `(만 ${displayAge}세)`}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-3">
+                                <div>
+                                  <span className="text-gray-400 block">
+                                    연락처
                                   </span>
-                                )}
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
-                                {member.phone}
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
-                                {member.registeredDate?.substring(0, 4) || "-"}
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-center text-xs">
-                                <button
-                                  onClick={() =>
-                                    navigate(`/admin/users/${member.id}/edit`)
-                                  }
-                                  className="text-indigo-600 hover:text-indigo-800 font-medium"
-                                >
-                                  셀 배정
-                                </button>
-                              </td>
-                            </tr>
+                                  {member.phone}
+                                </div>
+                                <div>
+                                  <span className="text-gray-400 block">
+                                    등록
+                                  </span>
+                                  {member.registeredDate?.substring(0, 4) ||
+                                    "-"}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() =>
+                                  navigate(`/admin/users/${member.id}/edit`)
+                                }
+                                className="w-full py-1.5 bg-indigo-50 text-indigo-600 rounded text-xs font-semibold hover:bg-indigo-100"
+                              >
+                                셀 배정하기
+                              </button>
+                            </div>
                           );
                         })}
+
                         {unassignedList.length === 0 && (
-                          <tr>
-                            <td
-                              colSpan={6}
-                              className="px-4 py-6 text-center text-xs text-gray-500"
-                            >
-                              미배정 성도가 없습니다.
-                            </td>
-                          </tr>
+                          <div className="text-center py-4 text-xs text-gray-500">
+                            미배정 인원이 없습니다.
+                          </div>
                         )}
-                      </tbody>
-                    </table>
-                    {unassignedList.length > 5 && (
-                      <div className="bg-gray-50 px-4 py-2 text-right border-t border-gray-100">
-                        <Link
-                          to="/admin/statistics"
-                          className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-                        >
-                          전체 보기 &rarr;
-                        </Link>
+
+                        {unassignedList.length > 5 && (
+                          <div className="text-center pt-2">
+                            <Link
+                              to="/admin/statistics"
+                              className="text-xs text-indigo-500 hover:underline"
+                            >
+                              전체 보기
+                            </Link>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+
+                      <div className="hidden md:block overflow-x-auto border border-gray-100 rounded-lg">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
+                                이름
+                              </th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
+                                성별
+                              </th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
+                                생년월일
+                              </th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
+                                연락처
+                              </th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
+                                등록 연도
+                              </th>
+                              <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">
+                                관리
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {unassignedList.slice(0, 5).map((member) => {
+                              const displayAge = calculateAge(member);
+                              return (
+                                <tr
+                                  key={member.id}
+                                  className="hover:bg-gray-50"
+                                >
+                                  <td className="px-4 py-3 whitespace-nowrap text-xs font-medium text-gray-900">
+                                    <button
+                                      onClick={() =>
+                                        navigate(`/admin/users/${member.id}`)
+                                      }
+                                      className="text-indigo-600 hover:underline"
+                                    >
+                                      {member.name}
+                                    </button>
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-xs">
+                                    <span
+                                      className={`px-2 py-0.5 rounded ${
+                                        member.gender === "MALE"
+                                          ? "bg-blue-50 text-blue-700"
+                                          : "bg-pink-50 text-pink-700"
+                                      }`}
+                                    >
+                                      {member.gender === "MALE"
+                                        ? "남자"
+                                        : "여자"}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
+                                    {member.birthDate ||
+                                      member.birthYear ||
+                                      "-"}
+                                    {displayAge !== null && (
+                                      <span className="ml-1 text-gray-400">
+                                        (만 {displayAge}세)
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
+                                    {member.phone}
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
+                                    {member.registeredDate?.substring(0, 4) ||
+                                      "-"}
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-center text-xs">
+                                    <button
+                                      onClick={() =>
+                                        navigate(
+                                          `/admin/users/${member.id}/edit`
+                                        )
+                                      }
+                                      className="text-indigo-600 hover:text-indigo-800 font-medium"
+                                    >
+                                      셀 배정
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+
+                            {unassignedList.length === 0 && (
+                              <tr>
+                                <td
+                                  colSpan={6}
+                                  className="px-4 py-6 text-center text-xs text-gray-500"
+                                >
+                                  미배정 인원이 없습니다.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+
+                        {unassignedList.length > 5 && (
+                          <div className="bg-gray-50 px-4 py-2 text-right border-t border-gray-100">
+                            <Link
+                              to="/admin/statistics"
+                              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                            >
+                              전체 보기 &rarr;
+                            </Link>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               </Card>
             )}
@@ -1023,37 +1128,47 @@ const DashboardPage: React.FC = () => {
               <Card title="출석 요약" icon={<FaChartLine />}>
                 <div className="mb-4">
                   <AttendanceFilterBar
-                    period={period} // ✅ period 복구됨
+                    period={period}
                     groupBy={groupBy}
-                    onChangePeriod={setPeriod} // ✅ setPeriod 복구됨
-                    onChangeGroupBy={setGroupBy}
+                    onChangePeriod={handlePeriodChange}
+                    onChangeGroupBy={handleGroupByChange}
                   />
                 </div>
                 <OverallAttendanceSummaryCard
-                  summary={dashboardData.overallAttendanceSummary}
+                  summary={dashboardData?.overallAttendanceSummary || null}
                 />
                 <AttendanceTrend
-                  data={dashboardData.attendanceTrend}
+                  data={dashboardData?.attendanceTrend}
                   selectedGroupBy={groupBy}
                   title="출석률 추이"
-                  dateRange={trendRange}
+                  dateRange={computeTrendRange(
+                    isExecutive,
+                    summaryMode,
+                    period,
+                    semesters,
+                    selectedSemesterId
+                  )}
                 />
               </Card>
             )}
           </div>
 
           <div className="space-y-6 xl:col-span-1 xl:sticky xl:top-24 self-start">
-            {dashboardData && (
-              <NewsCenterCard
-                data={dashboardData}
-                canManageNotices={isExecutive}
-                totalNotices={totalNotices}
-                totalPrayers={totalPrayers}
-                totalTodayBirthdays={dashboardData.totalTodayBirthdays}
-                totalWeeklyBirthdays={dashboardData.totalWeeklyBirthdays}
-                totalMonthlyBirthdays={dashboardData.totalMonthlyBirthdays}
-                baseRoute="admin"
-              />
+            {loadingMain ? (
+              <div className="h-64 bg-white rounded-2xl shadow-lg p-6 animate-pulse"></div>
+            ) : (
+              dashboardData && (
+                <NewsCenterCard
+                  data={dashboardData}
+                  canManageNotices={isExecutive}
+                  totalNotices={totalNotices}
+                  totalPrayers={totalPrayers}
+                  totalTodayBirthdays={dashboardData.totalTodayBirthdays}
+                  totalWeeklyBirthdays={dashboardData.totalWeeklyBirthdays}
+                  totalMonthlyBirthdays={dashboardData.totalMonthlyBirthdays}
+                  baseRoute="admin"
+                />
+              )
             )}
           </div>
         </div>

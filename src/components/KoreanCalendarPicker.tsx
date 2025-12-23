@@ -25,19 +25,18 @@ const parseLocalDate = (yyyyMMdd: string): Date | null => {
 
 const formatLocalDate = (date: Date): string => format(date, "yyyy-MM-dd");
 
-// ✅ [수정] react-datepicker의 12개 그리드 로직에 맞춰 범위 텍스트 계산
+// react-datepicker의 12개 그리드 로직에 맞춰 범위 텍스트 계산
 const getDecadeRangeText = (year: number) => {
   const start = Math.floor((year - 1) / 12) * 12 + 1;
   const end = start + 11;
   return `${start}-${end}`;
 };
 
-// 1. 공휴일 체크 로직 (양력)
+// 공휴일 체크 로직
 const isPublicHoliday = (date: Date) => {
   const month = date.getMonth() + 1;
   const day = date.getDate();
   const dateString = `${month}-${day}`;
-
   const solarHolidays = [
     "1-1",
     "3-1",
@@ -48,7 +47,6 @@ const isPublicHoliday = (date: Date) => {
     "10-9",
     "12-25",
   ];
-
   return solarHolidays.includes(dateString);
 };
 
@@ -139,10 +137,9 @@ const KoreanCalendarPicker: React.FC<Props> = ({
         dayClassName={getDayClassName}
         showYearPicker={mode === "year"}
         showMonthYearPicker={mode === "month"}
-        yearItemNumber={12} // 12개 그리드 사용
+        yearItemNumber={12}
         onChange={(date) => {
           if (!date) return;
-
           setViewDate(date);
 
           if (mode === "year") {
@@ -174,30 +171,19 @@ const KoreanCalendarPicker: React.FC<Props> = ({
               ? `${year}년 ${month}월`
               : mode === "month"
               ? `${year}년`
-              : getDecadeRangeText(year); // ✅ 수정된 텍스트 로직 적용
+              : getDecadeRangeText(year);
 
+          // ✅ 단일 이동 로직만 남김
           const goPrev = () => {
             if (mode === "day") decreaseMonth();
             if (mode === "month") decreaseYear();
-            if (mode === "year") changeYear(year - 12); // ✅ [수정] 12년 단위 이동
+            if (mode === "year") changeYear(year - 12);
           };
 
           const goNext = () => {
             if (mode === "day") increaseMonth();
             if (mode === "month") increaseYear();
-            if (mode === "year") changeYear(year + 12); // ✅ [수정] 12년 단위 이동
-          };
-
-          const goPrevFast = () => {
-            if (mode === "day") decreaseYear();
-            if (mode === "month") changeYear(year - 10);
-            if (mode === "year") changeYear(year - 120); // (선택) 12*10년 단위 이동
-          };
-
-          const goNextFast = () => {
-            if (mode === "day") increaseYear();
-            if (mode === "month") changeYear(year + 10);
-            if (mode === "year") changeYear(year + 120); // (선택) 12*10년 단위 이동
+            if (mode === "year") changeYear(year + 12);
           };
 
           const toggleMode = () => {
@@ -213,23 +199,22 @@ const KoreanCalendarPicker: React.FC<Props> = ({
 
           return (
             <div className="flex items-center justify-between px-1 sm:px-3 pb-2">
-              <div className="flex items-center gap-1 sm:gap-3">
-                <button type="button" onClick={goPrevFast} className={btnClass}>
-                  «
-                </button>
+              {/* 왼쪽 화살표 (하나만 남김) */}
+              <div className="flex items-center">
                 <button type="button" onClick={goPrev} className={btnClass}>
                   ‹
                 </button>
               </div>
+
+              {/* 중앙 타이틀 (클릭 시 모드 변경) */}
               <button type="button" onClick={toggleMode} className={titleClass}>
                 {title}
               </button>
-              <div className="flex items-center gap-1 sm:gap-3">
+
+              {/* 오른쪽 화살표 (하나만 남김) */}
+              <div className="flex items-center">
                 <button type="button" onClick={goNext} className={btnClass}>
                   ›
-                </button>
-                <button type="button" onClick={goNextFast} className={btnClass}>
-                  »
                 </button>
               </div>
             </div>

@@ -646,6 +646,10 @@ export interface DashboardDemographicsDto {
   cellMemberCount: number;
   previousSemesterCount: number;
 
+  // ✅ [New] 추가 요청 필드
+  executiveCount: number;
+  cellLeaderCount: number;
+
   // 연령대별 요약
   count10sAndUnder: number;
   count20s: number;
@@ -866,6 +870,8 @@ export interface SemesterSummaryDto {
   totalMemberCount: number;
   cellMemberCount: number;
   unassignedCount: number;
+  executiveCount: number;
+  cellLeaderCount: number;
   ageGroupSummary: {
     under20s: number;
     twenties: number;

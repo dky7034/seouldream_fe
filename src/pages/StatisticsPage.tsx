@@ -38,36 +38,28 @@ import type {
   DashboardDemographicsDto,
 } from "../types";
 
-// ✅ [유지] 만 나이 계산 헬퍼 함수 (파일 내 유지)
+// ✅ 만 나이 계산 헬퍼 함수
 const calculateAge = (member: UnassignedMemberDto): number | null => {
-  // 1. 백엔드에서 준 age가 있으면 그대로 사용
   if (member.age !== undefined && member.age !== null && member.age !== 0) {
     return member.age;
   }
-
-  // 2. birthDate('YYYY-MM-DD')가 있으면 계산
   if (member.birthDate) {
     const today = new Date();
     const birthDate = new Date(member.birthDate);
     let age = today.getFullYear() - birthDate.getFullYear();
     const m = today.getMonth() - birthDate.getMonth();
-
-    // 생일이 안 지났으면 1살 뺌
     if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
     return age;
   }
-
-  // 3. birthYear만 있으면 대략 계산 (현재연도 - 태어난연도)
   if (member.birthYear) {
     return new Date().getFullYear() - Number(member.birthYear);
   }
-
   return null;
 };
 
-// ✅ [최적화] 차트 컴포넌트에 React.memo 적용
+// ✅ 새가족 성장 차트
 const NewcomerGrowthChart = React.memo(
   ({ data }: { data: NewcomerStatDto[] }) => {
     if (!data || data.length === 0) {
@@ -128,36 +120,35 @@ const NewcomerGrowthChart = React.memo(
   }
 );
 
+// ✅ 연령대(2030) 파이 차트
 const AgeGroupPieChart = React.memo(
   ({ data }: { data: SemesterSummaryDto["ageGroupSummary"] }) => {
-    const total = data.under20s + data.twenties + data.thirties + data.over40s;
+    const total = data.twenties + data.thirties;
 
     if (total === 0) {
       return (
-        <div className="h-[250px] w-full flex items-center justify-center text-gray-400 border border-dashed border-gray-200 rounded-lg">
+        <div className="h-[200px] w-full flex items-center justify-center text-gray-400 border border-dashed border-gray-200 rounded-lg">
           데이터 없음
         </div>
       );
     }
 
     const chartData = [
-      { name: "10대 이하", value: data.under20s, color: "#93c5fd" },
       { name: "20대", value: data.twenties, color: "#86efac" },
       { name: "30대", value: data.thirties, color: "#fde047" },
-      { name: "40대 이상", value: data.over40s, color: "#d8b4fe" },
     ];
 
     return (
-      <div className="h-[250px] w-full flex items-center justify-center">
-        <div style={{ width: "100%", height: "100%", minHeight: "200px" }}>
+      <div className="h-[200px] w-full flex items-center justify-center">
+        <div style={{ width: "100%", height: "100%" }}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
                 data={chartData}
                 cx="50%"
                 cy="50%"
-                innerRadius={60}
-                outerRadius={80}
+                innerRadius={50}
+                outerRadius={70}
                 paddingAngle={5}
                 dataKey="value"
               >
@@ -166,7 +157,7 @@ const AgeGroupPieChart = React.memo(
                 ))}
               </Pie>
               <Tooltip />
-              <Legend iconType="circle" />
+              <Legend iconType="circle" verticalAlign="bottom" height={36} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -179,36 +170,31 @@ const AgeGroupPieChart = React.memo(
 const StatisticsPage: React.FC = () => {
   const navigate = useNavigate();
 
-  // ✅ [개선] 로딩 상태 분리 (초기 로딩 vs 데이터 갱신)
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isRefetching, setIsRefetching] = useState(false);
 
-  // 학기 목록
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const [selectedSemesterId, setSelectedSemesterId] = useState<number | null>(
     null
   );
 
-  // 통계 데이터 State
   const [newcomerStats, setNewcomerStats] = useState<NewcomerStatDto[]>([]);
   const [semesterSummary, setSemesterSummary] =
     useState<SemesterSummaryDto | null>(null);
+
   const [detailDemographics, setDetailDemographics] =
     useState<DashboardDemographicsDto | null>(null);
   const [unassignedList, setUnassignedList] = useState<UnassignedMemberDto[]>(
     []
   );
 
-  // 1. 학기 목록 불러오기 (초기 1회)
+  // 1. 학기 목록 불러오기 및 기본 학기 설정
   useEffect(() => {
     semesterService.getAllSemesters().then((list) => {
-      // ✅ [요청 반영] 활성화된 학기만 필터링
       const activeSemesters = list.filter((s) => s.isActive);
-
       setSemesters(activeSemesters);
 
       if (activeSemesters.length > 0) {
-        // 현재 날짜에 해당하는 학기 찾기
         const today = new Date();
         const currentMonthTotal =
           today.getFullYear() * 12 + (today.getMonth() + 1);
@@ -226,32 +212,27 @@ const StatisticsPage: React.FC = () => {
           );
         });
 
-        // 현재 학기 혹은 리스트의 첫 번째 학기 선택
         const targetId = currentSemester
           ? currentSemester.id
           : activeSemesters[0].id;
         setSelectedSemesterId(targetId);
       } else {
-        setIsInitialLoading(false); // 활성 학기가 없으면 로딩 종료
+        setIsInitialLoading(false);
       }
     });
   }, []);
 
-  // 2. 선택된 학기에 따른 데이터 Fetching
-  // ✅ [최적화] Race Condition 방지 & Refetching UX 개선
+  // 2. 데이터 Fetching
   useEffect(() => {
     if (!selectedSemesterId) return;
-
-    let ignore = false; // 🔒 요청 취소 플래그
+    let ignore = false;
 
     const fetchData = async () => {
-      // 초기 로딩이 아니면 Refetching 상태로 (화면 깜빡임 대신 투명도 조절)
       if (!isInitialLoading) setIsRefetching(true);
 
       try {
         const semester = semesters.find((s) => s.id === selectedSemesterId);
         if (!semester) return;
-
         const { startDate, endDate } = semester;
 
         const [newcomers, summary, dashboardData, unassigned] =
@@ -265,7 +246,6 @@ const StatisticsPage: React.FC = () => {
             statisticsService.getUnassignedMembers(),
           ]);
 
-        // 🔒 컴포넌트 언마운트 or 새로운 요청 발생 시 결과 무시
         if (ignore) return;
 
         setNewcomerStats(newcomers);
@@ -277,7 +257,6 @@ const StatisticsPage: React.FC = () => {
       } catch (error) {
         if (!ignore) console.error("통계 데이터 로드 실패:", error);
       } finally {
-        // 🔒 유효한 요청일 때만 로딩 해제
         if (!ignore) {
           setIsInitialLoading(false);
           setIsRefetching(false);
@@ -286,14 +265,12 @@ const StatisticsPage: React.FC = () => {
     };
 
     fetchData();
-
-    // 🧹 Cleanup: 이전 요청 무시
     return () => {
       ignore = true;
     };
   }, [selectedSemesterId, semesters, isInitialLoading]);
 
-  // ✅ [최적화] 파생 데이터 useMemo 적용
+  // 파생 데이터
   const { totalNewcomers, lastNewcomerStat } = useMemo(() => {
     const total = newcomerStats.reduce((acc, cur) => acc + cur.count, 0);
     const last =
@@ -301,7 +278,6 @@ const StatisticsPage: React.FC = () => {
     return { totalNewcomers: total, lastNewcomerStat: last };
   }, [newcomerStats]);
 
-  // ✅ [최적화] 미배정 인원 렌더링 데이터 준비
   const processedUnassignedList = useMemo(() => {
     return unassignedList.map((member) => ({
       ...member,
@@ -309,7 +285,14 @@ const StatisticsPage: React.FC = () => {
     }));
   }, [unassignedList]);
 
-  // 초기 로딩 시에만 전체 스피너 표시
+  // 스크롤 이동 핸들러 (DemographicsSection의 미배정 카드 클릭 시 호출)
+  const scrollToUnassigned = () => {
+    const element = document.getElementById("unassigned-section");
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   if (isInitialLoading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-50">
@@ -318,7 +301,6 @@ const StatisticsPage: React.FC = () => {
     );
   }
 
-  // 활성 학기가 아예 없는 경우
   if (!isInitialLoading && semesters.length === 0) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-50 text-gray-500">
@@ -354,9 +336,7 @@ const StatisticsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ✅ [UX 개선] Refetching 시 화면 투명도 처리 
-            - isRefetching이 true일 때 전체 컨텐츠를 반투명하게 하고 클릭 방지
-        */}
+        {/* 메인 컨텐츠 영역 */}
         <div
           className={`space-y-8 transition-opacity duration-200 ${
             isRefetching ? "opacity-50 pointer-events-none" : "opacity-100"
@@ -373,11 +353,9 @@ const StatisticsPage: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
-                {/* Memoized Component */}
                 <NewcomerGrowthChart data={newcomerStats} />
               </div>
 
-              {/* 인사이트 카드 */}
               <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-lg p-6 text-white flex flex-col justify-between">
                 <div>
                   <h3 className="text-lg font-semibold opacity-90">
@@ -424,7 +402,7 @@ const StatisticsPage: React.FC = () => {
             </div>
           </section>
 
-          {/* 섹션 2: 구성원 통계 */}
+          {/* 섹션 2: 구성원 통계 분석 */}
           <section>
             <div className="flex items-center gap-2 mb-4">
               <div className="p-2 bg-green-100 rounded-lg text-green-600">
@@ -435,37 +413,34 @@ const StatisticsPage: React.FC = () => {
               </h2>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-1">
-                <h3 className="font-semibold text-gray-700 mb-4 text-center">
-                  연령대별 구성비
-                </h3>
-                {semesterSummary && (
-                  /* Memoized Component */
-                  <AgeGroupPieChart data={semesterSummary.ageGroupSummary} />
-                )}
-
-                <div className="grid grid-cols-2 gap-3 mt-6">
-                  <div className="bg-gray-50 p-3 rounded-lg text-center">
-                    <div className="text-xs text-gray-500">전체 인원</div>
-                    <div className="font-bold text-gray-800">
-                      {semesterSummary?.totalMemberCount}명
-                    </div>
+            <div className="space-y-6">
+              {/* 1. 이번 학기 연령 구성비 (단독 배치) */}
+              {semesterSummary && (
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center justify-around">
+                  <div className="text-center md:text-left mb-4 md:mb-0">
+                    <h3 className="text-lg font-bold text-gray-800 mb-2">
+                      이번 학기 연령 구성비
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      20대와 30대의 비율을 한눈에 확인하세요.
+                    </p>
                   </div>
-                  <div className="bg-gray-50 p-3 rounded-lg text-center">
-                    <div className="text-xs text-gray-500">운영 셀</div>
-                    <div className="font-bold text-gray-800">
-                      {semesterSummary?.totalCellCount}개
-                    </div>
+                  <div className="w-full md:w-1/2 max-w-[400px]">
+                    <AgeGroupPieChart data={semesterSummary.ageGroupSummary} />
                   </div>
                 </div>
-              </div>
+              )}
 
-              <div className="lg:col-span-2">
+              {/* 2. 상세 지표 (DemographicsSection) */}
+              {/* 미배정, 전체, 임원 등을 포함하며 클릭 시 스크롤 이동 */}
+              <div className="w-full">
                 {detailDemographics ? (
-                  <DemographicsSection data={detailDemographics} />
+                  <DemographicsSection
+                    data={detailDemographics}
+                    onUnassignedClick={scrollToUnassigned}
+                  />
                 ) : (
-                  <div className="h-[350px] flex items-center justify-center bg-white rounded-lg border border-gray-100 text-gray-400">
+                  <div className="h-[200px] flex items-center justify-center bg-white rounded-lg border border-gray-100 text-gray-400">
                     데이터 로딩 중...
                   </div>
                 )}
@@ -473,25 +448,25 @@ const StatisticsPage: React.FC = () => {
             </div>
           </section>
 
-          {/* 섹션 3: 미배정 양육 관리 */}
-          <section>
+          {/* 섹션 3: 셀 미배정 인원 관리 */}
+          <section id="unassigned-section">
             <div className="flex items-center gap-2 mb-4">
               <div className="p-2 bg-orange-100 rounded-lg text-orange-600">
                 <FaUserSlash size={20} />
               </div>
               <h2 className="text-xl font-bold text-gray-800">
-                미배정 양육 관리
+                셀 미배정 인원 관리
               </h2>
             </div>
 
             <div className="bg-white rounded-xl shadow border border-gray-100 overflow-hidden">
               <div className="p-4 border-b border-gray-100 flex justify-between items-center">
                 <h3 className="font-semibold text-gray-700">
-                  미배정 성도 목록 ({processedUnassignedList.length}명)
+                  셀 미배정 인원 목록 ({processedUnassignedList.length}명)
                 </h3>
               </div>
 
-              {/* [모바일 전용] */}
+              {/* [모바일] 리스트 뷰 */}
               <div className="block md:hidden bg-gray-50 p-3 space-y-3">
                 {processedUnassignedList.map((member) => (
                   <div
@@ -551,12 +526,12 @@ const StatisticsPage: React.FC = () => {
                 ))}
                 {processedUnassignedList.length === 0 && (
                   <div className="text-center py-8 text-gray-400">
-                    미배정 성도가 없습니다.
+                    미배정 인원이 없습니다.
                   </div>
                 )}
               </div>
 
-              {/* [데스크탑 전용] */}
+              {/* [데스크탑] 테이블 뷰 */}
               <div className="hidden md:block overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
@@ -640,7 +615,7 @@ const StatisticsPage: React.FC = () => {
                           colSpan={6}
                           className="px-6 py-10 text-center text-sm text-gray-500"
                         >
-                          미배정 성도가 없습니다.
+                          미배정 인원이 없습니다.
                         </td>
                       </tr>
                     )}
