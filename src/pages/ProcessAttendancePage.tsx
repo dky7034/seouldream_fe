@@ -25,6 +25,7 @@ import SimpleSearchableSelect from "../components/SimpleSearchableSelect";
 interface MemberAttendanceForm extends ProcessAttendanceRequest {
   id?: number;
   prayerContent?: string;
+  // memo 필드는 더 이상 사용하지 않음
 }
 
 // --- UI Sub Components ---
@@ -61,6 +62,7 @@ const StatusButton: React.FC<{
   );
 };
 
+// [수정] 메모 입력 필드 제거됨
 const AttendanceCard: React.FC<{
   member: MemberDto;
   attendance: MemberAttendanceForm;
@@ -100,14 +102,7 @@ const AttendanceCard: React.FC<{
         ))}
       </div>
 
-      <input
-        type="text"
-        placeholder="메모를 입력하세요..."
-        value={attendance.memo || ""}
-        onChange={(e) => onAttendanceChange(member.id, "memo", e.target.value)}
-        className="mt-3 block w-full text-xs sm:text-sm p-2 rounded-md border border-gray-300 bg-white shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-        disabled={loading}
-      />
+      {/* 메모 input 필드 제거됨 */}
 
       <textarea
         placeholder="기도제목을 입력하세요..."
@@ -303,9 +298,9 @@ const ProcessAttendancePage: React.FC = () => {
               memberId: member.id,
               date: dateString,
               status: existing?.status || "ABSENT",
-              memo: existing?.memo || "",
+              // [수정] memo 필드 초기화 제거
               createdById: user.id,
-              prayerContent: "", // 기도제목은 별도 API라 여기서 바로 매핑 안됨(백엔드 로직에 맡김 or 필요시 추가 조회)
+              prayerContent: "", // 기도제목은 별도 API라 여기서 바로 매핑 안됨
             };
           }
         );
@@ -396,7 +391,7 @@ const ProcessAttendancePage: React.FC = () => {
       const items: AttendanceAndPrayerItem[] = memberAttendances.map((att) => ({
         memberId: att.memberId,
         status: att.status,
-        memo: att.memo?.trim() || undefined,
+        // [수정] memo 데이터 전송 제거
         prayerContent: att.prayerContent?.trim() || undefined,
       }));
 
