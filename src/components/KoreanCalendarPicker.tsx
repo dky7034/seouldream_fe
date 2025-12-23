@@ -25,9 +25,11 @@ const parseLocalDate = (yyyyMMdd: string): Date | null => {
 
 const formatLocalDate = (date: Date): string => format(date, "yyyy-MM-dd");
 
+// ✅ [수정] react-datepicker의 12개 그리드 로직에 맞춰 범위 텍스트 계산
 const getDecadeRangeText = (year: number) => {
-  const start = Math.floor(year / 10) * 10;
-  return `${start}-${start + 9}`;
+  const start = Math.floor((year - 1) / 12) * 12 + 1;
+  const end = start + 11;
+  return `${start}-${end}`;
 };
 
 // 1. 공휴일 체크 로직 (양력)
@@ -93,20 +95,20 @@ const KoreanCalendarPicker: React.FC<Props> = ({
           color: #ffffff !important;
         }
 
-        /* ✅ [추가] 모바일(640px 이하) 반응형 크기 조절 */
+        /* 모바일(640px 이하) 반응형 크기 조절 */
         @media (max-width: 640px) {
           .react-datepicker {
-            font-size: 0.8rem; /* 전체 폰트 축소 */
+            font-size: 0.8rem;
           }
           .react-datepicker__header {
-            padding-top: 0.5rem; /* 헤더 여백 축소 */
+            padding-top: 0.5rem;
           }
           .react-datepicker__day-name, 
           .react-datepicker__day, 
           .react-datepicker__time-name {
-            width: 1.9rem;      /* 날짜 셀 너비 축소 (기본값 약 1.7rem~2.5rem) */
-            line-height: 1.9rem;/* 높이 축소 */
-            margin: 0.1rem;     /* 셀 간격 축소 */
+            width: 1.9rem;
+            line-height: 1.9rem;
+            margin: 0.1rem;
           }
           .react-datepicker__current-month {
             font-size: 1rem;
@@ -137,7 +139,7 @@ const KoreanCalendarPicker: React.FC<Props> = ({
         dayClassName={getDayClassName}
         showYearPicker={mode === "year"}
         showMonthYearPicker={mode === "month"}
-        yearItemNumber={12}
+        yearItemNumber={12} // 12개 그리드 사용
         onChange={(date) => {
           if (!date) return;
 
@@ -172,30 +174,30 @@ const KoreanCalendarPicker: React.FC<Props> = ({
               ? `${year}년 ${month}월`
               : mode === "month"
               ? `${year}년`
-              : getDecadeRangeText(year);
+              : getDecadeRangeText(year); // ✅ 수정된 텍스트 로직 적용
 
           const goPrev = () => {
             if (mode === "day") decreaseMonth();
             if (mode === "month") decreaseYear();
-            if (mode === "year") changeYear(year - 10);
+            if (mode === "year") changeYear(year - 12); // ✅ [수정] 12년 단위 이동
           };
 
           const goNext = () => {
             if (mode === "day") increaseMonth();
             if (mode === "month") increaseYear();
-            if (mode === "year") changeYear(year + 10);
+            if (mode === "year") changeYear(year + 12); // ✅ [수정] 12년 단위 이동
           };
 
           const goPrevFast = () => {
             if (mode === "day") decreaseYear();
             if (mode === "month") changeYear(year - 10);
-            if (mode === "year") changeYear(year - 100);
+            if (mode === "year") changeYear(year - 120); // (선택) 12*10년 단위 이동
           };
 
           const goNextFast = () => {
             if (mode === "day") increaseYear();
             if (mode === "month") changeYear(year + 10);
-            if (mode === "year") changeYear(year + 100);
+            if (mode === "year") changeYear(year + 120); // (선택) 12*10년 단위 이동
           };
 
           const toggleMode = () => {
@@ -204,7 +206,6 @@ const KoreanCalendarPicker: React.FC<Props> = ({
             else setMode("year");
           };
 
-          // ✅ [변경] 버튼 스타일: 모바일에서는 작게(w-8 h-8), 데스크탑은 크게(sm:w-10 sm:h-10)
           const btnClass =
             "w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 active:bg-gray-100";
           const titleClass =

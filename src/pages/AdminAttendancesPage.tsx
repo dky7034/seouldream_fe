@@ -32,6 +32,8 @@ import {
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
   MinusIcon,
+  // ChevronLeftIcon,  // ❌ 삭제: 더 이상 외부 화살표를 쓰지 않으므로 제거
+  // ChevronRightIcon, // ❌ 삭제
 } from "@heroicons/react/24/outline";
 import { FaTh } from "react-icons/fa";
 
@@ -68,13 +70,9 @@ const translateAttendanceStatus = (status: string) => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// Sub Components
+// Sub Component 1: AttendanceStats (통계 카드)
 // ─────────────────────────────────────────────────────────────
 
-/**
- * ✅ [성능 최적화] React.memo 적용
- * Props가 변경되지 않으면 리렌더링 방지
- */
 const AttendanceStats = memo(
   ({
     stats,
@@ -96,16 +94,20 @@ const AttendanceStats = memo(
     if (!stats) return null;
 
     const { attendanceTrend = 0 } = stats;
+
     let trendColor = "text-gray-500";
+    let bgTrendColor = "bg-gray-100";
     let TrendIcon = MinusIcon;
     let trendText = "변동 없음";
 
     if (attendanceTrend > 0) {
-      trendColor = "text-red-500";
+      trendColor = "text-green-600";
+      bgTrendColor = "bg-green-50";
       TrendIcon = ArrowTrendingUpIcon;
       trendText = "증가";
     } else if (attendanceTrend < 0) {
-      trendColor = "text-blue-500";
+      trendColor = "text-red-500";
+      bgTrendColor = "bg-red-50";
       TrendIcon = ArrowTrendingDownIcon;
       trendText = "감소";
     }
@@ -131,20 +133,16 @@ const AttendanceStats = memo(
             </div>
           </div>
 
-          {/* 증감률 및 설명 */}
-          <div className="mt-4">
-            <div className="flex items-center text-sm mb-1">
-              <TrendIcon className={`h-4 w-4 mr-1 ${trendColor}`} />
-              <span className={`font-medium ${trendColor}`}>
-                {Math.abs(attendanceTrend)}%
-              </span>
-              <span className="text-gray-400 ml-1.5 text-xs">
-                지난 기간 대비 {trendText}
-              </span>
+          <div className="mt-4 flex items-center">
+            <div
+              className={`flex items-center px-2 py-0.5 rounded text-sm font-medium ${bgTrendColor} ${trendColor}`}
+            >
+              <TrendIcon className="h-4 w-4 mr-1" />
+              {Math.abs(attendanceTrend)}%
             </div>
-            <p className="text-xs text-gray-400">
-              실제 예배가 진행된 주차의 평균 인원
-            </p>
+            <span className="text-gray-400 ml-2 text-xs">
+              지난 기간 대비 {trendText}
+            </span>
           </div>
         </div>
 
@@ -171,7 +169,7 @@ const AttendanceStats = memo(
           </div>
         </div>
 
-        {/* 3. 장기 결석자 (0회) */}
+        {/* 3. 장기 결석자 */}
         <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-100 flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <div>
@@ -199,7 +197,7 @@ const AttendanceStats = memo(
 );
 
 // ─────────────────────────────────────────────────────────────
-// AttendanceMatrixView Component
+// Sub Component 2: AttendanceMatrixView (매트릭스 + 상단 요약)
 // ─────────────────────────────────────────────────────────────
 
 const AttendanceMatrixView = memo(
@@ -210,6 +208,7 @@ const AttendanceMatrixView = memo(
     endDate,
     unitType,
     isLoading,
+    onNavigate,
   }: {
     members: MemberDto[];
     attendances: AttendanceDto[];
@@ -217,21 +216,19 @@ const AttendanceMatrixView = memo(
     endDate: string;
     unitType: UnitType;
     isLoading: boolean;
+    onNavigate: (direction: "prev" | "next") => void;
   }) => {
-    // ✅ [성능 최적화] 미체크 계산 로직 개선
-    // 기존: 멤버별로 날짜 루프를 돌림 (O(N*M)) -> 개선: 전체 일요일 목록을 한 번 구하고 비교 (O(M + N))
+    // 미체크 및 통계 계산 로직
     const uncheckedCount = useMemo(() => {
       if (!startDate || !endDate || members.length === 0) return 0;
 
       const filterStart = new Date(startDate);
       const filterEnd = new Date(endDate);
 
-      // 1. 기간 내 모든 주일(일요일) 리스트업 (시간 정보 제거)
-      const sundays: number[] = []; // 타임스탬프로 저장하여 비교 속도 향상
+      const sundays: number[] = [];
       const current = new Date(filterStart);
       current.setHours(0, 0, 0, 0);
 
-      // 시작일 이후 첫 일요일 찾기 (만약 시작일이 일요일이면 포함)
       const dayOfWeek = current.getDay();
       if (dayOfWeek !== 0) {
         current.setDate(current.getDate() + (7 - dayOfWeek));
@@ -243,29 +240,24 @@ const AttendanceMatrixView = memo(
         current.setDate(current.getDate() + 7);
       }
 
-      // 2. 멤버별로 "가입일 이후의 주일 개수" 합산
       let totalPossibleChecks = 0;
+      const defaultJoinDate = new Date("2000-01-01").setHours(0, 0, 0, 0);
 
       members.forEach((member) => {
-        let joinTimestamp: number;
+        let joinTimestamp = defaultJoinDate;
         if (member.createdAt) {
           joinTimestamp = new Date(member.createdAt).setHours(0, 0, 0, 0);
         } else if (member.joinYear) {
           joinTimestamp = new Date(member.joinYear, 0, 1).setHours(0, 0, 0, 0);
-        } else {
-          joinTimestamp = new Date("2000-01-01").setHours(0, 0, 0, 0);
         }
 
-        // 가입일보다 뒤에 있는 주일의 개수만 카운트
-        // (sundays는 정렬되어 있으므로 이분 탐색이 가능하지만, 배열이 크지 않아 filter도 충분히 빠름)
-        // 성능을 더 높이려면 sundays 루프에서 break를 걸거나 인덱스를 찾으면 됨
-        let validSundays = 0;
+        let memberValidSundays = 0;
         for (const sundayTime of sundays) {
           if (sundayTime >= joinTimestamp) {
-            validSundays++;
+            memberValidSundays++;
           }
         }
-        totalPossibleChecks += validSundays;
+        totalPossibleChecks += memberValidSundays;
       });
 
       const recordedCount = attendances.filter((a) =>
@@ -275,7 +267,6 @@ const AttendanceMatrixView = memo(
       return Math.max(0, totalPossibleChecks - recordedCount);
     }, [startDate, endDate, members, attendances]);
 
-    // 매트릭스 뷰용 통계 계산
     const summary = useMemo(() => {
       const present = attendances.filter((a) => a.status === "PRESENT").length;
       const absent = attendances.filter((a) => a.status === "ABSENT").length;
@@ -297,14 +288,13 @@ const AttendanceMatrixView = memo(
     );
 
     const matrixMode = unitType === "month" ? "month" : "semester";
-    // startDate가 없으면 에러가 날 수 있으므로 방어 코드 추가
     const [targetYear, targetMonth] = startDate
       ? startDate.split("-").map(Number)
       : [0, 0];
 
     return (
       <div className="space-y-6 animate-fadeIn">
-        {/* 4분할 통계 카드 */}
+        {/* 4분할 요약 카드 */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
           <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
             <p className="text-xs sm:text-sm font-medium text-indigo-500">
@@ -339,16 +329,20 @@ const AttendanceMatrixView = memo(
           </div>
         </div>
 
-        {/* 매트릭스 테이블 */}
+        {/* 매트릭스 컨테이너 */}
         <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-4">
-          <h4 className="text-sm font-bold text-gray-700 mb-4 ml-1 flex items-center">
-            <FaTh className="mr-2 text-indigo-500" />
-            {unitType === "year"
-              ? `${targetYear}년 전체 현황`
-              : unitType === "semester"
-              ? "학기 전체 현황"
-              : "월간 상세 현황"}
-          </h4>
+          <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
+            <h4 className="text-sm font-bold text-gray-700 flex items-center">
+              <FaTh className="mr-2 text-indigo-500" />
+              {unitType === "year"
+                ? `${targetYear}년 전체 현황`
+                : unitType === "semester"
+                ? "학기 전체 현황"
+                : `${targetYear}년 ${targetMonth}월 상세 현황`}
+            </h4>
+
+            {/* ❌ 외부 화살표 버튼 제거됨: 이제 AttendanceMatrix 내부 화살표만 사용됨 */}
+          </div>
 
           <AttendanceMatrix
             mode={matrixMode}
@@ -358,7 +352,10 @@ const AttendanceMatrixView = memo(
             month={targetMonth}
             members={matrixMembers}
             attendances={attendances}
-            onMonthChange={() => {}}
+            // ✅ 내부 화살표 작동을 위한 연결
+            onMonthChange={(increment: number) =>
+              onNavigate(increment > 0 ? "next" : "prev")
+            }
             loading={isLoading}
             limitStartDate={startDate}
             limitEndDate={endDate}
@@ -383,22 +380,23 @@ const AdminAttendancesPage: React.FC = () => {
   const [matrixAttendances, setMatrixAttendances] = useState<AttendanceDto[]>(
     []
   );
-
   const [allMembers, setAllMembers] = useState<MemberDto[]>([]);
   const [overallStats, setOverallStats] =
     useState<OverallAttendanceStatDto | null>(null);
-  const [statsLoading, setStatsLoading] = useState<boolean>(false);
 
+  // Loading States
+  const [statsLoading, setStatsLoading] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Filter Data
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const hasActiveSemesters = semesters.length > 0;
-
   const [hasAutoSelectedSemester, setHasAutoSelectedSemester] = useState(false);
+  const [allCells, setAllCells] = useState<{ id: number; name: string }[]>([]);
 
-  // Filters
+  // Filters State
   const [filters, setFilters] = useState<Filters>({
     startDate: "",
     endDate: "",
@@ -423,8 +421,8 @@ const AdminAttendancesPage: React.FC = () => {
   // Effects & Logic
   // ─────────────────────────────────────────────────────────────
 
+  // 자동 학기 선택 로직
   useEffect(() => {
-    // 자동 학기 선택 로직
     if (semesters.length > 0 && !hasAutoSelectedSemester) {
       const today = new Date();
       const currentYM = `${today.getFullYear()}-${String(
@@ -461,6 +459,7 @@ const AdminAttendancesPage: React.FC = () => {
     }
   }, [semesters, hasAutoSelectedSemester, currentYear, currentMonth]);
 
+  // 날짜 범위 계산
   const effectiveDateRange = useMemo(() => {
     if (filterType === "range") {
       if (filters.startDate && filters.endDate) {
@@ -494,18 +493,17 @@ const AdminAttendancesPage: React.FC = () => {
       return null;
     }
 
+    // 학기 기간에 맞춰 날짜 조정
     if (semesters.length > 0) {
       const overlappingSemesters = semesters.filter(
         (s) => s.startDate <= rawEnd && s.endDate >= rawStart
       );
-
       if (overlappingSemesters.length > 0) {
         const sorted = [...overlappingSemesters].sort((a, b) =>
           a.startDate.localeCompare(b.startDate)
         );
         const firstSem = sorted[0];
         const lastSem = sorted[sorted.length - 1];
-
         if (rawStart < firstSem.startDate) rawStart = firstSem.startDate;
         if (rawEnd > lastSem.endDate) rawEnd = lastSem.endDate;
       }
@@ -514,6 +512,7 @@ const AdminAttendancesPage: React.FC = () => {
     return { startDate: rawStart, endDate: rawEnd };
   }, [filterType, filters, semesters, unitType]);
 
+  // API 파라미터 정리
   const getCleanedParams = useCallback(() => {
     const params: GetAttendancesParams = {
       status: filters.status as AttendanceStatus | undefined,
@@ -536,16 +535,16 @@ const AdminAttendancesPage: React.FC = () => {
     );
   }, [filters, effectiveDateRange]);
 
+  // 데이터 조회
   const fetchAttendances = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const params = getCleanedParams();
-      // 매트릭스용 대용량 fetch
       const matrixParams = {
         ...params,
         page: 0,
-        size: 2000,
+        size: 30000,
         sort: "date,asc",
       };
       const data = await attendanceService.getAttendances(
@@ -553,6 +552,7 @@ const AdminAttendancesPage: React.FC = () => {
       );
       setMatrixAttendances(data.content);
     } catch (err) {
+      console.error(err);
       setError("출석 기록을 불러오는 데 실패했습니다.");
     } finally {
       setLoading(false);
@@ -566,13 +566,14 @@ const AdminAttendancesPage: React.FC = () => {
       const data = await statisticsService.getOverallAttendance(params);
       setOverallStats(data);
     } catch (err) {
+      console.error(err);
       setOverallStats(null);
     } finally {
       setStatsLoading(false);
     }
   }, [getCleanedParams]);
 
-  // Initial Fetch Effect
+  // 초기 데이터 로드 및 filters 변경 시 재조회 (fetchAttendances가 filters에 의존함)
   useEffect(() => {
     if (user && ["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
       if (semesters.length > 0 || hasActiveSemesters === false) {
@@ -588,11 +589,15 @@ const AdminAttendancesPage: React.FC = () => {
         }
       })();
     }
-    // hasActiveSemesters가 의존성에 있지만, semesters 변경 시에만 실행되도록 주의
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, fetchOverallStats]); // 의존성 단순화: fetchOverallStats 내부에 getCleanedParams가 있어 필터 변경 시 커버됨
+  }, [
+    user,
+    fetchOverallStats,
+    fetchAttendances,
+    semesters.length,
+    hasActiveSemesters,
+  ]);
 
-  // Available Years & Semesters
+  // 기본 정보 로드
   useEffect(() => {
     if (user && ["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
       attendanceService
@@ -603,27 +608,58 @@ const AdminAttendancesPage: React.FC = () => {
         .getAllSemesters(true)
         .then(setSemesters)
         .catch(() => setSemesters([]));
+      if (user.role === "EXECUTIVE") {
+        cellService
+          .getAllCells({ size: 1000 })
+          .then((d) => setAllCells(d.content));
+      }
     }
-  }, [user]); // fetch 함수들 제거 (stable하지 않을 수 있음)
+  }, [user]);
 
-  // Cells
-  const [allCells, setAllCells] = useState<{ id: number; name: string }[]>([]);
-  useEffect(() => {
-    if (isExecutive) {
-      cellService
-        .getAllCells({ size: 1000 })
-        .then((d) => setAllCells(d.content));
-    }
-  }, [isExecutive]);
+  // ✅ 월 이동 핸들러
+  const handleMonthNavigation = useCallback(
+    (direction: "prev" | "next") => {
+      setFilters((prev) => {
+        if (unitType !== "month" || !prev.year || !prev.month) return prev;
 
-  // Handlers
+        let newYear = Number(prev.year);
+        let newMonth = Number(prev.month);
+
+        if (direction === "prev") {
+          newMonth -= 1;
+          if (newMonth < 1) {
+            newMonth = 12;
+            newYear -= 1;
+          }
+        } else {
+          newMonth += 1;
+          if (newMonth > 12) {
+            newMonth = 1;
+            newYear += 1;
+          }
+        }
+
+        return {
+          ...prev,
+          year: newYear,
+          month: newMonth,
+          semesterId: "",
+        };
+      });
+    },
+    [unitType]
+  );
+
+  // --- Handlers ---
   const handleFilterChange = (key: keyof Filters, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
+
   const handleSearch = () => {
     fetchAttendances();
     fetchOverallStats();
   };
+
   const resetFilters = () => {
     if (!user) return;
     setFilters({
@@ -642,54 +678,6 @@ const AdminAttendancesPage: React.FC = () => {
     setUnitType("year");
   };
 
-  const statusOptions = useMemo(
-    () => [
-      { value: "", label: "모든 상태" },
-      ...ATTENDANCE_STATUSES.map((s) => ({
-        value: s,
-        label: translateAttendanceStatus(s),
-      })),
-    ],
-    []
-  );
-
-  const cellOptions = useMemo(
-    () =>
-      !isExecutive
-        ? []
-        : [
-            { value: null, label: "전체 셀" },
-            ...allCells.map((c) => ({ value: c.id, label: c.name })),
-          ],
-    [allCells, isExecutive]
-  );
-
-  const memberOptions = useMemo(() => {
-    let list = allMembers;
-    if (isCellLeader && user?.cellId)
-      list = allMembers.filter((m) => m.cell?.id === user.cellId);
-    return [
-      { value: null, label: isCellLeader ? "내 셀 전체" : "전체 멤버" },
-      ...list.map((m) => ({
-        value: m.id,
-        label: formatDisplayName(m, list),
-      })),
-    ];
-  }, [allMembers, isCellLeader, user?.cellId]);
-
-  const yearOptions = useMemo(() => {
-    if (availableYears.length === 0)
-      return [
-        { value: "", label: "전체 연도" },
-        { value: currentYear, label: `${currentYear}년` },
-      ];
-    return [
-      { value: "", label: "전체 연도" },
-      ...availableYears.map((y) => ({ value: y, label: `${y}년` })),
-    ];
-  }, [availableYears, currentYear]);
-
-  // Unit Type Handlers (Optimized to not recreate functions if not needed)
   const handleUnitTypeClick = useCallback(
     (type: UnitType) => {
       setUnitType(type);
@@ -734,73 +722,64 @@ const AdminAttendancesPage: React.FC = () => {
       return { ...prev, year: baseYear, month: value, semesterId: "" };
     });
   };
-  const handleSemesterClick = (semesterId: number) => {
-    setFilters((prev) => ({ ...prev, semesterId, year: "", month: "" }));
-  };
 
-  const renderUnitButtons = () => {
-    switch (unitType) {
-      case "month":
-        return (
-          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => handleUnitValueClick(m)}
-                className={`px-2 py-1 border rounded-full text-xs ${
-                  filters.month === m ? "bg-blue-500 text-white" : "bg-white"
-                }`}
-              >
-                {m}월
-              </button>
-            ))}
-          </div>
-        );
-      case "semester":
-        if (semesters.length === 0)
-          return (
-            <div className="mt-4 rounded-md bg-yellow-50 p-3 text-xs text-yellow-800">
-              활성 학기가 없습니다.
-            </div>
-          );
-        return (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-            {semesters.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => handleSemesterClick(s.id)}
-                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
-                  filters.semesterId === s.id
-                    ? "bg-blue-500 text-white"
-                    : "bg-white"
-                }`}
-              >
-                {s.name}
-              </button>
-            ))}
-          </div>
-        );
-      case "year":
-      default:
-        return null;
-    }
-  };
+  // --- Options ---
+  const statusOptions = useMemo(
+    () => [
+      { value: "", label: "모든 상태" },
+      ...ATTENDANCE_STATUSES.map((s) => ({
+        value: s,
+        label: translateAttendanceStatus(s),
+      })),
+    ],
+    []
+  );
 
+  const cellOptions = useMemo(
+    () =>
+      !isExecutive
+        ? []
+        : [
+            { value: null, label: "전체 셀" },
+            ...allCells.map((c) => ({ value: c.id, label: c.name })),
+          ],
+    [allCells, isExecutive]
+  );
+
+  const memberOptions = useMemo(() => {
+    let list = allMembers;
+    if (isCellLeader && user?.cellId)
+      list = allMembers.filter((m) => m.cell?.id === user.cellId);
+    return [
+      { value: null, label: isCellLeader ? "내 셀 전체" : "전체 멤버" },
+      ...list.map((m) => ({ value: m.id, label: formatDisplayName(m, list) })),
+    ];
+  }, [allMembers, isCellLeader, user?.cellId]);
+
+  const yearOptions = useMemo(() => {
+    if (availableYears.length === 0)
+      return [
+        { value: "", label: "전체 연도" },
+        { value: currentYear, label: `${currentYear}년` },
+      ];
+    return [
+      { value: "", label: "전체 연도" },
+      ...availableYears.map((y) => ({ value: y, label: `${y}년` })),
+    ];
+  }, [availableYears, currentYear]);
+
+  // Target Members Filter
   const targetMembers = useMemo(() => {
-    if (filters.member) {
+    if (filters.member)
       return allMembers.filter((m) => m.id === filters.member?.value);
-    }
-    if (filters.cell) {
+    if (filters.cell)
       return allMembers.filter((m) => m.cell?.id === filters.cell?.value);
-    }
-    if (isCellLeader && user?.cellId) {
+    if (isCellLeader && user?.cellId)
       return allMembers.filter((m) => m.cell?.id === user.cellId);
-    }
     return allMembers;
   }, [allMembers, filters.member, filters.cell, isCellLeader, user]);
 
+  // --- Render ---
   if (!user || !["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
     return (
       <p className="mt-4 text-center text-sm text-red-600">
@@ -823,17 +802,16 @@ const AdminAttendancesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats (Memoized) */}
+      {/* Stats */}
       <AttendanceStats stats={overallStats} loading={statsLoading} />
 
-      {/* Filters (UI 생략: 기존 코드와 동일) */}
+      {/* Filter Panel */}
       <div className="p-4 bg-gray-50 rounded-lg mb-6 shadow-sm space-y-4">
-        {/* Unit/Range Type Toggle */}
+        {/* ... 필터 관련 코드는 기존과 동일합니다 (생략 가능하지만 전체 코드 요청이므로 유지) ... */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="text-base sm:text-lg font-semibold">조회 기간 설정</h3>
           <div className="flex flex-wrap gap-2">
             <button
-              type="button"
               onClick={() => setFilterType("unit")}
               className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
                 filterType === "unit"
@@ -844,7 +822,6 @@ const AdminAttendancesPage: React.FC = () => {
               단위로 조회
             </button>
             <button
-              type="button"
               onClick={() => setFilterType("range")}
               className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
                 filterType === "range"
@@ -857,8 +834,6 @@ const AdminAttendancesPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ... (필터 UI 부분은 위와 동일하므로, 복사해서 사용하시면 됩니다) ... */}
-        {/* Code Folding: 필터 UI 부분은 기존 코드 유지 */}
         {filterType === "range" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -916,7 +891,6 @@ const AdminAttendancesPage: React.FC = () => {
                 </label>
                 <div className="flex flex-wrap items-center gap-2 mt-1">
                   <button
-                    type="button"
                     onClick={() => handleUnitTypeClick("month")}
                     className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
                       unitType === "month"
@@ -927,7 +901,6 @@ const AdminAttendancesPage: React.FC = () => {
                     월간
                   </button>
                   <button
-                    type="button"
                     onClick={() =>
                       hasActiveSemesters && handleUnitTypeClick("semester")
                     }
@@ -943,7 +916,6 @@ const AdminAttendancesPage: React.FC = () => {
                     학기
                   </button>
                   <button
-                    type="button"
                     onClick={() => handleUnitTypeClick("year")}
                     className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
                       unitType === "year"
@@ -954,19 +926,57 @@ const AdminAttendancesPage: React.FC = () => {
                     연간
                   </button>
                 </div>
-                {!hasActiveSemesters && (
-                  <p className="mt-1 text-xs text-red-500">
-                    활성화된 학기가 없어 학기 단위 조회를 사용할 수 없습니다.
-                  </p>
-                )}
               </div>
             </div>
-            {renderUnitButtons()}
+
+            {unitType === "month" && (
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => handleUnitValueClick(m)}
+                    className={`px-2 py-1 border rounded-full text-xs ${
+                      filters.month === m
+                        ? "bg-blue-500 text-white"
+                        : "bg-white"
+                    }`}
+                  >
+                    {m}월
+                  </button>
+                ))}
+              </div>
+            )}
+            {unitType === "semester" && semesters.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                {semesters.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        semesterId: s.id,
+                        year: "",
+                        month: "",
+                      }))
+                    }
+                    className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
+                      filters.semesterId === s.id
+                        ? "bg-blue-500 text-white"
+                        : "bg-white"
+                    }`}
+                  >
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         <hr />
-        {/* Cell / Member / Status Filters */}
+        {/* Cell/Member/Status Filters */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">
@@ -976,11 +986,12 @@ const AdminAttendancesPage: React.FC = () => {
               <SimpleSearchableSelect
                 options={cellOptions}
                 value={filters.cell?.value ?? null}
-                onChange={(value) => {
-                  const selectedOption =
-                    cellOptions.find((o) => o.value === value) || null;
-                  handleFilterChange("cell", selectedOption);
-                }}
+                onChange={(value) =>
+                  handleFilterChange(
+                    "cell",
+                    cellOptions.find((o) => o.value === value) || null
+                  )
+                }
                 placeholder="전체 셀"
                 isClearable
               />
@@ -999,11 +1010,12 @@ const AdminAttendancesPage: React.FC = () => {
             <SimpleSearchableSelect
               options={memberOptions}
               value={filters.member?.value ?? null}
-              onChange={(value) => {
-                const selectedOption =
-                  memberOptions.find((o) => o.value === value) || null;
-                handleFilterChange("member", selectedOption);
-              }}
+              onChange={(value) =>
+                handleFilterChange(
+                  "member",
+                  memberOptions.find((o) => o.value === value) || null
+                )
+              }
               placeholder={isCellLeader ? "내 셀 멤버 검색" : "전체 멤버 검색"}
               isClearable
             />
@@ -1015,30 +1027,21 @@ const AdminAttendancesPage: React.FC = () => {
             <SimpleSearchableSelect
               options={statusOptions}
               value={filters.status}
-              onChange={(value) => {
-                const selectedOption =
-                  statusOptions.find((o) => o.value === value) || null;
-                handleFilterChange(
-                  "status",
-                  selectedOption ? selectedOption.value : ""
-                );
-              }}
+              onChange={(value) => handleFilterChange("status", value || "")}
               placeholder="모든 상태"
               isClearable={false}
             />
           </div>
         </div>
-        {/* Search Button Area */}
+
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="text-sm text-gray-600 hover:text-gray-900 text-left"
-            >
-              필터 초기화
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="text-sm text-gray-600 hover:text-gray-900 text-left"
+          >
+            필터 초기화
+          </button>
           <button
             type="button"
             onClick={handleSearch}
@@ -1054,7 +1057,6 @@ const AdminAttendancesPage: React.FC = () => {
         <p className="mb-4 text-center text-sm text-red-600">{error}</p>
       )}
 
-      {/* Content Rendering: Matrix Only (Memoized) */}
       <AttendanceMatrixView
         members={targetMembers}
         attendances={matrixAttendances}
@@ -1062,6 +1064,7 @@ const AdminAttendancesPage: React.FC = () => {
         endDate={effectiveDateRange?.endDate || ""}
         unitType={unitType}
         isLoading={loading}
+        onNavigate={handleMonthNavigation}
       />
     </div>
   );

@@ -1,6 +1,5 @@
-// src/components/AttendanceMatrix.tsx
 import React, { useMemo } from "react";
-import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
+// 화살표 아이콘 import 제거
 import type { AttendanceDto } from "../types";
 
 interface AttendanceMatrixProps {
@@ -12,7 +11,9 @@ interface AttendanceMatrixProps {
   month: number; // 1 ~ 12
   members: { memberId: number; memberName: string }[];
   attendances: AttendanceDto[];
-  onMonthChange: (increment: number) => void;
+
+  // onMonthChange 제거 (이제 부모에서만 처리하므로 여기선 필요 없음)
+
   loading?: boolean;
   limitStartDate?: string; // YYYY-MM-DD
   limitEndDate?: string; // YYYY-MM-DD
@@ -28,7 +29,6 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
   month,
   members,
   attendances,
-  onMonthChange,
   loading = false,
   limitStartDate,
   limitEndDate,
@@ -43,7 +43,6 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
     return `${y}-${m}-${d}`;
   };
 
-  // "YYYY-MM-DD" 또는 "YYYY-MM-DDTHH:mm:ss" 등도 안전하게 YYYY-MM-DD로 통일
   const normalizeISODate = (v: string | undefined | null) => {
     if (!v) return "";
     return v.slice(0, 10);
@@ -92,37 +91,11 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
   }, [mode, startDate, endDate, year, month, limitStartDate, limitEndDate]);
 
   // ----------------------------------------------------------------------
-  // 버튼 비활성화: Month 모드에서만 사용
+  // 버튼 비활성화 로직 제거 (버튼이 없으므로 불필요)
   // ----------------------------------------------------------------------
-  const { isPrevDisabled, isNextDisabled } = useMemo(() => {
-    if (mode === "semester") {
-      return { isPrevDisabled: true, isNextDisabled: true };
-    }
-
-    const currentMonthValue = year * 12 + month;
-    let prevDisabled = false;
-    let nextDisabled = false;
-
-    if (limitStartDate) {
-      const [limitY, limitM] = limitStartDate.split("-").map(Number);
-      const startMonthValue = limitY * 12 + limitM;
-      if (currentMonthValue <= startMonthValue) prevDisabled = true;
-    }
-
-    if (limitEndDate) {
-      const [limitY, limitM] = limitEndDate.split("-").map(Number);
-      const endMonthValue = limitY * 12 + limitM;
-      if (currentMonthValue >= endMonthValue) nextDisabled = true;
-    }
-
-    return { isPrevDisabled: prevDisabled, isNextDisabled: nextDisabled };
-  }, [mode, year, month, limitStartDate, limitEndDate]);
 
   // ----------------------------------------------------------------------
-  // ✅ 핵심: attendanceMap 생성 (타입에 맞게 단순/정확하게)
-  // - member는 항상 객체이므로 att.member.id 사용
-  // - date는 YYYY-MM-DD로 정규화
-  // - PRESENT/ABSENT만 유효
+  // attendanceMap 생성
   // ----------------------------------------------------------------------
   const attendanceMap = useMemo(() => {
     const map = new Map<string, MatrixStatus>();
@@ -157,38 +130,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
           </h3>
         )}
 
-        {/* 월간 모드일 때만 이동 버튼 표시 */}
-        {mode === "month" && (
-          <div className="flex gap-2">
-            <button
-              onClick={() => onMonthChange(-1)}
-              disabled={loading || isPrevDisabled}
-              className={`p-2 rounded-lg border border-gray-200 transition-colors ${
-                loading || isPrevDisabled
-                  ? "text-gray-300 bg-gray-50 cursor-not-allowed"
-                  : "text-gray-500 hover:bg-gray-100"
-              }`}
-              aria-label="이전 달"
-              type="button"
-            >
-              <FaChevronLeft />
-            </button>
-
-            <button
-              onClick={() => onMonthChange(1)}
-              disabled={loading || isNextDisabled}
-              className={`p-2 rounded-lg border border-gray-200 transition-colors ${
-                loading || isNextDisabled
-                  ? "text-gray-300 bg-gray-50 cursor-not-allowed"
-                  : "text-gray-500 hover:bg-gray-100"
-              }`}
-              aria-label="다음 달"
-              type="button"
-            >
-              <FaChevronRight />
-            </button>
-          </div>
-        )}
+        {/* 화살표 버튼 영역 제거됨 */}
       </div>
 
       {/* 로딩 상태 */}
