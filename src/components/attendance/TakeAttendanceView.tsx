@@ -647,7 +647,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                       이름
                     </th>
                     <th className="w-[20%] px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                      출석
+                      출석<span className="text-red-500 ml-0.5">*</span>
                     </th>
                     <th className="w-[65%] px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
                       기도제목 및 특이사항
@@ -694,7 +694,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                         </td>
                         <td className="w-[65%] px-6 py-4 align-top">
                           <textarea
-                            placeholder="상세 내용을 기록해 주세요."
+                            placeholder="상세 내용을 기록해 주세요. (필수)"
                             required
                             value={attendance.prayerContent || ""}
                             onChange={(e) =>
@@ -735,7 +735,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                     required
                     value={cellShare}
                     onChange={(e) => setCellShare(e.target.value)}
-                    placeholder="셀 나눔 내용과 은혜를 나눠주세요."
+                    placeholder="셀 나눔 내용과 은혜를 나눠주세요. (필수)"
                     rows={4}
                     className="w-full text-sm p-3 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 min-h-[100px]"
                   />
@@ -748,7 +748,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                     required
                     value={specialNotes}
                     onChange={(e) => setSpecialNotes(e.target.value)}
-                    placeholder="공유할 내용을 적어주세요."
+                    placeholder="공유할 내용을 적어주세요. (필수)"
                     rows={3}
                     className="w-full text-sm p-3 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 min-h-[80px]"
                   />
