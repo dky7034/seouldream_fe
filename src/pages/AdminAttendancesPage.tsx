@@ -214,7 +214,7 @@ const AttendanceMatrixView = memo(
     unitType: UnitType;
     isLoading: boolean;
   }) => {
-    // ✅ [수정] 정확한 미체크 카운트 로직 (Set 활용)
+    // ✅ [수정] 정확한 미체크 카운트 로직 (Set 활용 + 가입일 무시)
     const uncheckedCount = useMemo(() => {
       if (!startDate || !endDate || members.length === 0) return 0;
 
@@ -231,7 +231,7 @@ const AttendanceMatrixView = memo(
       start.setHours(0, 0, 0, 0);
       end.setHours(0, 0, 0, 0);
 
-      // 2. 기간 내 일요일 수집
+      // 2. 조회 기간 내 '일요일' 날짜 키 목록 생성
       const targetSundayKeys: string[] = [];
       const current = new Date(start);
 
@@ -245,7 +245,7 @@ const AttendanceMatrixView = memo(
         current.setDate(current.getDate() + 7);
       }
 
-      // 3. 실제 출석 기록을 Set으로 매핑 ("memberId-YYYY-MM-DD")
+      // 3. 실제 출석 기록 매핑
       const attendanceMap = new Set<string>();
       attendances.forEach((att) => {
         if (
@@ -253,35 +253,22 @@ const AttendanceMatrixView = memo(
           att.member?.id &&
           att.date
         ) {
-          const attDate = new Date(att.date); // 문자열 파싱
+          const attDate = new Date(att.date);
           const key = `${att.member.id}-${toDateKey(attDate)}`;
           attendanceMap.add(key);
         }
       });
 
-      // 4. 빈칸 카운트
+      // 4. 멤버별 미체크 카운트 (화면에 보이는 빈칸은 모두 카운트)
       let missingCount = 0;
 
       members.forEach((member) => {
-        // 가입일 기준
-        let joinDate = new Date("2000-01-01");
-        if (member.createdAt) {
-          joinDate = new Date(member.createdAt);
-        } else if (member.joinYear) {
-          const year = Number(member.joinYear);
-          if (!isNaN(year)) joinDate = new Date(year, 0, 1);
-        }
-        joinDate.setHours(0, 0, 0, 0);
-
         targetSundayKeys.forEach((sundayKey) => {
-          const sundayDate = new Date(sundayKey);
-          // 가입일 이후의 일요일만 체크 대상
-          if (sundayDate >= joinDate) {
-            const key = `${member.id}-${sundayKey}`;
-            // Map에 기록이 없으면 미체크로 간주
-            if (!attendanceMap.has(key)) {
-              missingCount++;
-            }
+          // ✅ 가입일(joinDate) 체크 로직 제거
+          // (화면에 회색 점이 보인다면 미체크로 간주하는 것이 직관적임)
+          const key = `${member.id}-${sundayKey}`;
+          if (!attendanceMap.has(key)) {
+            missingCount++;
           }
         });
       });
@@ -292,8 +279,11 @@ const AttendanceMatrixView = memo(
     const summary = useMemo(() => {
       const present = attendances.filter((a) => a.status === "PRESENT").length;
       const absent = attendances.filter((a) => a.status === "ABSENT").length;
-      const total = present + absent;
-      const rate = total > 0 ? (present / total) * 100 : 0;
+
+      // ✅ 전체 분모를 '기록된 수' 기준에서 '예상되는 전체 칸 수' 기준으로 볼 수도 있으나,
+      // 일단 기존 로직(기록 기준)을 유지하고 unchecked만 정확히 표시합니다.
+      const totalRecorded = present + absent;
+      const rate = totalRecorded > 0 ? (present / totalRecorded) * 100 : 0;
 
       return { present, absent, rate, unchecked: uncheckedCount };
     }, [attendances, uncheckedCount]);
@@ -316,10 +306,11 @@ const AttendanceMatrixView = memo(
 
     return (
       <div className="space-y-6 animate-fadeIn">
+        {/* 4분할 요약 카드 */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
           <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
             <p className="text-xs sm:text-sm font-medium text-indigo-500">
-              출석률
+              출석률 (기록 기준)
             </p>
             <p className="mt-1 text-2xl sm:text-3xl font-bold text-indigo-600">
               {summary.rate.toFixed(0)}
@@ -350,6 +341,7 @@ const AttendanceMatrixView = memo(
           </div>
         </div>
 
+        {/* 매트릭스 컨테이너 */}
         <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-4">
           <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
             <h4 className="text-sm font-bold text-gray-700 flex items-center">
@@ -620,8 +612,6 @@ const AdminAttendancesPage: React.FC = () => {
     }
   }, [user]);
 
-  // ❌ [삭제] 불필요한 handleMonthNavigation 함수 제거됨
-
   const handleFilterChange = (key: keyof Filters, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
@@ -767,6 +757,7 @@ const AdminAttendancesPage: React.FC = () => {
       <AttendanceStats stats={overallStats} loading={statsLoading} />
 
       <div className="p-4 bg-gray-50 rounded-lg mb-6 shadow-sm space-y-4">
+        {/* ... (필터 UI 부분은 기존과 동일) ... */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="text-base sm:text-lg font-semibold">조회 기간 설정</h3>
           <div className="flex flex-wrap gap-2">
@@ -1015,7 +1006,7 @@ const AdminAttendancesPage: React.FC = () => {
         <p className="mb-4 text-center text-sm text-red-600">{error}</p>
       )}
 
-      {/* ✅ [수정] onNavigate prop 제거됨 */}
+      {/* ✅ [수정] onNavigate prop 제거됨 (AttendanceMatrixView 내부에서 화살표 삭제했으므로 불필요) */}
       <AttendanceMatrixView
         members={targetMembers}
         attendances={matrixAttendances}
