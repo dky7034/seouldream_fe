@@ -523,6 +523,7 @@ const CellAttendanceMatrixCard: React.FC<{
     return months;
   }, [activeSemester]);
 
+  // ✅ [설명] 이 로직은 '빈칸(Empty Slots)'의 총 개수를 계산합니다.
   const uncheckedCount = useMemo(() => {
     if (!startDate || !endDate || sortedMembers.length === 0) return 0;
     const filterStart = new Date(startDate);
@@ -579,9 +580,8 @@ const CellAttendanceMatrixCard: React.FC<{
         <div className="bg-gray-50 p-3 sm:p-4 rounded-xl border border-gray-100 flex flex-col gap-4">
           <div className="flex flex-col gap-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              {/* 1. 좌측 영역: 학기 선택 Dropdown OR 연도 표시 Badge */}
+              {/* 좌측 영역: 학기 선택 Dropdown OR 연도 표시 Badge */}
               {unitType !== "year" ? (
-                // [기존] 학기/월간 모드일 때 -> 학기 선택 드롭다운
                 <div className="relative w-full sm:w-auto">
                   <div className="flex items-center bg-white px-3 py-2 rounded-md border border-gray-300 shadow-sm w-full sm:w-auto">
                     <FaCalendarAlt className="text-indigo-500 mr-2 text-sm flex-shrink-0" />
@@ -599,7 +599,6 @@ const CellAttendanceMatrixCard: React.FC<{
                   </div>
                 </div>
               ) : (
-                // ✅ [수정됨] 연간 모드일 때 -> '2025년' 텍스트 표시
                 <div className="flex items-center bg-white px-4 py-2 rounded-md border border-gray-300 shadow-sm w-full sm:w-auto justify-center sm:justify-start">
                   <FaCalendarAlt className="text-indigo-500 mr-2 text-sm" />
                   <span className="text-gray-900 font-bold text-sm">
@@ -679,39 +678,38 @@ const CellAttendanceMatrixCard: React.FC<{
           </div>
         </div>
 
-        {/* 4칸 통계 카드 */}
+        {/* ✅ [수정] 2칸 통계 카드 (출석률, 미체크) */}
         {periodSummary ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-center border-t border-b py-4">
-            <div className="p-3 bg-indigo-50 rounded-lg">
-              <p className="text-xs sm:text-sm font-medium text-indigo-500 break-keep">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 text-center border-t border-b py-4">
+            <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+              <p className="text-sm font-medium text-indigo-600 break-keep">
                 출석률
               </p>
-              <p className="mt-1 text-xl sm:text-3xl font-semibold text-indigo-600">
+              <p className="mt-2 text-3xl font-bold text-indigo-700">
                 {periodSummary.attendanceRate.toFixed(0)}
-                <span className="text-sm sm:text-lg">%</span>
+                <span className="text-lg ml-0.5">%</span>
               </p>
             </div>
-            <div className="p-3 bg-green-50 rounded-lg">
-              <p className="text-xs sm:text-sm font-medium text-green-600 break-keep">
-                출석
+
+            <div
+              className={`p-4 rounded-xl border ${
+                uncheckedCount > 0
+                  ? "bg-red-50 border-red-100"
+                  : "bg-gray-50 border-gray-200"
+              }`}
+            >
+              <p
+                className={`text-sm font-medium break-keep ${
+                  uncheckedCount > 0 ? "text-red-600" : "text-gray-500"
+                }`}
+              >
+                미체크 (건)
               </p>
-              <p className="mt-1 text-xl sm:text-3xl font-semibold text-green-700">
-                {periodSummary.totalPresent}
-              </p>
-            </div>
-            <div className="p-3 bg-red-50 rounded-lg">
-              <p className="text-xs sm:text-sm font-medium text-red-600 break-keep">
-                결석
-              </p>
-              <p className="mt-1 text-xl sm:text-3xl font-semibold text-red-700">
-                {periodSummary.totalAbsent}
-              </p>
-            </div>
-            <div className="p-3 bg-gray-100 rounded-lg">
-              <p className="text-xs sm:text-sm font-medium text-gray-500 break-keep">
-                미체크
-              </p>
-              <p className="mt-1 text-xl sm:text-3xl font-semibold text-gray-600">
+              <p
+                className={`mt-2 text-3xl font-bold ${
+                  uncheckedCount > 0 ? "text-red-700" : "text-gray-600"
+                }`}
+              >
                 {uncheckedCount}
               </p>
             </div>
@@ -742,7 +740,6 @@ const CellAttendanceMatrixCard: React.FC<{
             loading={false}
             limitStartDate={activeSemester?.startDate}
             limitEndDate={activeSemester?.endDate}
-            // ✅ [추가] semesters 목록을 넘겨주어 매트릭스 내부에서 필터링하게 함
             semesters={semesters}
           />
         </div>

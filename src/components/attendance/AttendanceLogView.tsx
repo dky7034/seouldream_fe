@@ -65,9 +65,6 @@ const getAttendanceMemberId = (att: any): number | null => {
 /** ------------------------------------------------------------
  * AttendanceMatrixView
  * ------------------------------------------------------------ */
-/** ------------------------------------------------------------
- * AttendanceMatrixView
- * ------------------------------------------------------------ */
 const AttendanceMatrixView: React.FC<{
   members: MemberDto[];
   attendances: AttendanceDto[];
@@ -81,8 +78,6 @@ const AttendanceMatrixView: React.FC<{
   limitEndDate?: string;
   filterMode: FilterMode;
   allMembers: { id: number; name: string; birthDate?: string }[];
-
-  // ✅ [추가] 부모로부터 사용자 권한을 받기 위한 Prop 정의
   userRole?: string;
 }> = ({
   members,
@@ -97,10 +92,9 @@ const AttendanceMatrixView: React.FC<{
   limitEndDate,
   filterMode,
   allMembers,
-  // ✅ [추가] 받아오기
   userRole,
 }) => {
-  // 미체크 계산 로직
+  // ✅ [복구] 미체크 계산 로직 (누락된 주차 확인용)
   const uncheckedCount = useMemo(() => {
     if (!startDate || !endDate || members.length === 0) return 0;
 
@@ -119,7 +113,6 @@ const AttendanceMatrixView: React.FC<{
     const cur = new Date(start);
     while (cur <= end) {
       if (cur.getDay() === 0) {
-        // safeFormatDate를 재사용하여 일관성 유지
         targetSundays.push(safeFormatDate(cur.toISOString(), "-"));
       }
       cur.setDate(cur.getDate() + 1);
@@ -140,11 +133,10 @@ const AttendanceMatrixView: React.FC<{
     let incompleteWeeks = 0;
 
     for (const sundayStr of targetSundays) {
-      // 단순히 해당 주차에 기록이 없는지 체크 (등록일 로직은 복잡도 줄이기 위해 생략)
       const activeMembers = members;
-
       if (activeMembers.length === 0) continue;
 
+      // 해당 주차(일요일)에 기록이 없는 멤버가 한 명이라도 있으면 누락으로 간주
       const isWeekIncomplete = activeMembers.some((m) => {
         const key = `${m.id}-${sundayStr}`;
         return !attendanceSet.has(key);
@@ -155,12 +147,6 @@ const AttendanceMatrixView: React.FC<{
 
     return incompleteWeeks;
   }, [startDate, endDate, members, attendances]);
-
-  const summary = useMemo(() => {
-    const present = attendances.filter((a) => a.status === "PRESENT").length;
-    const absent = attendances.filter((a) => a.status === "ABSENT").length;
-    return { present, absent, unchecked: uncheckedCount };
-  }, [attendances, uncheckedCount]);
 
   const matrixMembers = useMemo(
     () =>
@@ -179,35 +165,35 @@ const AttendanceMatrixView: React.FC<{
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* 통계 카드 */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 text-center">
-        <div className="p-3 sm:p-4 bg-green-50 rounded-xl border border-green-100">
-          <p className="text-xs sm:text-sm font-medium text-green-600 break-keep">
-            출석
-          </p>
-          <p className="mt-1 text-xl sm:text-3xl font-bold text-green-700">
-            {summary.present}
-          </p>
-        </div>
-
-        <div className="p-3 sm:p-4 bg-red-50 rounded-xl border border-red-100">
-          <p className="text-xs sm:text-sm font-medium text-red-600 break-keep">
-            결석
-          </p>
-          <p className="mt-1 text-xl sm:text-3xl font-bold text-red-700">
-            {summary.absent}
+      {/* ✅ [수정] 통계 카드: 출석/결석 제거하고 '누락(주)'만 단독 표시 */}
+      {uncheckedCount > 0 ? (
+        <div className="p-3 sm:p-4 bg-red-50 rounded-xl border border-red-200 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold text-red-700">
+              ⚠️ 출석 체크가 누락된 주가 있습니다.
+            </p>
+            <p className="text-xs text-red-500 mt-1">
+              해당 기간 내 총 <strong>{uncheckedCount}개</strong>의
+              주일(Sunday)에 대해 출석 기록이 완벽하지 않습니다.
+            </p>
+          </div>
+          <p className="text-3xl font-bold text-red-700 ml-4">
+            {uncheckedCount}
           </p>
         </div>
-
-        <div className="p-3 sm:p-4 bg-gray-100 rounded-xl border border-gray-200 col-span-2 lg:col-span-1">
-          <p className="text-xs sm:text-sm font-medium text-gray-500 break-keep">
-            출석 체크 누락 (주)
-          </p>
-          <p className="mt-1 text-xl sm:text-3xl font-bold text-gray-600">
-            {summary.unchecked}
-          </p>
+      ) : (
+        <div className="p-3 sm:p-4 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-between opacity-80">
+          <div>
+            <p className="text-sm font-bold text-gray-600">
+              ✅ 모든 주차 입력 완료
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              조회 기간 내 누락된 주차가 없습니다.
+            </p>
+          </div>
+          <p className="text-3xl font-bold text-gray-400 ml-4">0</p>
         </div>
-      </div>
+      )}
 
       {/* 매트릭스 */}
       <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-3 sm:p-4">
@@ -227,7 +213,6 @@ const AttendanceMatrixView: React.FC<{
           loading={loading}
           limitStartDate={limitStartDate}
           limitEndDate={limitEndDate}
-          // ✅ [핵심 수정] 임원(EXECUTIVE)일 때만 true, 그 외(셀장 등)는 false
           showAttendanceRate={userRole === "EXECUTIVE"}
         />
       </div>

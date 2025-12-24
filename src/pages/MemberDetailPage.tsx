@@ -264,7 +264,7 @@ const AttendanceSummaryCard: React.FC<{
   onMatrixMonthChange: (increment: number) => void;
   startDate: string;
   endDate: string;
-  userRole?: string; // ✅ 사용자 권한 정보 추가
+  userRole?: string;
 }> = ({
   summary,
   memberId,
@@ -282,7 +282,7 @@ const AttendanceSummaryCard: React.FC<{
   onMonthSelect,
   startDate,
   endDate,
-  userRole, // ✅ 받아오기
+  userRole,
 }) => {
   const totalSummary = summary?.totalSummary;
 
@@ -303,6 +303,7 @@ const AttendanceSummaryCard: React.FC<{
     return months;
   }, [activeSemester]);
 
+  // 미체크(빈칸) 계산 로직
   const uncheckedCount = useMemo(() => {
     if (!startDate || !endDate) return 0;
     const filterStart = new Date(startDate);
@@ -446,47 +447,47 @@ const AttendanceSummaryCard: React.FC<{
           </div>
         </div>
 
-        {/* --- 통계 요약 (그리드) --- */}
+        {/* --- ✅ [수정] 통계 요약 (그리드: 출석률 & 미체크) --- */}
         {totalSummary ? (
-          <div
-            className={`grid grid-cols-2 ${
-              isExecutive ? "lg:grid-cols-4" : "lg:grid-cols-3"
-            } gap-3 sm:gap-4 text-center border-t border-b py-4`}
-          >
-            {/* ✅ [수정] 출석률 통계 카드는 임원(EXECUTIVE)일 때만 표시 */}
-            {isExecutive && (
-              <div className="py-3 px-1 sm:p-3 bg-indigo-50 rounded-lg flex flex-col items-center justify-center">
-                <p className="text-xs sm:text-sm font-medium text-indigo-500 whitespace-nowrap">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-center border-t border-b py-4">
+            {/* 1. 출석률 (임원만 표시) */}
+            {isExecutive ? (
+              <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100 flex flex-col items-center justify-center">
+                <p className="text-sm font-medium text-indigo-600 whitespace-nowrap">
                   출석률
                 </p>
-                <p className="mt-1 text-xl sm:text-3xl font-semibold text-indigo-600">
+                <p className="mt-2 text-3xl font-bold text-indigo-700">
                   {totalSummary.attendanceRate.toFixed(0)}
-                  <span className="text-sm sm:text-lg">%</span>
+                  <span className="text-lg ml-0.5">%</span>
                 </p>
               </div>
+            ) : (
+              // 임원이 아닐 경우 빈 공간을 채우거나, 미체크 카드를 전체 너비로 쓸 수 있음.
+              // 여기서는 미체크 카드가 강조되도록 빈 div 처리는 생략하고 아래 로직에 맡김
+              // (만약 임원이 아니면 grid가 2개 생기는데 첫번째가 없으므로 자동으로 레이아웃 조정됨)
+              <></>
             )}
 
-            <div className="py-3 px-1 sm:p-3 bg-green-50 rounded-lg flex flex-col items-center justify-center">
-              <p className="text-xs sm:text-sm font-medium text-green-600 whitespace-nowrap">
-                출석
+            {/* 2. 미체크 (누락) - 셀장/임원 모두 표시 */}
+            <div
+              className={`p-4 rounded-xl border flex flex-col items-center justify-center ${
+                uncheckedCount > 0
+                  ? "bg-red-50 border-red-100"
+                  : "bg-gray-50 border-gray-200"
+              } ${!isExecutive ? "sm:col-span-2" : ""}`} // 임원이 아니면 미체크 카드를 꽉 채움
+            >
+              <p
+                className={`text-sm font-medium whitespace-nowrap ${
+                  uncheckedCount > 0 ? "text-red-600" : "text-gray-500"
+                }`}
+              >
+                미체크 (건)
               </p>
-              <p className="mt-1 text-xl sm:text-3xl font-semibold text-green-700">
-                {totalSummary.totalPresent}
-              </p>
-            </div>
-            <div className="py-3 px-1 sm:p-3 bg-red-50 rounded-lg flex flex-col items-center justify-center">
-              <p className="text-xs sm:text-sm font-medium text-red-600 whitespace-nowrap">
-                결석
-              </p>
-              <p className="mt-1 text-xl sm:text-3xl font-semibold text-red-700">
-                {totalSummary.totalAbsent}
-              </p>
-            </div>
-            <div className="py-3 px-1 sm:p-3 bg-gray-100 rounded-lg flex flex-col items-center justify-center">
-              <p className="text-xs sm:text-sm font-medium text-gray-500 whitespace-nowrap">
-                미체크
-              </p>
-              <p className="mt-1 text-xl sm:text-3xl font-semibold text-gray-600">
+              <p
+                className={`mt-2 text-3xl font-bold ${
+                  uncheckedCount > 0 ? "text-red-700" : "text-gray-600"
+                }`}
+              >
                 {uncheckedCount}
               </p>
             </div>
@@ -515,7 +516,6 @@ const AttendanceSummaryCard: React.FC<{
             loading={false}
             limitStartDate={activeSemester?.startDate}
             limitEndDate={activeSemester?.endDate}
-            // ✅ [수정] 임원일 때만 출석률 컬럼 표시
             showAttendanceRate={isExecutive}
           />
         </div>

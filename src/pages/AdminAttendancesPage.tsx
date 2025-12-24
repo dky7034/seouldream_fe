@@ -68,7 +68,7 @@ const translateAttendanceStatus = (status: string) => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// Sub Component 1: AttendanceStats (통계 카드)
+// Sub Component 1: AttendanceStats (상단 종합 통계 카드 - 유지)
 // ─────────────────────────────────────────────────────────────
 
 const AttendanceStats = memo(
@@ -214,11 +214,10 @@ const AttendanceMatrixView = memo(
     unitType: UnitType;
     isLoading: boolean;
   }) => {
-    // ✅ [수정] 정확한 미체크 카운트 로직 (Set 활용 + 가입일 무시)
+    // ✅ 미체크 카운트 로직 (Set 활용 + 가입일 무시하여 빈칸 기준)
     const uncheckedCount = useMemo(() => {
       if (!startDate || !endDate || members.length === 0) return 0;
 
-      // 1. 날짜 키 생성 헬퍼 (YYYY-MM-DD)
       const toDateKey = (d: Date) => {
         const y = d.getFullYear();
         const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -231,11 +230,9 @@ const AttendanceMatrixView = memo(
       start.setHours(0, 0, 0, 0);
       end.setHours(0, 0, 0, 0);
 
-      // 2. 조회 기간 내 '일요일' 날짜 키 목록 생성
       const targetSundayKeys: string[] = [];
       const current = new Date(start);
 
-      // 시작일이 일요일이 아니면 다음 일요일로 이동
       if (current.getDay() !== 0) {
         current.setDate(current.getDate() + (7 - current.getDay()));
       }
@@ -245,7 +242,6 @@ const AttendanceMatrixView = memo(
         current.setDate(current.getDate() + 7);
       }
 
-      // 3. 실제 출석 기록 매핑
       const attendanceMap = new Set<string>();
       attendances.forEach((att) => {
         if (
@@ -259,13 +255,9 @@ const AttendanceMatrixView = memo(
         }
       });
 
-      // 4. 멤버별 미체크 카운트 (화면에 보이는 빈칸은 모두 카운트)
       let missingCount = 0;
-
       members.forEach((member) => {
         targetSundayKeys.forEach((sundayKey) => {
-          // ✅ 가입일(joinDate) 체크 로직 제거
-          // (화면에 회색 점이 보인다면 미체크로 간주하는 것이 직관적임)
           const key = `${member.id}-${sundayKey}`;
           if (!attendanceMap.has(key)) {
             missingCount++;
@@ -279,13 +271,10 @@ const AttendanceMatrixView = memo(
     const summary = useMemo(() => {
       const present = attendances.filter((a) => a.status === "PRESENT").length;
       const absent = attendances.filter((a) => a.status === "ABSENT").length;
-
-      // ✅ 전체 분모를 '기록된 수' 기준에서 '예상되는 전체 칸 수' 기준으로 볼 수도 있으나,
-      // 일단 기존 로직(기록 기준)을 유지하고 unchecked만 정확히 표시합니다.
       const totalRecorded = present + absent;
       const rate = totalRecorded > 0 ? (present / totalRecorded) * 100 : 0;
 
-      return { present, absent, rate, unchecked: uncheckedCount };
+      return { rate, unchecked: uncheckedCount };
     }, [attendances, uncheckedCount]);
 
     const matrixMembers = useMemo(
@@ -306,36 +295,37 @@ const AttendanceMatrixView = memo(
 
     return (
       <div className="space-y-6 animate-fadeIn">
-        {/* 4분할 요약 카드 */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
+        {/* ✅ [수정] 2칸 통계 카드 (출석률, 미체크) */}
+        <div className="grid grid-cols-2 gap-4 text-center">
           <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
-            <p className="text-xs sm:text-sm font-medium text-indigo-500">
+            <p className="text-sm font-medium text-indigo-600 break-keep">
               출석률 (기록 기준)
             </p>
-            <p className="mt-1 text-2xl sm:text-3xl font-bold text-indigo-600">
+            <p className="mt-2 text-3xl font-bold text-indigo-700">
               {summary.rate.toFixed(0)}
-              <span className="text-lg">%</span>
+              <span className="text-lg ml-0.5">%</span>
             </p>
           </div>
-          <div className="p-4 bg-green-50 rounded-xl border border-green-100">
-            <p className="text-xs sm:text-sm font-medium text-green-600">
-              출석
+
+          <div
+            className={`p-4 rounded-xl border ${
+              summary.unchecked > 0
+                ? "bg-red-50 border-red-100"
+                : "bg-gray-50 border-gray-200"
+            }`}
+          >
+            <p
+              className={`text-sm font-medium break-keep ${
+                summary.unchecked > 0 ? "text-red-600" : "text-gray-500"
+              }`}
+            >
+              미체크 (건)
             </p>
-            <p className="mt-1 text-2xl sm:text-3xl font-bold text-green-700">
-              {summary.present}
-            </p>
-          </div>
-          <div className="p-4 bg-red-50 rounded-xl border border-red-100">
-            <p className="text-xs sm:text-sm font-medium text-red-600">결석</p>
-            <p className="mt-1 text-2xl sm:text-3xl font-bold text-red-700">
-              {summary.absent}
-            </p>
-          </div>
-          <div className="p-4 bg-gray-100 rounded-xl border border-gray-200">
-            <p className="text-xs sm:text-sm font-medium text-gray-500">
-              미체크
-            </p>
-            <p className="mt-1 text-2xl sm:text-3xl font-bold text-gray-600">
+            <p
+              className={`mt-2 text-3xl font-bold ${
+                summary.unchecked > 0 ? "text-red-700" : "text-gray-600"
+              }`}
+            >
               {summary.unchecked}
             </p>
           </div>
@@ -757,7 +747,7 @@ const AdminAttendancesPage: React.FC = () => {
       <AttendanceStats stats={overallStats} loading={statsLoading} />
 
       <div className="p-4 bg-gray-50 rounded-lg mb-6 shadow-sm space-y-4">
-        {/* ... (필터 UI 부분은 기존과 동일) ... */}
+        {/* 필터 영역 */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="text-base sm:text-lg font-semibold">조회 기간 설정</h3>
           <div className="flex flex-wrap gap-2">
@@ -1006,7 +996,6 @@ const AdminAttendancesPage: React.FC = () => {
         <p className="mb-4 text-center text-sm text-red-600">{error}</p>
       )}
 
-      {/* ✅ [수정] onNavigate prop 제거됨 (AttendanceMatrixView 내부에서 화살표 삭제했으므로 불필요) */}
       <AttendanceMatrixView
         members={targetMembers}
         attendances={matrixAttendances}
