@@ -48,9 +48,15 @@ const AdminNoticesPage: React.FC = () => {
   const hasActiveSemesters = semesters.length > 0;
 
   // ✅ [Helper] 날짜 포맷팅 함수
+  // ✅ [수정된 Helper] Timezone을 적용하여 날짜 변환
+  // UTC 문자열을 브라우저 로컬 시간(한국 시간)으로 변환하여 표시
   const safeFormatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return "-";
-    return dateStr.split("T")[0].replace(/-/g, ".");
+    const date = new Date(dateStr);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}.${month}.${day}`;
   };
 
   // ───────────────── URL 기반 초기값 설정 ─────────────────
