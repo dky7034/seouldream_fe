@@ -976,6 +976,8 @@ const CellLeaderDashboard: React.FC = () => {
                   loading={matrixLoading}
                   limitStartDate={activeSemester.startDate}
                   limitEndDate={activeSemester.endDate}
+                  // ✅ [핵심 수정] 임원일 때만 보이게 설정 (셀장은 안 보임)
+                  showAttendanceRate={user?.role === "EXECUTIVE"}
                 />
               ) : (
                 <div className="text-center p-10 text-gray-400">

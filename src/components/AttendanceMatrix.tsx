@@ -17,6 +17,9 @@ interface AttendanceMatrixProps {
   limitEndDate?: string;
 
   semesters?: SemesterDto[];
+
+  // ✅ [추가] 출석률 컬럼 표시 여부 (기본값: true)
+  showAttendanceRate?: boolean;
 }
 
 type MatrixStatus = "PRESENT" | "ABSENT";
@@ -33,6 +36,8 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
   limitStartDate,
   limitEndDate,
   semesters,
+  // ✅ [추가] 기본값을 true로 두어 기존 로직 유지 (필요한 곳에서만 false로 끔)
+  showAttendanceRate = true,
 }) => {
   const toDateKey = (date: Date) => {
     const y = date.getFullYear();
@@ -46,7 +51,6 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
     return v.slice(0, 10);
   };
 
-  // 1. 표시할 날짜 계산 (기존 로직 유지 + 연간 모드 시 학기 필터링)
   const targetDays = useMemo(() => {
     const days: Date[] = [];
 
@@ -54,7 +58,6 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
       const start = new Date(startDate);
       const end = new Date(endDate);
 
-      // ✅ [안전장치] 시간 초기화 (타임존 이슈 방지)
       start.setHours(0, 0, 0, 0);
       end.setHours(0, 0, 0, 0);
 
@@ -68,7 +71,6 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
         const currentDateStr = toDateKey(current);
         let isValid = true;
 
-        // 연간 모드일 경우: 해당 일요일이 '학기 기간'에 포함되는지 체크
         if (mode === "year" && semesters && semesters.length > 0) {
           const isInAnySemester = semesters.some(
             (sem) =>
@@ -88,7 +90,6 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
       return days;
     }
 
-    // 월간 보기
     const date = new Date(year, month - 1, 1);
     while (date.getMonth() === month - 1) {
       if (date.getDay() === 0) {
@@ -162,12 +163,10 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
           <table className="w-full text-sm border-separate border-spacing-0">
             <thead>
               <tr>
-                {/* 1. 이름 컬럼 (좌측 고정) */}
                 <th className="sticky left-0 z-20 bg-gray-50 p-2 min-w-[80px] text-left font-medium text-gray-500 border-b border-r border-gray-200 shadow-[1px_0_3px_rgba(0,0,0,0.05)]">
                   이름
                 </th>
 
-                {/* 2. 날짜 컬럼들 */}
                 {targetDays.length > 0 ? (
                   targetDays.map((day) => (
                     <th
@@ -186,15 +185,16 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                   </th>
                 )}
 
-                {/* 3. 출석률 헤더 (우측 고정) */}
-                <th className="sticky right-0 z-20 bg-gray-50 p-2 min-w-[60px] text-center font-medium text-gray-500 border-b border-l border-gray-200 shadow-[-1px_0_3px_rgba(0,0,0,0.05)]">
-                  출석률
-                </th>
+                {/* ✅ [수정] showAttendanceRate가 true일 때만 렌더링 */}
+                {showAttendanceRate && (
+                  <th className="sticky right-0 z-20 bg-gray-50 p-2 min-w-[60px] text-center font-medium text-gray-500 border-b border-l border-gray-200 shadow-[-1px_0_3px_rgba(0,0,0,0.05)]">
+                    출석률
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
               {members.map((member) => {
-                // 각 멤버별 출석률 계산 로직
                 let presentCount = 0;
                 targetDays.forEach((day) => {
                   const status = attendanceMap.get(
@@ -216,12 +216,10 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                     key={member.memberId}
                     className="hover:bg-gray-50/50 transition-colors"
                   >
-                    {/* 이름 셀 */}
                     <td className="sticky left-0 z-10 bg-white p-2 font-medium text-gray-700 border-b border-r border-gray-100 whitespace-nowrap shadow-[1px_0_3px_rgba(0,0,0,0.05)]">
                       {member.memberName}
                     </td>
 
-                    {/* 출석 체크 셀들 */}
                     {targetDays.length > 0 ? (
                       targetDays.map((day) => {
                         const dateStr = toDateKey(day);
@@ -259,19 +257,21 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                       <td className="p-2 border-b border-gray-50"></td>
                     )}
 
-                    {/* 출석률 값 표시 (우측 고정) */}
-                    <td className="sticky right-0 z-10 bg-white p-2 text-center border-b border-l border-gray-100 font-bold text-indigo-600 shadow-[-1px_0_3px_rgba(0,0,0,0.05)]">
-                      {attendanceRate}%
-                    </td>
+                    {/* ✅ [수정] showAttendanceRate가 true일 때만 렌더링 */}
+                    {showAttendanceRate && (
+                      <td className="sticky right-0 z-10 bg-white p-2 text-center border-b border-l border-gray-100 font-bold text-indigo-600 shadow-[-1px_0_3px_rgba(0,0,0,0.05)]">
+                        {attendanceRate}%
+                      </td>
+                    )}
                   </tr>
                 );
               })}
 
-              {/* 데이터 없음 메시지 */}
               {members.length === 0 && (
                 <tr>
+                  {/* ✅ [수정] colSpan 계산 시 showAttendanceRate 고려 */}
                   <td
-                    colSpan={targetDays.length + 2}
+                    colSpan={targetDays.length + (showAttendanceRate ? 2 : 1)}
                     className="p-8 text-center text-gray-400 bg-gray-50"
                   >
                     등록된 셀원이 없습니다.

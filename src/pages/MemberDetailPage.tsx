@@ -24,7 +24,7 @@ import AttendanceMatrix from "../components/AttendanceMatrix";
 import { FaCalendarAlt, FaClock } from "react-icons/fa";
 
 // -------------------------------------------------------------------------
-// [Helpers] 날짜 처리 관련
+// [Helpers] 날짜 및 나이 계산
 // -------------------------------------------------------------------------
 
 /** Date 객체를 YYYY-MM-DD 문자열로 변환 */
@@ -43,6 +43,18 @@ const isDateInSemesterMonthRange = (date: Date, semester: SemesterDto) => {
   const e = new Date(semester.endDate);
   const eYm = e.getFullYear() * 12 + e.getMonth();
   return targetYm >= sYm && targetYm <= eYm;
+};
+
+// ✅ 날짜 포맷팅 (KST 적용)
+const safeFormatDate = (dateStr: string | null | undefined) => {
+  if (!dateStr) return "";
+  const targetStr =
+    dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
+  const date = new Date(targetStr);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 };
 
 // -------------------------------------------------------------------------
@@ -66,7 +78,6 @@ const InfoCard: React.FC<{
   </div>
 );
 
-// [수정] 모바일: 상하 배치 / 데스크탑: 좌우 배치 (Grid)
 const InfoDl: React.FC<{ items: { dt: string; dd: React.ReactNode }[] }> = ({
   items,
 }) => (
@@ -94,32 +105,42 @@ const BasicInfoCard: React.FC<{
   member: MemberDto;
   isCurrentUser: boolean;
   onEditProfile: () => void;
-}> = ({ member, isCurrentUser, onEditProfile }) => (
-  <InfoCard
-    title="기본 정보"
-    actions={
-      isCurrentUser && (
-        <button
-          onClick={onEditProfile}
-          className="px-3 py-1 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 whitespace-nowrap"
-        >
-          수정
-        </button>
-      )
-    }
-  >
-    <InfoDl
-      items={[
-        { dt: "이름", dd: member.name },
-        { dt: "아이디", dd: member.username },
-        { dt: "이메일", dd: member.email },
-        { dt: "연락처", dd: member.phone },
-        { dt: "생년월일", dd: `${member.birthDate} (${member.age}세)` },
-        { dt: "주소", dd: member.address || "정보 없음" },
-      ]}
-    />
-  </InfoCard>
-);
+}> = ({ member, isCurrentUser, onEditProfile }) => {
+  // ✅ 백엔드에서 주는 age(만 나이) 우선 사용
+  const ageDisplay =
+    member.age !== undefined && member.age !== null
+      ? `(만 ${member.age}세)`
+      : "";
+
+  const displayBirthDate = safeFormatDate(member.birthDate);
+
+  return (
+    <InfoCard
+      title="기본 정보"
+      actions={
+        isCurrentUser && (
+          <button
+            onClick={onEditProfile}
+            className="px-3 py-1 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 whitespace-nowrap"
+          >
+            수정
+          </button>
+        )
+      }
+    >
+      <InfoDl
+        items={[
+          { dt: "이름", dd: member.name },
+          { dt: "아이디", dd: member.username },
+          { dt: "이메일", dd: member.email },
+          { dt: "연락처", dd: member.phone },
+          { dt: "생년월일", dd: `${displayBirthDate} ${ageDisplay}` },
+          { dt: "주소", dd: member.address || "정보 없음" },
+        ]}
+      />
+    </InfoCard>
+  );
+};
 
 // --- 교회 정보 카드 ---
 const ChurchInfoCard: React.FC<{ member: MemberDto }> = ({ member }) => (
@@ -129,7 +150,9 @@ const ChurchInfoCard: React.FC<{ member: MemberDto }> = ({ member }) => (
         { dt: "셀", dd: member.cell?.name || "없음" },
         {
           dt: "셀 배정일",
-          dd: member.cellAssignmentDate ? member.cellAssignmentDate : "미배정",
+          dd: member.cellAssignmentDate
+            ? safeFormatDate(member.cellAssignmentDate)
+            : "미배정",
         },
         { dt: "역할", dd: translateRole(member.role) },
         { dt: "등록연도", dd: member.joinYear },
@@ -207,7 +230,7 @@ const PrayersCard: React.FC<{ prayers: PrayerDto[] }> = ({ prayers }) => (
                   {p.content}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {new Date(p.createdAt).toLocaleDateString()}
+                  {safeFormatDate(p.createdAt)}
                 </p>
               </Link>
             </li>
@@ -221,10 +244,7 @@ const PrayersCard: React.FC<{ prayers: PrayerDto[] }> = ({ prayers }) => (
 );
 
 // ─────────────────────────────────────────────────────────────
-// [핵심] 출석 요약 카드 (미체크 정책 적용 완료 + 모바일 UI 개선)
-// ─────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────
-// [핵심] 출석 요약 카드 (통계 UI 패딩 수정으로 글자 잘림 해결)
+// [핵심] 출석 요약 카드 (미체크 정책 + 임원/셀장 권한별 UI 적용)
 // ─────────────────────────────────────────────────────────────
 const AttendanceSummaryCard: React.FC<{
   summary: MemberAttendanceSummaryDto | null;
@@ -244,6 +264,7 @@ const AttendanceSummaryCard: React.FC<{
   onMatrixMonthChange: (increment: number) => void;
   startDate: string;
   endDate: string;
+  userRole?: string; // ✅ 사용자 권한 정보 추가
 }> = ({
   summary,
   memberId,
@@ -261,8 +282,12 @@ const AttendanceSummaryCard: React.FC<{
   onMonthSelect,
   startDate,
   endDate,
+  userRole, // ✅ 받아오기
 }) => {
   const totalSummary = summary?.totalSummary;
+
+  // ✅ 임원 권한 확인
+  const isExecutive = userRole === "EXECUTIVE";
 
   const semesterMonths = useMemo(() => {
     if (!activeSemester) return [];
@@ -344,7 +369,6 @@ const AttendanceSummaryCard: React.FC<{
         {/* --- 컨트롤 패널 --- */}
         <div className="bg-gray-50 p-3 sm:p-4 rounded-xl border border-gray-100 flex flex-col gap-4">
           <div className="flex flex-col gap-3">
-            {/* 1행: 학기 선택 + 보기 모드 버튼 */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="relative w-full sm:w-auto">
                 <div className="flex items-center bg-white px-3 py-2 rounded-md border border-gray-300 shadow-sm w-full sm:w-auto">
@@ -363,7 +387,6 @@ const AttendanceSummaryCard: React.FC<{
                 </div>
               </div>
 
-              {/* 보기 모드 */}
               <div className="flex bg-gray-200 p-1 rounded-lg w-full sm:w-auto">
                 <button
                   onClick={() => onUnitTypeChange("month")}
@@ -388,7 +411,6 @@ const AttendanceSummaryCard: React.FC<{
               </div>
             </div>
 
-            {/* 2행: 월 선택 */}
             {unitType === "month" && activeSemester && (
               <div className="animate-fadeIn mt-1">
                 <span className="text-xs font-bold text-gray-500 block mb-2 px-1">
@@ -424,19 +446,26 @@ const AttendanceSummaryCard: React.FC<{
           </div>
         </div>
 
-        {/* --- 통계 요약 (4칸 그리드) - 수정된 부분 --- */}
+        {/* --- 통계 요약 (그리드) --- */}
         {totalSummary ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-center border-t border-b py-4">
-            {/* [수정] 모바일에서 좌우 패딩을 px-1로 줄여서 글자 공간 확보, whitespace-nowrap 적용 */}
-            <div className="py-3 px-1 sm:p-3 bg-indigo-50 rounded-lg flex flex-col items-center justify-center">
-              <p className="text-xs sm:text-sm font-medium text-indigo-500 whitespace-nowrap">
-                출석률
-              </p>
-              <p className="mt-1 text-xl sm:text-3xl font-semibold text-indigo-600">
-                {totalSummary.attendanceRate.toFixed(0)}
-                <span className="text-sm sm:text-lg">%</span>
-              </p>
-            </div>
+          <div
+            className={`grid grid-cols-2 ${
+              isExecutive ? "lg:grid-cols-4" : "lg:grid-cols-3"
+            } gap-3 sm:gap-4 text-center border-t border-b py-4`}
+          >
+            {/* ✅ [수정] 출석률 통계 카드는 임원(EXECUTIVE)일 때만 표시 */}
+            {isExecutive && (
+              <div className="py-3 px-1 sm:p-3 bg-indigo-50 rounded-lg flex flex-col items-center justify-center">
+                <p className="text-xs sm:text-sm font-medium text-indigo-500 whitespace-nowrap">
+                  출석률
+                </p>
+                <p className="mt-1 text-xl sm:text-3xl font-semibold text-indigo-600">
+                  {totalSummary.attendanceRate.toFixed(0)}
+                  <span className="text-sm sm:text-lg">%</span>
+                </p>
+              </div>
+            )}
+
             <div className="py-3 px-1 sm:p-3 bg-green-50 rounded-lg flex flex-col items-center justify-center">
               <p className="text-xs sm:text-sm font-medium text-green-600 whitespace-nowrap">
                 출석
@@ -486,6 +515,8 @@ const AttendanceSummaryCard: React.FC<{
             loading={false}
             limitStartDate={activeSemester?.startDate}
             limitEndDate={activeSemester?.endDate}
+            // ✅ [수정] 임원일 때만 출석률 컬럼 표시
+            showAttendanceRate={isExecutive}
           />
         </div>
       </div>
@@ -493,7 +524,8 @@ const AttendanceSummaryCard: React.FC<{
   );
 };
 
-// --- 관리자 도구 카드 ---
+// ... (이후 AdminActionsCard, TeamManagementModal, TempPasswordModal 등 기존과 동일) ...
+
 const AdminActionsCard: React.FC<{
   onResetPassword: () => void;
   isResetting: boolean;
@@ -514,7 +546,6 @@ const AdminActionsCard: React.FC<{
   </InfoCard>
 );
 
-// --- 모달들 ---
 const TeamManagementModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
@@ -619,7 +650,6 @@ const MemberDetailPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 데이터 상태
   const [member, setMember] = useState<MemberDto | null>(null);
   const [prayers, setPrayers] = useState<PrayerDto[]>([]);
   const [attendanceSummary, setAttendanceSummary] =
@@ -628,7 +658,6 @@ const MemberDetailPage: React.FC = () => {
   const [memberTeams, setMemberTeams] = useState<TeamDto[]>([]);
   const [allTeams, setAllTeams] = useState<TeamDto[]>([]);
 
-  // 기간 선택 로직 상태
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const [activeSemester, setActiveSemester] = useState<SemesterDto | null>(
     null
@@ -636,12 +665,10 @@ const MemberDetailPage: React.FC = () => {
   const [unitType, setUnitType] = useState<"semester" | "month">("semester");
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
 
-  // 모달 상태
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [showConfirmResetModal, setShowConfirmResetModal] = useState(false);
   const [showTempPasswordModal, setShowTempPasswordModal] = useState(false);
 
-  // 비밀번호 초기화 상태
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [resetPasswordError, setResetPasswordError] = useState<string | null>(
     null
@@ -970,6 +997,8 @@ const MemberDetailPage: React.FC = () => {
             onMatrixMonthChange={handleMatrixMonthChange}
             startDate={periodRange.startDate}
             endDate={periodRange.endDate}
+            // ✅ [추가] 사용자 권한 정보 전달
+            userRole={user?.role}
           />
         </div>
 

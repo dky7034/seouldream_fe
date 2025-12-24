@@ -65,6 +65,9 @@ const getAttendanceMemberId = (att: any): number | null => {
 /** ------------------------------------------------------------
  * AttendanceMatrixView
  * ------------------------------------------------------------ */
+/** ------------------------------------------------------------
+ * AttendanceMatrixView
+ * ------------------------------------------------------------ */
 const AttendanceMatrixView: React.FC<{
   members: MemberDto[];
   attendances: AttendanceDto[];
@@ -78,6 +81,9 @@ const AttendanceMatrixView: React.FC<{
   limitEndDate?: string;
   filterMode: FilterMode;
   allMembers: { id: number; name: string; birthDate?: string }[];
+
+  // ✅ [추가] 부모로부터 사용자 권한을 받기 위한 Prop 정의
+  userRole?: string;
 }> = ({
   members,
   attendances,
@@ -91,6 +97,8 @@ const AttendanceMatrixView: React.FC<{
   limitEndDate,
   filterMode,
   allMembers,
+  // ✅ [추가] 받아오기
+  userRole,
 }) => {
   // 미체크 계산 로직
   const uncheckedCount = useMemo(() => {
@@ -219,6 +227,8 @@ const AttendanceMatrixView: React.FC<{
           loading={loading}
           limitStartDate={limitStartDate}
           limitEndDate={limitEndDate}
+          // ✅ [핵심 수정] 임원(EXECUTIVE)일 때만 true, 그 외(셀장 등)는 false
+          showAttendanceRate={userRole === "EXECUTIVE"}
         />
       </div>
     </div>
@@ -783,6 +793,8 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
         limitEndDate={selectedSemester?.endDate}
         filterMode={filterMode}
         allMembers={allMembers}
+        // ✅ [추가] 여기서 user.role 정보를 하위 컴포넌트로 전달
+        userRole={user.role}
       />
     </div>
   );

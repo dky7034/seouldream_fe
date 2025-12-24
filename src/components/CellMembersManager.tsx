@@ -16,36 +16,16 @@ interface CellMembersManagerProps {
   allMembers: { id: number; name: string; birthDate?: string }[];
 }
 
-// ✅ [추가] 날짜 포맷팅 함수 (KST 적용)
+// ✅ 날짜 포맷팅 함수 (KST 적용)
 const safeFormatDate = (dateStr: string | null | undefined) => {
   if (!dateStr) return "";
-  // T는 있는데 Z가 없으면 Z를 붙여줌 (UTC 인식 유도 -> 브라우저가 KST 변환)
   const targetStr =
     dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
-
   const date = new Date(targetStr);
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-};
-
-// ✅ [수정] 만 나이 계산 함수 (safeFormatDate 사용)
-const calculateAge = (birthDateString: string): number | null => {
-  if (!birthDateString) return null;
-  // KST로 변환된 날짜 문자열 사용
-  const formattedDate = safeFormatDate(birthDateString);
-  if (!formattedDate) return null;
-
-  const birthDate = new Date(formattedDate);
-  const today = new Date();
-
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const m = today.getMonth() - birthDate.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  return age;
 };
 
 const CellMembersManager: React.FC<CellMembersManagerProps> = ({
@@ -164,16 +144,18 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
           {/* ✅ 모바일: 카드형 리스트 */}
           <div className="sm:hidden space-y-3">
             {sortedMembers.map((member) => {
-              const age = calculateAge(member.birthDate || "");
               const isMe = user.memberId === member.id;
-
               const found = allMembers.find((am) => am.id === member.id);
               const displayName = found
                 ? formatDisplayName(found, allMembers)
                 : member.name;
 
-              // ✅ 날짜 포맷팅 적용
+              // ✅ [수정] 백엔드 만 나이 사용
               const displayBirthDate = safeFormatDate(member.birthDate);
+              const ageDisplay =
+                member.age !== undefined && member.age !== null
+                  ? `(만 ${member.age}세)`
+                  : "";
 
               return (
                 <div
@@ -212,9 +194,7 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                       <span className="text-gray-500">생년월일</span>
                       <span>
                         {displayBirthDate
-                          ? `${displayBirthDate}${
-                              age != null ? ` (만 ${age}세)` : ""
-                            }`
+                          ? `${displayBirthDate} ${ageDisplay}`
                           : "-"}
                       </span>
                     </div>
@@ -286,11 +266,15 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                     ? formatDisplayName(found, allMembers)
                     : member.name;
 
-                  // ✅ 날짜 포맷팅 적용
+                  // ✅ [수정] 백엔드 만 나이 사용
                   const displayBirthDate = safeFormatDate(member.birthDate);
                   const displayAssignedDate = safeFormatDate(
                     member.cellAssignmentDate
                   );
+                  const ageDisplay =
+                    member.age !== undefined && member.age !== null
+                      ? `(만 ${member.age}세)`
+                      : "";
 
                   return (
                     <tr
@@ -325,9 +309,7 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                         </span>
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
-                        {displayBirthDate}{" "}
-                        {displayBirthDate &&
-                          `(만 ${calculateAge(member.birthDate || "")}세)`}
+                        {displayBirthDate} {ageDisplay}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
                         {member.joinYear}
