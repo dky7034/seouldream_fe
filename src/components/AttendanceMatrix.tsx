@@ -216,7 +216,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                     key={member.memberId}
                     className="hover:bg-gray-50/50 transition-colors"
                   >
-                    <td className="sticky left-0 z-10 bg-white p-2 font-medium text-gray-700 border-b border-r border-gray-100 whitespace-nowrap shadow-[1px_0_3px_rgba(0,0,0,0.05)]">
+                    <td className="sticky left-0 z-30 bg-white p-2 font-medium text-gray-700 border-b border-r border-gray-100 whitespace-nowrap shadow-[1px_0_3px_rgba(0,0,0,0.05)]">
                       {member.memberName}
                     </td>
 
@@ -259,7 +259,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
 
                     {/* ✅ [수정] showAttendanceRate가 true일 때만 렌더링 */}
                     {showAttendanceRate && (
-                      <td className="sticky right-0 z-10 bg-white p-2 text-center border-b border-l border-gray-100 font-bold text-indigo-600 shadow-[-1px_0_3px_rgba(0,0,0,0.05)]">
+                      <td className="sticky right-0 z-20 bg-white p-2 text-center border-b border-l border-gray-100 font-bold text-indigo-600 shadow-[-1px_0_3px_rgba(0,0,0,0.05)]">
                         {attendanceRate}%
                       </td>
                     )}
