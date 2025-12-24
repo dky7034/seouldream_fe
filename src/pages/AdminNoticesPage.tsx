@@ -47,6 +47,13 @@ const AdminNoticesPage: React.FC = () => {
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const hasActiveSemesters = semesters.length > 0;
 
+  // ✅ [Helper] 날짜 포맷팅 함수 (백엔드 LocalDate/LocalDateTime 대응)
+  // "2025-05-20T..." -> "2025.05.20" 변환 (타임존 이슈 방지)
+  const safeFormatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return "-";
+    return dateStr.split("T")[0].replace(/-/g, ".");
+  };
+
   // ───────────────── URL 기반 초기값 설정 ─────────────────
   const [filters, setFilters] = useState(() => {
     const title = searchParams.get("title") ?? "";
@@ -61,18 +68,27 @@ const AdminNoticesPage: React.FC = () => {
     const startDate = searchParams.get("startDate") ?? "";
     const endDate = searchParams.get("endDate") ?? "";
 
-    const safeNumber = (val: string | null, defaultValue: number | "" = "") => {
-      if (!val) return defaultValue;
+    const safeNumber = (val: string | null) => {
+      if (!val) return "";
       const num = Number(val);
-      return isNaN(num) ? defaultValue : num;
+      return isNaN(num) ? "" : num;
     };
+
+    // yearParam이 'all'이면 빈문자열(전체), 없으면 현재연도, 있으면 해당 숫자
+    let initialYear: number | "" = currentYear;
+    if (yearParam === "all") {
+      initialYear = "";
+    } else if (yearParam) {
+      const parsed = Number(yearParam);
+      if (!isNaN(parsed)) initialYear = parsed;
+    }
 
     return {
       title,
       pinned,
       startDate,
       endDate,
-      year: safeNumber(yearParam, currentYear),
+      year: initialYear,
       month: safeNumber(monthParam),
       semesterId: safeNumber(semesterIdParam),
     };
@@ -102,23 +118,15 @@ const AdminNoticesPage: React.FC = () => {
 
   const debouncedTitleFilter = useDebounce(filters.title, 500);
 
-  // ✅ [성능 최적화] 멤버 ID -> 포맷된 이름 매핑 (Map 사용)
-  // 기존: 렌더링마다 find()로 검색 (O(N*rows)) -> 개선: Map 조회 (O(1))
   const memberNameMap = useMemo(() => {
     const map = new Map<number, string>();
     if (allMembersForNameCheck.length === 0) return map;
-
-    // formatDisplayName 함수가 내부적으로 중복 검사를 하므로,
-    // 여기서 미리 모든 멤버에 대해 계산해둡니다.
     allMembersForNameCheck.forEach((m) => {
-      // 💡 여기서 formatDisplayName을 호출하여 결과를 저장
       map.set(m.id, formatDisplayName(m, allMembersForNameCheck));
     });
-
     return map;
   }, [allMembersForNameCheck]);
 
-  // ✅ [성능 최적화] Map 조회 헬퍼 함수
   const getFormattedName = useCallback(
     (id?: number, name?: string) => {
       if (!name) return "알 수 없음";
@@ -149,7 +157,7 @@ const AdminNoticesPage: React.FC = () => {
         }
       }
 
-      const yearText = filters.year ? `${filters.year}년` : "전체 연도";
+      const yearText = filters.year === "" ? "전체 연도" : `${filters.year}년`;
 
       if (unitType === "year") {
         return `조회 단위: 연간 (${yearText})`;
@@ -184,8 +192,12 @@ const AdminNoticesPage: React.FC = () => {
         if (nextFilters.startDate) params.startDate = nextFilters.startDate;
         if (nextFilters.endDate) params.endDate = nextFilters.endDate;
       } else {
-        if (typeof nextFilters.year === "number")
+        if (nextFilters.year === "") {
+          params.year = "all";
+        } else if (typeof nextFilters.year === "number") {
           params.year = String(nextFilters.year);
+        }
+
         if (typeof nextFilters.month === "number")
           params.month = String(nextFilters.month);
         if (typeof nextFilters.semesterId === "number")
@@ -318,7 +330,6 @@ const AdminNoticesPage: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      // 병렬로 실행하여 초기 로딩 속도 미세 개선
       Promise.all([fetchAvailableYears(), fetchSemesters()]);
     }
   }, [user, fetchAvailableYears, fetchSemesters]);
@@ -360,7 +371,7 @@ const AdminNoticesPage: React.FC = () => {
 
   const handleUnitTypeClick = (type: UnitType) => {
     const cy = new Date().getFullYear();
-    const baseYear = filters.year || cy;
+    const baseYear = filters.year === "" ? "" : filters.year || cy;
     let nextFilters = { ...filters };
 
     if (type === "year") {
@@ -371,9 +382,10 @@ const AdminNoticesPage: React.FC = () => {
         semesterId: "" as const,
       };
     } else if (type === "month") {
+      const targetYear = baseYear === "" ? cy : baseYear;
       nextFilters = {
         ...filters,
-        year: baseYear,
+        year: targetYear,
         month: (filters.month as number) || currentMonth,
         semesterId: "" as const,
       };
@@ -385,7 +397,7 @@ const AdminNoticesPage: React.FC = () => {
         semesterId: filters.semesterId || ("" as const),
       };
 
-      if (semesters.length > 0) {
+      if (semesters.length > 0 && !nextFilters.semesterId) {
         const now = new Date();
         const currentYearMonth = `${now.getFullYear()}-${String(
           now.getMonth() + 1
@@ -417,7 +429,7 @@ const AdminNoticesPage: React.FC = () => {
 
   const handleUnitValueClick = (value: number) => {
     const cy = new Date().getFullYear();
-    const baseYear = filters.year || cy;
+    const baseYear = filters.year === "" ? cy : filters.year || cy;
 
     const nextFilters = {
       ...filters,
@@ -889,8 +901,10 @@ const AdminNoticesPage: React.FC = () => {
                             {notice.title}
                           </Link>
                           <p className="text-[11px] text-gray-500">
-                            작성일{" "}
-                            {new Date(notice.createdAt).toLocaleDateString()}
+                            작성일 {/* ✅ safeFormatDate 적용 */}
+                            <span className="font-medium text-gray-700">
+                              {safeFormatDate(notice.createdAt)}
+                            </span>
                           </p>
                           <p className="text-[11px] text-gray-500">
                             작성자{" "}
@@ -987,7 +1001,8 @@ const AdminNoticesPage: React.FC = () => {
                               )}
                             </td>
                             <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500">
-                              {new Date(notice.createdAt).toLocaleDateString()}
+                              {/* ✅ safeFormatDate 적용 */}
+                              {safeFormatDate(notice.createdAt)}
                             </td>
                             <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500">
                               {getFormattedName(

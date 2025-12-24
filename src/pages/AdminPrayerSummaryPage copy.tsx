@@ -16,7 +16,7 @@ import type {
 } from "../types";
 import SimpleSearchableSelect from "../components/SimpleSearchableSelect";
 import Pagination from "../components/Pagination";
-import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
+import KoreanCalendarPicker from "../components/KoreanCalendarPicker"; // ✅ 달력 컴포넌트 임포트
 
 type SummaryMode = "members" | "cells";
 type UnitType = "year" | "month" | "semester";
@@ -115,7 +115,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
 
   const hasActiveSemesters = semesters.length > 0;
 
-  // ✅ 백엔드 수정 완료로 기본 정렬을 다시 'totalCount'로 설정
   const [sortConfig, setSortConfig] = useState<{
     key: SortKey;
     direction: SortDirection;
@@ -126,14 +125,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
 
   const memberOptions: { value: number; label: string }[] = [];
   const cellOptions: { value: number; label: string }[] = [];
-
-  // ✅ [Helper] 날짜 포맷팅 함수 (백엔드 LocalDate 대응)
-  const safeFormatDate = (dateStr: string | null | undefined) => {
-    if (!dateStr) return "-";
-    // "2025-05-20T..." 또는 "2025-05-20" 모두 처리
-    // T 앞부분만 자르고, 하이픈을 점으로 변경
-    return dateStr.split("T")[0].replace(/-/g, ".");
-  };
 
   const fetchSemesters = useCallback(async () => {
     try {
@@ -554,6 +545,7 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
               setSortConfig({ key: "totalCount", direction: "descending" });
               navigate("/admin/prayers/summary/members");
             }}
+            // ✅ 변경됨: bg-indigo-600 -> bg-blue-500, border-indigo-600 -> border-blue-500
             className={`px-3 py-1 text-xs sm:text-sm rounded-full border ${
               mode === "members"
                 ? "bg-blue-500 text-white border-blue-500"
@@ -570,6 +562,7 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
               setSortConfig({ key: "totalCount", direction: "descending" });
               navigate("/admin/prayers/summary/cells");
             }}
+            // ✅ 변경됨: bg-indigo-600 -> bg-blue-500, border-indigo-600 -> border-blue-500
             className={`px-3 py-1 text-xs sm:text-sm rounded-full border ${
               mode === "cells"
                 ? "bg-blue-500 text-white border-blue-500"
@@ -615,6 +608,7 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                 <label className="block text-sm font-medium text-gray-700">
                   기간 시작
                 </label>
+                {/* ✅ KoreanCalendarPicker 적용 */}
                 <KoreanCalendarPicker
                   value={filters.startDate}
                   onChange={(date) => handleFilterChange("startDate", date)}
@@ -624,6 +618,7 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                 <label className="block text-sm font-medium text-gray-700">
                   기간 종료
                 </label>
+                {/* ✅ KoreanCalendarPicker 적용 */}
                 <KoreanCalendarPicker
                   value={filters.endDate}
                   onChange={(date) => handleFilterChange("endDate", date)}
@@ -767,10 +762,9 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
           <p className="text-center text-sm text-red-500 mb-4">{error}</p>
         )}
 
-        {/* 1. 멤버별 요약 목록 */}
         {!loading && !error && mode === "members" && memberSummaryPage && (
           <>
-            {/* 모바일 뷰 */}
+            {/* 모바일 카드 */}
             <div className="space-y-3 md:hidden mb-4">
               {memberSummaryPage.content.length === 0 ? (
                 <div className="bg-white rounded-lg shadow border p-4 text-center text-xs sm:text-sm text-gray-500">
@@ -820,9 +814,8 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                         <div className="text-right text-[11px] text-gray-500">
                           최근 작성일
                           <br />
-                          {/* ✅ safeFormatDate 적용 */}
                           <span className="font-medium text-gray-800">
-                            {safeFormatDate(row.latestCreatedAt)}
+                            {new Date(row.latestCreatedAt).toLocaleDateString()}
                           </span>
                         </div>
                       </div>
@@ -841,7 +834,7 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
               )}
             </div>
 
-            {/* 데스크탑 뷰 */}
+            {/* 🖥 데스크탑 테이블 (md 이상) */}
             <div className="hidden md:block bg-white shadow-md rounded-lg overflow-x-auto mb-4">
               <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
                 <thead className="bg-gray-50">
@@ -937,8 +930,7 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                             {row.totalCount.toLocaleString()}건
                           </td>
                           <td className="px-3 sm:px-6 py-2 sm:py-3 whitespace-nowrap">
-                            {/* ✅ safeFormatDate 적용 */}
-                            {safeFormatDate(row.latestCreatedAt)}
+                            {new Date(row.latestCreatedAt).toLocaleDateString()}
                           </td>
                         </tr>
                       );
@@ -957,7 +949,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
           </>
         )}
 
-        {/* 2. 셀별 요약 목록 */}
         {!loading && !error && mode === "cells" && cellSummaryPage && (
           <>
             <div className="space-y-3 md:hidden mb-4">
@@ -984,9 +975,8 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                       <div className="text-right text-[11px] text-gray-500">
                         최근 작성일
                         <br />
-                        {/* ✅ safeFormatDate 적용 */}
                         <span className="font-medium text-gray-800">
-                          {safeFormatDate(row.latestCreatedAt)}
+                          {new Date(row.latestCreatedAt).toLocaleDateString()}
                         </span>
                       </div>
                     </div>
@@ -1065,8 +1055,7 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                           {row.totalCount.toLocaleString()}건
                         </td>
                         <td className="px-3 sm:px-6 py-2 sm:py-3 whitespace-nowrap">
-                          {/* ✅ safeFormatDate 적용 */}
-                          {safeFormatDate(row.latestCreatedAt)}
+                          {new Date(row.latestCreatedAt).toLocaleDateString()}
                         </td>
                       </tr>
                     ))

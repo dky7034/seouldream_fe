@@ -49,7 +49,7 @@ interface NewsCenterCardProps {
   canManageNotices: boolean;
   totalNotices: number;
   totalPrayers: number;
-  baseRoute?: "admin" | "cell"; // 경로 분기용 Prop
+  baseRoute?: "admin" | "cell";
 }
 
 type NewsTab = "notices" | "prayers";
@@ -65,12 +65,10 @@ const NewsCenterCard: React.FC<NewsCenterCardProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<NewsTab>("notices");
 
-  // ✅ [수정 1] 셀장 모드인지 확인
   const isCellMode = baseRoute === "cell";
-
-  // ✅ [수정 2] 제목 분기 처리 (셀장이면 '공지사항', 관리자는 '공동체 소식')
   const cardTitle = isCellMode ? "공지사항" : "공동체 소식";
 
+  // ✅ [수정됨] 링크 경로 생성 로직
   const getLinkPath = (type: "notice" | "prayer", id?: number) => {
     if (type === "notice") {
       return id ? `/admin/notices/${id}` : `/admin/notices`;
@@ -80,7 +78,9 @@ const NewsCenterCard: React.FC<NewsCenterCardProps> = ({
       if (baseRoute === "cell") {
         return `/my-cell`;
       } else {
-        return id ? `/admin/prayers/${id}` : `/admin/prayers`;
+        // id가 있으면(개별 항목) 상세 페이지로,
+        // id가 없으면(더보기) 요청하신 '멤버별 요약 페이지'로 이동
+        return id ? `/admin/prayers/${id}` : `/admin/prayers/summary/members`; // 👈 여기가 변경되었습니다.
       }
     }
     return "#";
@@ -90,7 +90,7 @@ const NewsCenterCard: React.FC<NewsCenterCardProps> = ({
   const prayers: RecentPrayerInfo[] = data.recentPrayers;
 
   const renderContent = () => {
-    // 1. 공지사항 탭 (셀장은 항상 이 내용만 보게 됨)
+    // 1. 공지사항 탭
     if (activeTab === "notices") {
       const items = notices.slice(0, MAX_NEWS_ITEMS);
       return notices.length > 0 ? (
@@ -161,11 +161,12 @@ const NewsCenterCard: React.FC<NewsCenterCardProps> = ({
               </li>
             ))}
           </ul>
+          {/* 기도제목 더보기 링크 */}
           {totalPrayers > MAX_NEWS_ITEMS && baseRoute !== "cell" && (
             <div className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-[11px] sm:text-xs text-gray-400">
               <span>외 {totalPrayers - MAX_NEWS_ITEMS}개 더 있습니다.</span>
               <Link
-                to={getLinkPath("prayer")}
+                to={getLinkPath("prayer")} // id 없이 호출 -> 위에서 설정한 경로로 이동
                 className="text-indigo-500 hover:text-indigo-700 font-medium"
               >
                 전체 기도제목 보기
@@ -186,7 +187,7 @@ const NewsCenterCard: React.FC<NewsCenterCardProps> = ({
   return (
     <Card
       icon={<FaBullhorn className="text-yellow-500" />}
-      title={cardTitle} // ✅ 변경된 제목 적용
+      title={cardTitle}
       actions={
         activeTab === "notices" && canManageNotices ? (
           <Link
@@ -198,7 +199,6 @@ const NewsCenterCard: React.FC<NewsCenterCardProps> = ({
         ) : null
       }
     >
-      {/* ✅ [수정 3] 셀장이 아닐 때(관리자일 때)만 탭 버튼 노출 */}
       {!isCellMode && (
         <div className="mb-4">
           <div className="inline-flex flex-wrap gap-1 bg-gray-100 p-1 rounded-lg">
@@ -226,9 +226,6 @@ const NewsCenterCard: React.FC<NewsCenterCardProps> = ({
         </div>
       )}
 
-      {/* isCellMode가 true면 탭 버튼이 사라지지만, 
-        activeTab의 초기값은 "notices"이므로 자동으로 공지사항만 렌더링됩니다. 
-      */}
       {renderContent()}
     </Card>
   );

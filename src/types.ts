@@ -149,6 +149,7 @@ export interface CellDto {
   members: MemberDto[];
   createdAt: string;
   updatedAt: string;
+  attendanceRate?: number; // ✅ [추가] 백엔드에서 계산해서 내려주는 출석률
 }
 
 export interface CellReportDto {

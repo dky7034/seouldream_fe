@@ -197,7 +197,7 @@ const AddMemberToCellModal: React.FC<{
   );
 };
 
-// ───────────────── [컴포넌트] CellReportHistoryItem ─────────────────
+// ───────────────── [컴포넌트] CellReportHistoryItem (수정됨: 메모 제거) ─────────────────
 const CellReportHistoryItem: React.FC<{
   cellId: number;
   date: string; // YYYY-MM-DD
@@ -253,6 +253,7 @@ const CellReportHistoryItem: React.FC<{
 
   return (
     <div className="border border-gray-200 rounded-lg bg-white overflow-hidden mb-3 shadow-sm">
+      {/* 헤더 영역 */}
       <button
         onClick={toggleOpen}
         className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
@@ -274,6 +275,7 @@ const CellReportHistoryItem: React.FC<{
         </div>
       </button>
 
+      {/* 상세 내용 영역 */}
       {isOpen && (
         <div className="p-4 border-t border-gray-200 bg-white animate-fadeIn">
           {loading ? (
@@ -286,6 +288,7 @@ const CellReportHistoryItem: React.FC<{
             </div>
           ) : (
             <div className="space-y-6">
+              {/* 공통 보고서 내용 */}
               {(reportData!.cellShare || reportData!.specialNotes) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
@@ -307,18 +310,24 @@ const CellReportHistoryItem: React.FC<{
                 </div>
               )}
 
+              {/* 멤버별 리포트 섹션 */}
               {reportData!.attendances.length > 0 && (
                 <div>
                   <h4 className="text-sm font-bold text-gray-800 mb-3 pl-1 border-l-4 border-indigo-500">
                     &nbsp;멤버별 기도제목 및 특이사항
                   </h4>
 
+                  {/* ──────────────────────────────────────────────
+                      [모바일 뷰] 카드 리스트 형태 (md:hidden)
+                      메모 관련 로직 제거됨
+                     ────────────────────────────────────────────── */}
                   <div className="md:hidden space-y-3">
                     {reportData!.attendances.map((att) => (
                       <div
                         key={att.id}
                         className="p-3 border border-gray-200 rounded-lg bg-gray-50 flex flex-col gap-2"
                       >
+                        {/* 카드 헤더: 이름과 출석 상태 */}
                         <div className="flex justify-between items-center border-b border-gray-200 pb-2">
                           <span className="font-medium text-gray-900 text-sm">
                             {formatNameWithBirthdate(att.member)}
@@ -333,6 +342,8 @@ const CellReportHistoryItem: React.FC<{
                             {att.status === "PRESENT" ? "출석" : "결석"}
                           </span>
                         </div>
+
+                        {/* 카드 바디: 기도제목 표시 (메모 제거) */}
                         <div className="text-sm text-gray-700 pt-1">
                           {att.prayerContent ? (
                             <div className="mb-1 whitespace-pre-wrap leading-relaxed">
@@ -351,6 +362,10 @@ const CellReportHistoryItem: React.FC<{
                     ))}
                   </div>
 
+                  {/* ──────────────────────────────────────────────
+                      [데스크톱 뷰] 기존 테이블 형태 (hidden md:block)
+                      메모 관련 컬럼 및 로직 제거됨
+                     ────────────────────────────────────────────── */}
                   <div className="hidden md:block overflow-x-auto border border-gray-200 rounded-lg">
                     <table className="min-w-full divide-y divide-gray-200 text-sm">
                       <thead className="bg-gray-50">
@@ -407,18 +422,20 @@ const CellReportHistoryItem: React.FC<{
   );
 };
 
-// ───────────────── [컴포넌트] CellReportHistoryContainer ─────────────────
+// 주차별 컨테이너
 const CellReportHistoryContainer: React.FC<{
   cellId: number;
   startDate: string;
   endDate: string;
   attendances: AttendanceDto[];
 }> = ({ cellId, startDate, endDate, attendances }) => {
+  // [수정] attendanceDate -> date 로 변경
   const writtenDates = useMemo(() => {
     const dates = new Set<string>();
     if (attendances) {
       attendances.forEach((att) => {
         if (att.date) {
+          // 여기서 att.attendanceDate 대신 att.date를 사용해야 합니다.
           dates.add(att.date);
         }
       });
@@ -487,8 +504,8 @@ const CellAttendanceMatrixCard: React.FC<{
   semesters: SemesterDto[];
   activeSemester: SemesterDto | null;
   onSemesterChange: (id: number) => void;
-  unitType: "semester" | "month" | "year";
-  onUnitTypeChange: (type: "semester" | "month" | "year") => void;
+  unitType: "semester" | "month";
+  onUnitTypeChange: (type: "semester" | "month") => void;
   selectedMonth: number | null;
   onMonthSelect: (month: number) => void;
   matrixAttendances: AttendanceDto[];
@@ -579,36 +596,25 @@ const CellAttendanceMatrixCard: React.FC<{
         <div className="bg-gray-50 p-3 sm:p-4 rounded-xl border border-gray-100 flex flex-col gap-4">
           <div className="flex flex-col gap-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              {/* 1. 좌측 영역: 학기 선택 Dropdown OR 연도 표시 Badge */}
-              {unitType !== "year" ? (
-                // [기존] 학기/월간 모드일 때 -> 학기 선택 드롭다운
-                <div className="relative w-full sm:w-auto">
-                  <div className="flex items-center bg-white px-3 py-2 rounded-md border border-gray-300 shadow-sm w-full sm:w-auto">
-                    <FaCalendarAlt className="text-indigo-500 mr-2 text-sm flex-shrink-0" />
-                    <select
-                      value={activeSemester?.id || ""}
-                      onChange={(e) => onSemesterChange(Number(e.target.value))}
-                      className="bg-transparent text-gray-700 font-semibold text-sm focus:outline-none cursor-pointer w-full sm:min-w-[140px]"
-                    >
-                      {semesters.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+              {/* 학기 선택 Dropdown */}
+              <div className="relative w-full sm:w-auto">
+                <div className="flex items-center bg-white px-3 py-2 rounded-md border border-gray-300 shadow-sm w-full sm:w-auto">
+                  <FaCalendarAlt className="text-indigo-500 mr-2 text-sm flex-shrink-0" />
+                  <select
+                    value={activeSemester?.id || ""}
+                    onChange={(e) => onSemesterChange(Number(e.target.value))}
+                    className="bg-transparent text-gray-700 font-semibold text-sm focus:outline-none cursor-pointer w-full sm:min-w-[140px]"
+                  >
+                    {semesters.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              ) : (
-                // ✅ [수정됨] 연간 모드일 때 -> '2025년' 텍스트 표시
-                <div className="flex items-center bg-white px-4 py-2 rounded-md border border-gray-300 shadow-sm w-full sm:w-auto justify-center sm:justify-start">
-                  <FaCalendarAlt className="text-indigo-500 mr-2 text-sm" />
-                  <span className="text-gray-900 font-bold text-sm">
-                    {new Date(startDate).getFullYear()}년
-                  </span>
-                </div>
-              )}
+              </div>
 
-              {/* 연간/학기/월별 버튼 */}
+              {/* 보기 모드 Toggle */}
               <div className="flex bg-gray-200 p-1 rounded-lg w-full sm:w-auto">
                 <button
                   onClick={() => onUnitTypeChange("month")}
@@ -628,17 +634,7 @@ const CellAttendanceMatrixCard: React.FC<{
                       : "text-gray-500 hover:bg-gray-300"
                   }`}
                 >
-                  학기
-                </button>
-                <button
-                  onClick={() => onUnitTypeChange("year")}
-                  className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-medium rounded-md transition-all whitespace-nowrap ${
-                    unitType === "year"
-                      ? "bg-white text-indigo-700 shadow ring-1 ring-black/5"
-                      : "text-gray-500 hover:bg-gray-300"
-                  }`}
-                >
-                  연간
+                  학기 전체
                 </button>
               </div>
             </div>
@@ -725,14 +721,12 @@ const CellAttendanceMatrixCard: React.FC<{
         {/* 매트릭스 */}
         <div className="pt-2">
           <h4 className="text-sm font-medium text-gray-700 mb-3 ml-1 break-keep">
-            {unitType === "year"
-              ? `[${new Date(startDate).getFullYear()}년] 전체 현황`
-              : unitType === "semester"
+            {unitType === "semester"
               ? `[${activeSemester?.name}] 전체 현황`
               : `${selectedMonth}월 상세 현황`}
           </h4>
           <AttendanceMatrix
-            mode={unitType}
+            mode={unitType === "month" ? "month" : "semester"}
             startDate={startDate}
             endDate={endDate}
             year={new Date(startDate).getFullYear()}
@@ -742,8 +736,6 @@ const CellAttendanceMatrixCard: React.FC<{
             loading={false}
             limitStartDate={activeSemester?.startDate}
             limitEndDate={activeSemester?.endDate}
-            // ✅ [추가] semesters 목록을 넘겨주어 매트릭스 내부에서 필터링하게 함
-            semesters={semesters}
           />
         </div>
       </div>
@@ -768,10 +760,7 @@ const CellDetailPage: React.FC = () => {
   const [activeSemester, setActiveSemester] = useState<SemesterDto | null>(
     null
   );
-  // ✅ [수정] unitType에 "year" 추가
-  const [unitType, setUnitType] = useState<"semester" | "month" | "year">(
-    "semester"
-  );
+  const [unitType, setUnitType] = useState<"semester" | "month">("semester");
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
 
   const [matrixAttendances, setMatrixAttendances] = useState<AttendanceDto[]>(
@@ -824,22 +813,9 @@ const CellDetailPage: React.FC = () => {
     loadSemesters();
   }, []);
 
-  // ✅ [수정] periodRange 계산 로직에 연간 조회 추가
   const periodRange = useMemo(() => {
-    // 1. 연간 조회일 때
-    if (unitType === "year") {
-      const targetYear = activeSemester
-        ? new Date(activeSemester.startDate).getFullYear()
-        : new Date().getFullYear();
-
-      return {
-        startDate: `${targetYear}-01-01`,
-        endDate: `${targetYear}-12-31`,
-      };
-    }
-
-    // 2. 기존 로직 (학기/월간)
     if (!activeSemester) return { startDate: "", endDate: "" };
+
     const { startDate: semStart, endDate: semEnd } = activeSemester;
 
     if (unitType === "semester" || selectedMonth === null) {
@@ -936,10 +912,9 @@ const CellDetailPage: React.FC = () => {
     }
   };
 
-  // ✅ [수정] 핸들러에서 "year" 처리 추가
-  const handleUnitTypeChange = (type: "semester" | "month" | "year") => {
+  const handleUnitTypeChange = (type: "semester" | "month") => {
     setUnitType(type);
-    if (type === "semester" || type === "year") {
+    if (type === "semester") {
       setSelectedMonth(null);
       return;
     }
@@ -1172,7 +1147,7 @@ const CellDetailPage: React.FC = () => {
               endDate={periodRange.endDate}
             />
 
-            {/* 셀 보고서 기록 */}
+            {/* [수정] 셀 보고서 기록 */}
             {cell && periodRange.startDate && (
               <CellReportHistoryContainer
                 cellId={cell.id}

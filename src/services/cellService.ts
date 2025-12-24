@@ -40,6 +40,17 @@ export const cellService = {
     }
   },
 
+  // ✅ [신규 추가] 백엔드 변경 사항 반영: 셀 편성 연도 조회
+  getAvailableYears: async (): Promise<number[]> => {
+    try {
+      const response = await api.get("/cells/available-years");
+      return response.data;
+    } catch (error: any) {
+      console.error("Failed to fetch available years:", error);
+      throw error;
+    }
+  },
+
   createCell: async (data: CreateCellRequest): Promise<CellDto> => {
     try {
       const response = await api.post("/cells", data);
