@@ -115,7 +115,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
 
   const hasActiveSemesters = semesters.length > 0;
 
-  // ✅ 백엔드 수정 완료로 기본 정렬을 다시 'totalCount'로 설정
   const [sortConfig, setSortConfig] = useState<{
     key: SortKey;
     direction: SortDirection;
@@ -127,12 +126,20 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
   const memberOptions: { value: number; label: string }[] = [];
   const cellOptions: { value: number; label: string }[] = [];
 
-  // ✅ [Helper] 날짜 포맷팅 함수 (백엔드 LocalDate 대응)
+  // ✅ [수정 1] 날짜 포맷팅 함수 개선 (타임존 문제 해결)
+  // 입력값에 'Z'가 없으면 강제로 붙여서 UTC로 인식하게 함 -> 브라우저가 KST로 자동 변환
   const safeFormatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return "-";
-    // "2025-05-20T..." 또는 "2025-05-20" 모두 처리
-    // T 앞부분만 자르고, 하이픈을 점으로 변경
-    return dateStr.split("T")[0].replace(/-/g, ".");
+
+    // T는 있는데 Z가 없으면 Z를 붙여줌 (Spring Boot 기본 LocalDateTime 대응)
+    const targetStr =
+      dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
+
+    const date = new Date(targetStr);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}.${month}.${day}`;
   };
 
   const fetchSemesters = useCallback(async () => {
@@ -177,7 +184,9 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     fetchAllMembers();
   }, [user]);
 
-  useEffect(() => {
+  // ❌ [수정 2] 자동 연도 선택 로직 삭제
+  // '전체 연도'("") 상태를 유지해야 하므로, 데이터 로딩 후 강제로 최신 연도로 바꾸는 이 Effect는 제거합니다.
+  /* useEffect(() => {
     if (
       filterType === "unit" &&
       unitType === "year" &&
@@ -189,6 +198,7 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
       setCurrentPage(0);
     }
   }, [filterType, unitType, filters.year, availableYears]);
+  */
 
   const buildBaseParams = useCallback((): GetPrayersParams => {
     const params: GetPrayersParams = {
@@ -210,6 +220,7 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
           params.endDate = semester.endDate;
         }
       } else {
+        // filters.year가 ""이면 normalizeNumberInput이 undefined 반환 -> 파라미터 제외됨 -> 백엔드 전체 조회
         params.year = normalizeNumberInput(filters.year);
         params.month = normalizeNumberInput(filters.month);
       }
@@ -338,11 +349,16 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
       const currentMonth = now.getMonth() + 1;
 
       if (type === "year") {
-        next.year = next.year || currentYear;
+        // ✅ [수정 3] "전체 연도"("") 상태 유지. 없으면(null) 현재년도 대신 ""(전체)로 설정해도 됨
+        // 여기서는 기존 값이 있으면 유지하고, 없으면 빈값(전체) 유지.
+        next.year = next.year === "" ? "" : next.year || currentYear;
         next.month = "";
         next.semesterId = "";
       } else if (type === "month") {
-        next.year = next.year || currentYear;
+        // 월간은 연도 필수 -> 전체 연도("") 상태라면 현재 연도로 강제 설정
+        const targetYear =
+          next.year === "" ? currentYear : next.year || currentYear;
+        next.year = targetYear;
         next.month = next.month || currentMonth;
         next.semesterId = "";
       } else if (type === "semester") {

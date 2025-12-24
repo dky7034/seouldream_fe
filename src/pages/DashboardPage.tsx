@@ -28,7 +28,6 @@ import { translateRole } from "../utils/roleUtils";
 import {
   getPeriodDates,
   getThisWeekRange,
-  formatDateKorean,
   toISODateString,
 } from "../utils/dateutils";
 
@@ -52,6 +51,20 @@ import { DemographicsSection } from "../components/DemographicsSection";
 // --- 타입 정의 ---
 type SummaryMode = "SEMESTER" | "YEAR";
 type IncompleteFilter = "WEEK" | "MONTH" | "SEMESTER";
+
+// ✅ [추가] 날짜 포맷팅 함수 (타임존 문제 해결 및 일관성 유지)
+const safeFormatDate = (dateStr: string | null | undefined) => {
+  if (!dateStr) return "-";
+  // T는 있는데 Z가 없으면 Z를 붙여줌 (UTC 인식 유도 -> 브라우저가 KST 변환)
+  const targetStr =
+    dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
+
+  const date = new Date(targetStr);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}.${month}.${day}`;
+};
 
 // --- Helper Functions ---
 const computeTrendRange = (
@@ -147,7 +160,8 @@ const formatDateGroupLabel = (
     const [y, w] = raw.split("-W");
     return `${y}년 ${w}주차`;
   }
-  return formatDateKorean(raw);
+  // DAY인 경우 safeFormatDate 사용
+  return safeFormatDate(raw);
 };
 
 // --- Sub Components ---
@@ -359,8 +373,9 @@ const AttendanceTrend: React.FC<{
         </h2>
         {dateRange && (
           <span className="text-[10px] text-gray-400">
-            {formatDateKorean(dateRange.startDate)} ~{" "}
-            {formatDateKorean(dateRange.endDate)}
+            {/* ✅ safeFormatDate 적용 */}
+            {safeFormatDate(dateRange.startDate)} ~{" "}
+            {safeFormatDate(dateRange.endDate)}
           </span>
         )}
       </div>
@@ -435,7 +450,8 @@ const IncompleteAttendanceSection: React.FC<{
                   {r.missedDatesCount}
                 </td>
                 <td className="px-3 py-2 text-gray-500">
-                  {r.missedDates[r.missedDates.length - 1]}
+                  {/* ✅ safeFormatDate 적용 */}
+                  {safeFormatDate(r.missedDates[r.missedDates.length - 1])}
                 </td>
               </tr>
             ))}
@@ -753,7 +769,7 @@ const DashboardPage: React.FC = () => {
   })();
 
   const incompleteRangeLabel = incompleteDateRange
-    ? `${formatDateKorean(incompleteDateRange.startDate)} ~ ${formatDateKorean(
+    ? `${safeFormatDate(incompleteDateRange.startDate)} ~ ${safeFormatDate(
         incompleteDateRange.endDate
       )}`
     : "";

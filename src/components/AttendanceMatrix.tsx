@@ -1,3 +1,4 @@
+// src/components/AttendanceMatrix.tsx
 import React, { useMemo } from "react";
 import type { AttendanceDto, SemesterDto } from "../types";
 
@@ -52,6 +53,11 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
     if ((mode === "semester" || mode === "year") && startDate && endDate) {
       const start = new Date(startDate);
       const end = new Date(endDate);
+
+      // ✅ [안전장치] 시간 초기화 (타임존 이슈 방지)
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+
       const current = new Date(start);
 
       if (current.getDay() !== 0) {
@@ -180,8 +186,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                   </th>
                 )}
 
-                {/* ✅ [수정] 3. 출석률 헤더 (우측 고정) */}
-                {/* 텍스트를 '율(%)' -> '출석률'로 변경 */}
+                {/* 3. 출석률 헤더 (우측 고정) */}
                 <th className="sticky right-0 z-20 bg-gray-50 p-2 min-w-[60px] text-center font-medium text-gray-500 border-b border-l border-gray-200 shadow-[-1px_0_3px_rgba(0,0,0,0.05)]">
                   출석률
                 </th>
@@ -189,9 +194,8 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
             </thead>
             <tbody>
               {members.map((member) => {
-                // ✅ [추가] 각 멤버별 출석률 계산 로직
+                // 각 멤버별 출석률 계산 로직
                 let presentCount = 0;
-                // targetDays(표시되는 날짜) 기준으로 순회하며 계산
                 targetDays.forEach((day) => {
                   const status = attendanceMap.get(
                     `${member.memberId}-${toDateKey(day)}`
@@ -201,7 +205,6 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                   }
                 });
 
-                // 0으로 나누기 방지 및 반올림 적용 (Math.round)
                 const totalWeeks = targetDays.length;
                 const attendanceRate =
                   totalWeeks > 0
@@ -256,7 +259,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                       <td className="p-2 border-b border-gray-50"></td>
                     )}
 
-                    {/* ✅ [추가] 출석률 값 표시 (우측 고정) */}
+                    {/* 출석률 값 표시 (우측 고정) */}
                     <td className="sticky right-0 z-10 bg-white p-2 text-center border-b border-l border-gray-100 font-bold text-indigo-600 shadow-[-1px_0_3px_rgba(0,0,0,0.05)]">
                       {attendanceRate}%
                     </td>
@@ -267,7 +270,6 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
               {/* 데이터 없음 메시지 */}
               {members.length === 0 && (
                 <tr>
-                  {/* targetDays + 이름 + 출석률 컬럼까지 합쳐서 colSpan 지정 */}
                   <td
                     colSpan={targetDays.length + 2}
                     className="p-8 text-center text-gray-400 bg-gray-50"

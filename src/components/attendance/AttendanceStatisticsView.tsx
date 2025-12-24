@@ -17,6 +17,7 @@ type FilterMode = "unit" | "range";
  * Helpers
  * ----------------------------- */
 
+// ✅ [수정] 시간 초기화를 포함한 일요일 계산
 const countSundays = (startInput: Date, endInput: Date): number => {
   if (startInput > endInput) return 0;
 
@@ -24,14 +25,13 @@ const countSundays = (startInput: Date, endInput: Date): number => {
   current.setHours(0, 0, 0, 0);
 
   const end = new Date(endInput);
-  end.setHours(23, 59, 59, 999);
-
-  let count = 0;
+  end.setHours(0, 0, 0, 0); // 23:59:59 대신 00:00:00으로 맞추고 비교 (안전)
 
   if (current.getDay() !== 0) {
     current.setDate(current.getDate() + (7 - current.getDay()));
   }
 
+  let count = 0;
   while (current <= end) {
     count++;
     current.setDate(current.getDate() + 7);
@@ -39,26 +39,21 @@ const countSundays = (startInput: Date, endInput: Date): number => {
   return count;
 };
 
+// 날짜 범위 체크 (타임존 무시하고 년/월/일 비교)
 const isDateInSemesterOrSameMonth = (date: Date, semester: SemesterDto) => {
   const start = new Date(semester.startDate);
   const end = new Date(semester.endDate);
 
-  const startDay = new Date(start);
-  startDay.setHours(0, 0, 0, 0);
-  const endDay = new Date(end);
-  endDay.setHours(23, 59, 59, 999);
-  if (date >= startDay && date <= endDay) return true;
+  // 단순 타임스탬프 비교
+  if (date >= start && date <= end) return true;
 
-  const isSameYear =
-    date.getFullYear() === start.getFullYear() ||
-    date.getFullYear() === end.getFullYear();
-  if (!isSameYear) return false;
-
-  const m = date.getMonth();
+  // 같은 년/월인지 체크 (학기 시작/종료 월 포함 여부)
   const isStartMonth =
-    date.getFullYear() === start.getFullYear() && m === start.getMonth();
+    date.getFullYear() === start.getFullYear() &&
+    date.getMonth() === start.getMonth();
   const isEndMonth =
-    date.getFullYear() === end.getFullYear() && m === end.getMonth();
+    date.getFullYear() === end.getFullYear() &&
+    date.getMonth() === end.getMonth();
 
   return isStartMonth || isEndMonth;
 };
@@ -153,8 +148,9 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
         if (currentSemester) {
           const semStart = new Date(currentSemester.startDate);
           const semEnd = new Date(currentSemester.endDate);
+          // 시간 초기화
           semStart.setHours(0, 0, 0, 0);
-          semEnd.setHours(23, 59, 59, 999);
+          semEnd.setHours(0, 0, 0, 0);
 
           if (semStart > start) start = semStart;
           if (semEnd < end) end = semEnd;
@@ -223,6 +219,7 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
           };
         }
       } else {
+        // 월간 조회
         params = {
           year: filters.year,
           month: filters.month,
@@ -453,7 +450,7 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
                 <div className="text-xs text-gray-400 mb-2 break-keep">
                   * 선택된 학기 기간 내의 월만 표시됩니다.
                 </div>
-                {/* [수정] 가로 스크롤 적용 */}
+                {/* ✅ [수정] 가로 스크롤 UI 적용 */}
                 <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x">
                   {semesterMonths.length > 0 ? (
                     semesterMonths.map((m) => {

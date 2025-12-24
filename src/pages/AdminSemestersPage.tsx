@@ -8,7 +8,7 @@ import type {
 } from "../types";
 import ConfirmModal from "../components/ConfirmModal";
 import AlertModal from "../components/AlertModal";
-import KoreanCalendarPicker from "../components/KoreanCalendarPicker"; // ✅ 전달주신 컴포넌트 임포트
+import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
 
 const AdminSemestersPage: React.FC = () => {
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
@@ -18,7 +18,6 @@ const AdminSemestersPage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
-  // ✅ 초기값은 요청하신 대로 빈 문자열("")로 비워둡니다.
   const [form, setForm] = useState<{
     name: string;
     startDate: string;
@@ -40,6 +39,20 @@ const AdminSemestersPage: React.FC = () => {
   const [alertModalTitle, setAlertModalTitle] = useState("");
   const [alertModalMessage, setAlertModalMessage] = useState("");
 
+  // ✅ [추가] 날짜 포맷팅 함수 (다른 페이지와 디자인 통일: YYYY.MM.DD)
+  const safeFormatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return "-";
+    // T는 있는데 Z가 없으면 Z를 붙여줌 (UTC 인식 유도 -> 브라우저가 KST 변환)
+    const targetStr =
+      dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
+
+    const date = new Date(targetStr);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}.${month}.${day}`;
+  };
+
   const showAlert = (title: string, message: string) => {
     setAlertModalTitle(title);
     setAlertModalMessage(message);
@@ -47,7 +60,6 @@ const AdminSemestersPage: React.FC = () => {
   };
 
   const resetForm = () => {
-    // ✅ 폼 초기화 시에도 날짜를 비워둡니다.
     setForm({
       name: "",
       startDate: "",
@@ -64,9 +76,10 @@ const AdminSemestersPage: React.FC = () => {
       setError(null);
       const data = await semesterService.getAllSemesters();
 
-      // 시작일 기준 오름차순 정렬
+      // 시작일 기준 내림차순 정렬 (최신 학기가 위로 오게)
+      // 기존 오름차순(a-b)에서 내림차순(b-a)으로 변경 추천 (관리 편의상)
       const sorted = [...data].sort((a, b) =>
-        a.startDate.localeCompare(b.startDate)
+        b.startDate.localeCompare(a.startDate)
       );
 
       setSemesters(sorted);
@@ -90,7 +103,6 @@ const AdminSemestersPage: React.FC = () => {
     }));
   };
 
-  // ✅ KoreanCalendarPicker는 선택된 날짜 문자열("YYYY-MM-DD")을 그대로 반환합니다.
   const handleDateStringChange = (
     field: "startDate" | "endDate",
     val: string
@@ -106,7 +118,6 @@ const AdminSemestersPage: React.FC = () => {
       return;
     }
 
-    // 날짜 유효성 체크: 종료일 >= 시작일
     if (form.endDate < form.startDate) {
       showAlert("입력 오류", "종료일은 시작일 이후여야 합니다.");
       return;
@@ -247,7 +258,6 @@ const AdminSemestersPage: React.FC = () => {
               />
             </div>
 
-            {/* 시작일 - 초기값은 "" 이며 비워져 있습니다. */}
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 시작일 <span className="text-red-500">*</span>
@@ -258,7 +268,6 @@ const AdminSemestersPage: React.FC = () => {
               />
             </div>
 
-            {/* 종료일 - 초기값은 "" 이며 비워져 있습니다. */}
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 종료일 <span className="text-red-500">*</span>
@@ -351,11 +360,13 @@ const AdminSemestersPage: React.FC = () => {
               <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-gray-700">
                 <div>
                   <p className="text-gray-400">시작일</p>
-                  <p className="mt-0.5">{semester.startDate}</p>
+                  {/* ✅ safeFormatDate 적용 */}
+                  <p className="mt-0.5">{safeFormatDate(semester.startDate)}</p>
                 </div>
                 <div>
                   <p className="text-gray-400">종료일</p>
-                  <p className="mt-0.5">{semester.endDate}</p>
+                  {/* ✅ safeFormatDate 적용 */}
+                  <p className="mt-0.5">{safeFormatDate(semester.endDate)}</p>
                 </div>
               </div>
 
@@ -432,10 +443,12 @@ const AdminSemestersPage: React.FC = () => {
                     {semester.name}
                   </td>
                   <td className="whitespace-nowrap px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-900">
-                    {semester.startDate}
+                    {/* ✅ safeFormatDate 적용 */}
+                    {safeFormatDate(semester.startDate)}
                   </td>
                   <td className="whitespace-nowrap px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-900">
-                    {semester.endDate}
+                    {/* ✅ safeFormatDate 적용 */}
+                    {safeFormatDate(semester.endDate)}
                   </td>
                   <td className="whitespace-nowrap px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-900">
                     <div className="flex items-center">

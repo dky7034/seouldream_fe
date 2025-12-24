@@ -1,3 +1,4 @@
+// src/pages/AdminCellsPage.tsx
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { cellService } from "../services/cellService";
@@ -66,18 +67,49 @@ const AdminCellsPage: React.FC = () => {
     { name: string; birthDate?: string }[]
   >([]);
 
-  const now = new Date();
-  const currentYear = now.getFullYear();
+  // const now = new Date();
+  // const currentYear = now.getFullYear();
 
-  // 필터 상태
-  const [filters, setFilters] = useState<Filters>({
-    name: "",
-    active: "all",
-    startDate: "",
-    endDate: "",
-    year: currentYear,
-    month: "",
-    semesterId: "",
+  // ✅ [Helper] 날짜 포맷팅 함수 (KST 적용)
+  // const safeFormatDate = (dateStr: string | null | undefined) => {
+  //   if (!dateStr) return "-";
+  //   // T는 있는데 Z가 없으면 Z를 붙여줌 (UTC 인식 유도 -> 브라우저가 KST 변환)
+  //   const targetStr =
+  //     dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
+
+  //   const date = new Date(targetStr);
+  //   const year = date.getFullYear();
+  //   const month = String(date.getMonth() + 1).padStart(2, "0");
+  //   const day = String(date.getDate()).padStart(2, "0");
+  //   return `${year}.${month}.${day}`;
+  // };
+
+  // ───────────────── 필터 상태 (URL 기반 초기값) ─────────────────
+  const [filters, setFilters] = useState<Filters>(() => {
+    const name = searchParams.get("name") || "";
+    const active = (searchParams.get("active") as Filters["active"]) || "all";
+    const startDate = searchParams.get("startDate") || "";
+    const endDate = searchParams.get("endDate") || "";
+    const yearParam = searchParams.get("year");
+    const monthParam = searchParams.get("month");
+    const semesterIdParam = searchParams.get("semesterId");
+
+    // ✅ 초기값을 '전체 연도'("")로 설정
+    let initialYear: number | "" = "";
+    if (yearParam && yearParam !== "all") {
+      const parsed = Number(yearParam);
+      if (!isNaN(parsed)) initialYear = parsed;
+    }
+
+    return {
+      name,
+      active,
+      startDate,
+      endDate,
+      year: initialYear,
+      month: monthParam ? Number(monthParam) : "",
+      semesterId: semesterIdParam ? Number(semesterIdParam) : "",
+    };
   });
 
   const [filterType, setFilterType] = useState<"unit" | "range">("unit");
@@ -88,7 +120,6 @@ const AdminCellsPage: React.FC = () => {
   const debouncedNameFilter = useDebounce(filters.name, 500);
   const hasActiveSemesters = semesters.length > 0;
 
-  // ✅ [수정 3] updateQueryParams를 useCallback으로 감싸서 의존성 문제 해결
   const updateQueryParams = useCallback(
     (updates: Record<string, string | number | undefined | null>) => {
       const newParams = new URLSearchParams(searchParams);
@@ -101,7 +132,6 @@ const AdminCellsPage: React.FC = () => {
         }
       });
 
-      // ✅ [수정 2] hasOwnProperty 안전하게 호출 (ESLint 에러 해결)
       if (!Object.prototype.hasOwnProperty.call(updates, "page")) {
         newParams.set("page", "0");
       }
@@ -220,10 +250,10 @@ const AdminCellsPage: React.FC = () => {
     }
 
     const year = typeof filters.year === "number" ? filters.year : undefined;
+
+    // ✅ [수정 3] 로직 단순화: year가 없으면 무조건 null 반환
+    // (이전 코드에서 불필요했던 unitType 체크를 제거하여 Linter 경고 해결)
     if (!year) {
-      if (unitType === "year") {
-        return { startDate: "1900-01-01", endDate: "2100-12-31" };
-      }
       return null;
     }
 
@@ -239,7 +269,7 @@ const AdminCellsPage: React.FC = () => {
 
     const last = lastDayOfMonth(year, 12);
     return { startDate: `${year}-01-01`, endDate: `${year}-12-${pad(last)}` };
-  }, [filterType, filters, semesters, unitType]);
+  }, [filterType, filters, semesters]); // unitType 의존성 제거됨
 
   const fetchCells = useCallback(async () => {
     if (!user || user.role !== "EXECUTIVE") return;
@@ -271,8 +301,9 @@ const AdminCellsPage: React.FC = () => {
       sort: sortParam,
       name: debouncedNameFilter,
       active: filters.active === "all" ? undefined : filters.active === "true",
-      startDate: dateRange?.startDate,
-      endDate: dateRange?.endDate,
+      // ✅ dateRange가 null이면 undefined 처리 (전체 기간 조회)
+      startDate: dateRange?.startDate || undefined,
+      endDate: dateRange?.endDate || undefined,
     };
 
     const cleanedParams = Object.fromEntries(
@@ -334,7 +365,6 @@ const AdminCellsPage: React.FC = () => {
     fetchCells();
   }, [user, fetchCells, semesters.length, unitType]);
 
-  // ✅ [수정 3] 의존성 배열에 updateQueryParams 추가
   useEffect(() => {
     if (semesters.length === 0 || hasInitialized) return;
 
@@ -382,7 +412,7 @@ const AdminCellsPage: React.FC = () => {
       });
     }
     setHasInitialized(true);
-  }, [semesters, hasInitialized, searchParams, updateQueryParams]); // updateQueryParams 추가
+  }, [semesters, hasInitialized, searchParams, updateQueryParams]);
 
   // --- Memoized Data ---
 
@@ -469,17 +499,15 @@ const AdminCellsPage: React.FC = () => {
     };
 
     if (type === "year") {
-      // [수정 전] 목록에 있는 연도 중 가장 최신(0번째) 연도를 선택
-      // updates.year = filters.year || (availableYears.length > 0 ? availableYears[0] : now.getFullYear());
-
-      // ✅ [수정 후] 목록 순서와 상관없이 '현재 연도(올해)'를 기본값으로 선택
-      // (기존에 선택된 연도가 있다면 유지하고, 없으면 올해를 선택)
-      updates.year = filters.year || now.getFullYear();
-
+      // ✅ [수정 4] "전체 연도"("") 상태 유지 (없으면 빈값)
+      updates.year = filters.year === "" ? "" : filters.year || "";
       updates.month = "";
       updates.semesterId = "";
     } else if (type === "month") {
-      updates.year = filters.year || now.getFullYear();
+      updates.year =
+        filters.year === ""
+          ? now.getFullYear()
+          : filters.year || now.getFullYear();
       updates.month = filters.month || now.getMonth() + 1;
       updates.semesterId = "";
     } else if (type === "semester") {
@@ -759,7 +787,7 @@ const AdminCellsPage: React.FC = () => {
                       )
                     : "미정";
 
-                  // ✅ [수정] 소수점 1자리(toFixed(1)) -> 정수 반올림(Math.round)
+                  // 소수점 1자리(toFixed(1)) -> 정수 반올림(Math.round)
                   const rateText =
                     cell.attendanceRate !== undefined
                       ? `${Math.round(cell.attendanceRate)}%`
@@ -883,7 +911,6 @@ const AdminCellsPage: React.FC = () => {
                           )
                         : "미정";
 
-                      // ✅ [수정] 소수점 1자리(toFixed(1)) -> 정수 반올림(Math.round)
                       const rateText =
                         cell.attendanceRate !== undefined
                           ? `${Math.round(cell.attendanceRate)}%`
@@ -964,7 +991,7 @@ const AdminCellsPage: React.FC = () => {
                 정말로 &quot;{cellToDelete?.name}&quot; 셀을 삭제하시겠습니까?
               </p>
 
-              {/* ✅ [수정 1] deleteError 상태 사용 (unused var 에러 해결) */}
+              {/* deleteError 상태 사용 (unused var 에러 해결) */}
               {deleteError && (
                 <div className="mt-2 p-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded">
                   {deleteError}

@@ -32,8 +32,6 @@ import {
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
   MinusIcon,
-  // ChevronLeftIcon,  // ❌ 삭제: 더 이상 외부 화살표를 쓰지 않으므로 제거
-  // ChevronRightIcon, // ❌ 삭제
 } from "@heroicons/react/24/outline";
 import { FaTh } from "react-icons/fa";
 
@@ -217,7 +215,6 @@ const AttendanceMatrixView = memo(
     isLoading: boolean;
     onNavigate: (direction: "prev" | "next") => void;
   }) => {
-    // 미체크 및 통계 계산 로직
     const uncheckedCount = useMemo(() => {
       if (!startDate || !endDate || members.length === 0) return 0;
 
@@ -293,7 +290,6 @@ const AttendanceMatrixView = memo(
 
     return (
       <div className="space-y-6 animate-fadeIn">
-        {/* 4분할 요약 카드 */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
           <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
             <p className="text-xs sm:text-sm font-medium text-indigo-500">
@@ -328,7 +324,6 @@ const AttendanceMatrixView = memo(
           </div>
         </div>
 
-        {/* 매트릭스 컨테이너 */}
         <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-4">
           <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
             <h4 className="text-sm font-bold text-gray-700 flex items-center">
@@ -339,8 +334,6 @@ const AttendanceMatrixView = memo(
                 ? "학기 전체 현황"
                 : `${targetYear}년 ${targetMonth}월 상세 현황`}
             </h4>
-
-            {/* ❌ 외부 화살표 버튼 제거됨: 이제 AttendanceMatrix 내부 화살표만 사용됨 */}
           </div>
 
           <AttendanceMatrix
@@ -401,6 +394,7 @@ const AdminAttendancesPage: React.FC = () => {
         ? { value: user.cellId, label: user.cellName }
         : null,
     status: "",
+    // ✅ [수정 1] 초기값을 '전체("")'가 아닌 '올해(currentYear)'로 설정
     year: currentYear,
     month: "" as number | "",
     semesterId: "" as number | "",
@@ -416,7 +410,6 @@ const AdminAttendancesPage: React.FC = () => {
   // Effects & Logic
   // ─────────────────────────────────────────────────────────────
 
-  // 자동 학기 선택 로직
   useEffect(() => {
     if (semesters.length > 0 && !hasAutoSelectedSemester) {
       const today = new Date();
@@ -454,7 +447,6 @@ const AdminAttendancesPage: React.FC = () => {
     }
   }, [semesters, hasAutoSelectedSemester, currentYear, currentMonth]);
 
-  // 날짜 범위 계산
   const effectiveDateRange = useMemo(() => {
     if (filterType === "range") {
       if (filters.startDate && filters.endDate) {
@@ -488,7 +480,6 @@ const AdminAttendancesPage: React.FC = () => {
       return null;
     }
 
-    // 학기 기간에 맞춰 날짜 조정
     if (semesters.length > 0) {
       const overlappingSemesters = semesters.filter(
         (s) => s.startDate <= rawEnd && s.endDate >= rawStart
@@ -507,7 +498,6 @@ const AdminAttendancesPage: React.FC = () => {
     return { startDate: rawStart, endDate: rawEnd };
   }, [filterType, filters, semesters, unitType]);
 
-  // API 파라미터 정리
   const getCleanedParams = useCallback(() => {
     const params: GetAttendancesParams = {
       status: filters.status as AttendanceStatus | undefined,
@@ -530,7 +520,6 @@ const AdminAttendancesPage: React.FC = () => {
     );
   }, [filters, effectiveDateRange]);
 
-  // 데이터 조회
   const fetchAttendances = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -568,7 +557,6 @@ const AdminAttendancesPage: React.FC = () => {
     }
   }, [getCleanedParams]);
 
-  // 초기 데이터 로드 및 filters 변경 시 재조회 (fetchAttendances가 filters에 의존함)
   useEffect(() => {
     if (user && ["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
       if (semesters.length > 0 || hasActiveSemesters === false) {
@@ -592,7 +580,6 @@ const AdminAttendancesPage: React.FC = () => {
     hasActiveSemesters,
   ]);
 
-  // 기본 정보 로드
   useEffect(() => {
     if (user && ["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
       attendanceService
@@ -611,7 +598,6 @@ const AdminAttendancesPage: React.FC = () => {
     }
   }, [user]);
 
-  // ✅ 월 이동 핸들러
   const handleMonthNavigation = useCallback(
     (direction: "prev" | "next") => {
       setFilters((prev) => {
@@ -645,7 +631,6 @@ const AdminAttendancesPage: React.FC = () => {
     [unitType]
   );
 
-  // --- Handlers ---
   const handleFilterChange = (key: keyof Filters, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
@@ -681,11 +666,12 @@ const AdminAttendancesPage: React.FC = () => {
           typeof prev.year === "number" ? prev.year : currentYear;
         const next: Filters = { ...prev };
         if (type === "year") {
-          next.year = baseYear;
+          // ✅ [수정 2] 연간 선택 시 year가 없으면 현재년도로 강제 설정 (전체 연도 불허)
+          next.year = baseYear || currentYear;
           next.month = "";
           next.semesterId = "";
         } else if (type === "month") {
-          next.year = baseYear;
+          next.year = baseYear || currentYear;
           next.month = (prev.month as number) || currentMonth;
           next.semesterId = "";
         } else if (type === "semester") {
@@ -718,7 +704,6 @@ const AdminAttendancesPage: React.FC = () => {
     });
   };
 
-  // --- Options ---
   const statusOptions = useMemo(
     () => [
       { value: "", label: "모든 상태" },
@@ -751,19 +736,15 @@ const AdminAttendancesPage: React.FC = () => {
     ];
   }, [allMembers, isCellLeader, user?.cellId]);
 
+  // ✅ [수정 3] "전체 연도" 옵션 제거하고 DB 연도들만 표시 (없으면 올해라도 표시)
   const yearOptions = useMemo(() => {
-    if (availableYears.length === 0)
-      return [
-        { value: "", label: "전체 연도" },
-        { value: currentYear, label: `${currentYear}년` },
-      ];
-    return [
-      { value: "", label: "전체 연도" },
-      ...availableYears.map((y) => ({ value: y, label: `${y}년` })),
-    ];
+    if (availableYears.length === 0) {
+      return [{ value: currentYear, label: `${currentYear}년` }];
+    }
+    // "전체 연도" { value: "", label: "전체 연도" } 제거
+    return availableYears.map((y) => ({ value: y, label: `${y}년` }));
   }, [availableYears, currentYear]);
 
-  // Target Members Filter
   const targetMembers = useMemo(() => {
     if (filters.member)
       return allMembers.filter((m) => m.id === filters.member?.value);
@@ -774,7 +755,6 @@ const AdminAttendancesPage: React.FC = () => {
     return allMembers;
   }, [allMembers, filters.member, filters.cell, isCellLeader, user]);
 
-  // --- Render ---
   if (!user || !["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
     return (
       <p className="mt-4 text-center text-sm text-red-600">
@@ -785,7 +765,6 @@ const AdminAttendancesPage: React.FC = () => {
 
   return (
     <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
@@ -797,12 +776,9 @@ const AdminAttendancesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats */}
       <AttendanceStats stats={overallStats} loading={statsLoading} />
 
-      {/* Filter Panel */}
       <div className="p-4 bg-gray-50 rounded-lg mb-6 shadow-sm space-y-4">
-        {/* ... 필터 관련 코드는 기존과 동일합니다 (생략 가능하지만 전체 코드 요청이므로 유지) ... */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="text-base sm:text-lg font-semibold">조회 기간 설정</h3>
           <div className="flex flex-wrap gap-2">
@@ -971,7 +947,6 @@ const AdminAttendancesPage: React.FC = () => {
         )}
 
         <hr />
-        {/* Cell/Member/Status Filters */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">

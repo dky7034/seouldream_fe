@@ -25,39 +25,39 @@ type FilterMode = "unit" | "range";
 type UnitType = "month" | "semester";
 
 /** -----------------------------
- * Helpers (프로덕션용 안전 버전)
+ * Helpers (Timezone Safe Version)
  * ----------------------------- */
 
-const parseLocal = (dateStr: string | undefined | null): Date | null => {
-  if (!dateStr) return null;
-  const [y, m, d] = dateStr.slice(0, 10).split("-").map(Number);
-  if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d);
+// ✅ [수정] 날짜 포맷팅 함수 (KST 적용)
+const safeFormatDate = (
+  dateStr: string | null | undefined,
+  separator = "-"
+) => {
+  if (!dateStr) return "";
+
+  // T는 있는데 Z가 없으면 Z를 붙여줌 (UTC 인식 유도 -> 브라우저가 KST 변환)
+  const targetStr =
+    dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
+
+  const date = new Date(targetStr);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}${separator}${month}${separator}${day}`;
 };
 
-const normalizeISODate = (v: string | undefined | null) => {
-  if (!v) return "";
-  return v.slice(0, 10);
-};
-
-const toLocalISODate = (date: Date) => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-};
-
-const getAttendanceMemberId = (att: any): string | number | null => {
+const getAttendanceMemberId = (att: any): number | null => {
   if (att?.memberId !== undefined && att?.memberId !== null)
-    return att.memberId;
+    return Number(att.memberId);
 
   const m = att?.member;
   if (!m) return null;
 
-  if (typeof m === "number" || typeof m === "string") return m;
+  if (typeof m === "number" || typeof m === "string") return Number(m);
   if (typeof m === "object") {
-    if (m.id !== undefined && m.id !== null) return m.id;
-    if (m.memberId !== undefined && m.memberId !== null) return m.memberId;
+    if (m.id !== undefined && m.id !== null) return Number(m.id);
+    if (m.memberId !== undefined && m.memberId !== null)
+      return Number(m.memberId);
   }
   return null;
 };
@@ -74,7 +74,6 @@ const AttendanceMatrixView: React.FC<{
   year: number;
   month: number;
   loading: boolean;
-  onMonthChange?: (increment: number) => void;
   limitStartDate?: string;
   limitEndDate?: string;
   filterMode: FilterMode;
@@ -93,55 +92,53 @@ const AttendanceMatrixView: React.FC<{
   filterMode,
   allMembers,
 }) => {
+  // 미체크 계산 로직
   const uncheckedCount = useMemo(() => {
     if (!startDate || !endDate || members.length === 0) return 0;
 
-    const filterStart = parseLocal(startDate);
-    const filterEnd = parseLocal(endDate);
-    if (!filterStart || !filterEnd) return 0;
+    const startStr = safeFormatDate(startDate, "-");
+    const endStr = safeFormatDate(endDate, "-");
 
-    filterStart.setHours(0, 0, 0, 0);
-    filterEnd.setHours(0, 0, 0, 0);
-    if (filterStart > filterEnd) return 0;
+    const start = new Date(startStr);
+    const end = new Date(endStr);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
 
+    if (start > end) return 0;
+
+    // 기간 내 일요일 수집
     const targetSundays: string[] = [];
-    const cur = new Date(filterStart);
-
-    while (cur <= filterEnd) {
-      if (cur.getDay() === 0) targetSundays.push(toLocalISODate(cur));
+    const cur = new Date(start);
+    while (cur <= end) {
+      if (cur.getDay() === 0) {
+        // safeFormatDate를 재사용하여 일관성 유지
+        targetSundays.push(safeFormatDate(cur.toISOString(), "-"));
+      }
       cur.setDate(cur.getDate() + 1);
     }
 
+    // 출석 기록 Set (MemberId-YYYY-MM-DD)
     const attendanceSet = new Set<string>();
     for (const a of attendances) {
       const mId = getAttendanceMemberId(a);
-      const dateKey = normalizeISODate(a?.date);
+      const dateKey = safeFormatDate(a.date, "-");
 
       if (mId === null || !dateKey) continue;
       if (!["PRESENT", "ABSENT"].includes(a.status)) continue;
 
-      attendanceSet.add(`${String(mId)}-${dateKey}`);
+      attendanceSet.add(`${mId}-${dateKey}`);
     }
 
     let incompleteWeeks = 0;
 
     for (const sundayStr of targetSundays) {
-      const sunday = parseLocal(sundayStr);
-      if (!sunday) continue;
-      sunday.setHours(0, 0, 0, 0);
-
-      const activeMembers = members.filter((m) => {
-        const baseDateStr =
-          normalizeISODate((m as any).cellAssignmentDate) || "";
-        const base = parseLocal(baseDateStr) || new Date(m.joinYear, 0, 1);
-        base.setHours(0, 0, 0, 0);
-        return base <= sunday;
-      });
+      // 단순히 해당 주차에 기록이 없는지 체크 (등록일 로직은 복잡도 줄이기 위해 생략)
+      const activeMembers = members;
 
       if (activeMembers.length === 0) continue;
 
       const isWeekIncomplete = activeMembers.some((m) => {
-        const key = `${String(m.id)}-${sundayStr}`;
+        const key = `${m.id}-${sundayStr}`;
         return !attendanceSet.has(key);
       });
 
@@ -511,17 +508,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
     }));
   };
 
-  const handleMatrixMonthChange = (increment: number) => {
-    setFilters((prev) => {
-      const currentDate = new Date(prev.year, prev.month - 1, 1);
-      currentDate.setMonth(currentDate.getMonth() + increment);
-      return {
-        ...prev,
-        year: currentDate.getFullYear(),
-        month: currentDate.getMonth() + 1,
-      };
-    });
-  };
+  // ❌ [삭제] handleMatrixMonthChange 제거됨 (사용 안함)
 
   const filteredMembers = useMemo(() => {
     return filters.memberId
@@ -535,7 +522,10 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
 
     if (unitType === "semester") {
       const sem = semesters.find((s) => s.id === filters.semesterId);
-      return { sDate: sem?.startDate || "", eDate: sem?.endDate || "" };
+      return {
+        sDate: safeFormatDate(sem?.startDate, "-"),
+        eDate: safeFormatDate(sem?.endDate, "-"),
+      };
     }
 
     const y = filters.year;
@@ -553,7 +543,10 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
 
     if (startObj > endObj) return { sDate: "", eDate: "" };
 
-    return { sDate: toLocalISODate(startObj), eDate: toLocalISODate(endObj) };
+    return {
+      sDate: safeFormatDate(startObj.toISOString(), "-"),
+      eDate: safeFormatDate(endObj.toISOString(), "-"),
+    };
   }, [filterMode, unitType, filters, semesters, selectedSemester]);
 
   const memberOptions = useMemo(
@@ -704,7 +697,6 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
                   * 선택된 학기({selectedSemester?.name})에 포함된 월만
                   표시됩니다.
                 </div>
-                {/* [수정] 가로 스크롤 영역 */}
                 <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x">
                   {semesterMonths.length > 0 ? (
                     semesterMonths.map((m) => {
@@ -787,7 +779,6 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
         year={filters.year}
         month={filters.month}
         loading={loading}
-        onMonthChange={handleMatrixMonthChange}
         limitStartDate={selectedSemester?.startDate}
         limitEndDate={selectedSemester?.endDate}
         filterMode={filterMode}

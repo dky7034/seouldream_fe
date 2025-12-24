@@ -2,9 +2,9 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { attendanceService } from "../services/attendanceService";
-import { memberService } from "../services/memberService"; // 추가
+import { memberService } from "../services/memberService";
 import { useAuth } from "../hooks/useAuth";
-import { formatDisplayName } from "../utils/memberUtils"; // 추가
+import { formatDisplayName } from "../utils/memberUtils";
 import type { MemberAlertDto } from "../types";
 
 const AttendanceAlertsPage: React.FC = () => {
@@ -15,13 +15,27 @@ const AttendanceAlertsPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 동명이인 판별을 위한 전체 멤버 리스트 (ID, 이름, 생년월일)
+  // 동명이인 판별을 위한 전체 멤버 리스트
   const [allMembersForNameCheck, setAllMembersForNameCheck] = useState<
     { id: number; name: string; birthDate?: string }[]
   >([]);
 
   // 인풋은 문자열 중심으로 관리
   const [consecutiveAbsences, setConsecutiveAbsences] = useState<string>("3");
+
+  // ✅ [추가] 날짜 포맷팅 함수 (타임존 문제 해결 및 일관성 유지)
+  const safeFormatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return "-";
+    // T는 있는데 Z가 없으면 Z를 붙여줌 (UTC 인식 유도 -> 브라우저가 KST 변환)
+    const targetStr =
+      dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
+
+    const date = new Date(targetStr);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}.${month}.${day}`;
+  };
 
   // --- 출석 경고 목록 조회 ---
   const fetchAlerts = useCallback(async (threshold: number) => {
@@ -40,7 +54,7 @@ const AttendanceAlertsPage: React.FC = () => {
     }
   }, []);
 
-  // --- 초기 로딩 (권한 체크 + 기본 3회 기준 조회) ---
+  // --- 초기 로딩 ---
   useEffect(() => {
     if (!user) {
       setLoading(false);
@@ -57,20 +71,18 @@ const AttendanceAlertsPage: React.FC = () => {
     void fetchAlerts(3);
   }, [user, fetchAlerts]);
 
-  // --- [추가] 동명이인 처리를 위해 전체 멤버 목록 미리 로딩 ---
+  // --- 동명이인 처리를 위해 전체 멤버 목록 미리 로딩 ---
   useEffect(() => {
     if (!user || !["EXECUTIVE", "CELL_LEADER"].includes(user.role)) return;
 
     const fetchAllMembers = async () => {
       try {
-        // 이름 중복 확인을 위해 충분히 큰 사이즈로 조회
         const page = await memberService.getAllMembers({
           page: 0,
           size: 2000,
           sort: "id,asc",
         });
 
-        // 필요한 정보만 추출하여 저장
         const list = page.content.map((m) => ({
           id: m.id,
           name: m.name,
@@ -90,7 +102,6 @@ const AttendanceAlertsPage: React.FC = () => {
     const value = Number(consecutiveAbsences);
     const threshold = Math.max(1, isNaN(value) ? 1 : value);
 
-    // 인풋 상태를 정상화
     if (consecutiveAbsences !== String(threshold)) {
       setConsecutiveAbsences(String(threshold));
     }
@@ -98,7 +109,6 @@ const AttendanceAlertsPage: React.FC = () => {
     void fetchAlerts(threshold);
   };
 
-  // --- input blur 시 1 미만 / NaN 방어 ---
   const handleBlur = () => {
     const value = Number(consecutiveAbsences);
     if (Number.isNaN(value) || value < 1) {
@@ -106,7 +116,6 @@ const AttendanceAlertsPage: React.FC = () => {
     }
   };
 
-  // --- 로그인/권한 에러: 가운데 카드 형태 안내 ---
   if (error && (!user || !["EXECUTIVE", "CELL_LEADER"].includes(user.role))) {
     return (
       <div className="bg-gray-50 min-h-screen flex items-center justify-center px-4">
@@ -139,7 +148,6 @@ const AttendanceAlertsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 에러 메시지 (권한 있는 사용자 기준) */}
         {error && user && ["EXECUTIVE", "CELL_LEADER"].includes(user.role) && (
           <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-200 text-xs sm:text-sm text-red-700">
             {error}
@@ -157,7 +165,6 @@ const AttendanceAlertsPage: React.FC = () => {
                 연속 결석 횟수 기준
               </label>
 
-              {/* 인풋 + 버튼 나란히 */}
               <div className="mt-1 flex items-center gap-2">
                 <input
                   id="consecutiveAbsences"
@@ -201,7 +208,6 @@ const AttendanceAlertsPage: React.FC = () => {
         {/* 결과 영역 */}
         {!loading && (
           <>
-            {/* 요약 텍스트 */}
             <div className="mb-3 text-xs sm:text-sm text-gray-700">
               <span className="font-medium">
                 {consecutiveAbsences || "1"}회 연속 결석 기준
@@ -210,7 +216,7 @@ const AttendanceAlertsPage: React.FC = () => {
               <span>현재 {alerts.length}명</span>
             </div>
 
-            {/* 📱 모바일: 카드 리스트 (md 미만) */}
+            {/* 📱 모바일: 카드 리스트 */}
             <div className="space-y-3 md:hidden mb-4">
               {alerts.length === 0 ? (
                 <div className="bg-white rounded-lg shadow border border-gray-100 p-4 text-center text-xs sm:text-sm text-gray-500">
@@ -218,7 +224,6 @@ const AttendanceAlertsPage: React.FC = () => {
                 </div>
               ) : (
                 alerts.map((alert) => {
-                  // 동명이인 처리 로직 적용
                   const foundMember = allMembersForNameCheck.find(
                     (m) => m.id === alert.memberId
                   );
@@ -231,7 +236,6 @@ const AttendanceAlertsPage: React.FC = () => {
                       key={alert.memberId}
                       className="bg-white rounded-lg shadow border border-gray-100 p-4 text-xs space-y-2"
                     >
-                      {/* 상단: 이름 / 셀 */}
                       <div className="flex justify-between items-start gap-2">
                         <div className="flex-1">
                           <button
@@ -255,15 +259,11 @@ const AttendanceAlertsPage: React.FC = () => {
                         </span>
                       </div>
 
-                      {/* 하단: 마지막 출석일 */}
                       <div className="mt-2 flex justify-between items-center text-[11px] text-gray-600">
                         <span className="font-medium">마지막 출석일</span>
                         <span>
-                          {alert.lastAttendanceDate
-                            ? new Date(
-                                alert.lastAttendanceDate
-                              ).toLocaleDateString()
-                            : "-"}
+                          {/* ✅ safeFormatDate 적용 */}
+                          {safeFormatDate(alert.lastAttendanceDate)}
                         </span>
                       </div>
                     </div>
@@ -272,7 +272,7 @@ const AttendanceAlertsPage: React.FC = () => {
               )}
             </div>
 
-            {/* 🖥 데스크탑: 테이블 (md 이상) */}
+            {/* 🖥 데스크탑: 테이블 */}
             <div className="hidden md:block bg-white shadow-md rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
@@ -295,7 +295,6 @@ const AttendanceAlertsPage: React.FC = () => {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {alerts.length > 0 ? (
                       alerts.map((alert) => {
-                        // 동명이인 처리 로직 적용
                         const foundMember = allMembersForNameCheck.find(
                           (m) => m.id === alert.memberId
                         );
@@ -323,11 +322,8 @@ const AttendanceAlertsPage: React.FC = () => {
                               {alert.cellName || "*소속 셀 없음"}
                             </td>
                             <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-700">
-                              {alert.lastAttendanceDate
-                                ? new Date(
-                                    alert.lastAttendanceDate
-                                  ).toLocaleDateString()
-                                : "-"}
+                              {/* ✅ safeFormatDate 적용 */}
+                              {safeFormatDate(alert.lastAttendanceDate)}
                             </td>
                             <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm font-bold text-red-600">
                               {alert.consecutiveAbsences}회

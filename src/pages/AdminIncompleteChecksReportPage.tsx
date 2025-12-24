@@ -13,7 +13,7 @@ import { memberService } from "../services/memberService";
 import { formatDisplayName } from "../utils/memberUtils";
 import { semesterService } from "../services/semesterService";
 import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
-import { useNavigate } from "react-router-dom"; // ✅ 1. useNavigate 임포트
+import { useNavigate } from "react-router-dom";
 
 type FilterType = "unit" | "range";
 type UnitType = "year" | "month" | "semester";
@@ -28,7 +28,12 @@ type Filters = {
 
 const AdminIncompleteChecksReportPage: React.FC = () => {
   const { user } = useAuth();
-  const navigate = useNavigate(); // ✅ 2. navigate 훅 초기화
+  const navigate = useNavigate();
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
   const [report, setReport] = useState<IncompleteCheckReportDto[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,41 +50,36 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
   const [filters, setFilters] = useState<Filters>({
     startDate: "",
     endDate: "",
-    year: "" as number | "",
+    // ✅ [수정 1] 초기값을 '전체("")'가 아닌 '올해(currentYear)'로 설정
+    year: currentYear,
     month: "" as number | "",
     semesterId: "" as number | "",
   });
   const [filterType, setFilterType] = useState<FilterType>("unit");
   const [unitType, setUnitType] = useState<UnitType>("semester");
 
-  // ... (이전 코드와 동일: yearOptions, handleFilterChange, formatShortDate 등) ...
-  const yearOptions = useMemo(
-    () =>
-      availableYears.length === 0
-        ? (() => {
-            const cy = new Date().getFullYear();
-            return [
-              { value: "", label: "전체 연도" },
-              { value: cy, label: `${cy}년` },
-            ];
-          })()
-        : [
-            { value: "", label: "전체 연도" },
-            ...availableYears.map((year) => ({
-              value: year,
-              label: `${year}년`,
-            })),
-          ],
-    [availableYears]
-  );
+  // ✅ [수정 2] "전체 연도" 옵션 제거하고 DB 연도들만 표시 (없으면 올해 표시)
+  const yearOptions = useMemo(() => {
+    if (availableYears.length === 0) {
+      return [{ value: currentYear, label: `${currentYear}년` }];
+    }
+    // { value: "", label: "전체 연도" } 제거됨
+    return availableYears.map((year) => ({
+      value: year,
+      label: `${year}년`,
+    }));
+  }, [availableYears, currentYear]);
 
   const handleFilterChange = (field: keyof Filters, value: any) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
   };
 
+  // ✅ [수정 3] 날짜 포맷팅 함수 개선 (타임존 문제 해결)
   const formatShortDate = (dateStr: string) => {
     if (!dateStr) return "";
-    const [, month, day] = dateStr.split("-");
+    const date = new Date(dateStr); // 브라우저 로컬 시간대 반영
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
     return `${month}/${day}`;
   };
 
@@ -108,12 +108,11 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
     return "";
   }, [filterType, unitType, filters, semesters]);
 
-  // ... (이전 코드와 동일: useEffect for auto select, handlers, renderUnitButtons) ...
   useEffect(() => {
     if (semesters.length > 0 && !hasAutoSelectedSemester) {
-      const now = new Date();
-      const currentYearMonth = `${now.getFullYear()}-${String(
-        now.getMonth() + 1
+      const today = new Date();
+      const currentYearMonth = `${today.getFullYear()}-${String(
+        today.getMonth() + 1
       ).padStart(2, "0")}`;
 
       let targetSemester = semesters.find((s) => {
@@ -140,44 +139,43 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
         setUnitType("month");
         setFilters((prev) => ({
           ...prev,
-          year: now.getFullYear(),
-          month: now.getMonth() + 1,
+          year: currentYear,
+          month: currentMonth,
           semesterId: "",
         }));
       }
       setHasAutoSelectedSemester(true);
     }
-  }, [semesters, hasAutoSelectedSemester]);
+  }, [semesters, hasAutoSelectedSemester, currentYear, currentMonth]);
 
   const handleUnitTypeClick = (type: UnitType) => {
     setUnitType(type);
     setFilters((prev) => {
-      const currentYear =
-        typeof prev.year === "number" ? prev.year : new Date().getFullYear();
-      const currentMonth = new Date().getMonth() + 1;
+      const baseYear = typeof prev.year === "number" ? prev.year : currentYear;
       const next: Filters = { ...prev };
 
       if (type === "year") {
-        next.year = currentYear;
+        // ✅ [수정 4] 연도 필수 유지
+        next.year = baseYear;
         next.month = "";
         next.semesterId = "";
       } else if (type === "month") {
-        next.year = currentYear;
+        next.year = baseYear;
         next.month = (next.month as number) || currentMonth;
         next.semesterId = "";
       } else if (type === "semester") {
         next.year = "";
         next.month = "";
         if (semesters.length > 0) {
-          const now = new Date();
-          const currentYearMonth = `${now.getFullYear()}-${String(
-            now.getMonth() + 1
+          const today = new Date();
+          const currentYM = `${today.getFullYear()}-${String(
+            today.getMonth() + 1
           ).padStart(2, "0")}`;
 
           let target = semesters.find((s) => {
             const start = s.startDate.substring(0, 7);
             const end = s.endDate.substring(0, 7);
-            return currentYearMonth >= start && currentYearMonth <= end;
+            return currentYM >= start && currentYM <= end;
           });
 
           if (!target) {
@@ -193,8 +191,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
 
   const handleUnitValueChange = (value: number) => {
     setFilters((prev) => {
-      const cy = new Date().getFullYear();
-      const baseYear = prev.year || cy;
+      const baseYear = typeof prev.year === "number" ? prev.year : currentYear;
       return {
         ...prev,
         year: baseYear,
@@ -264,7 +261,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
     }
   };
 
-  // ... (fetchIncompleteChecks, fetchAvailableYears, fetchSemesters 등 로직 동일) ...
   const fetchIncompleteChecks = useCallback(
     async (opts?: { skipLoading?: boolean }) => {
       if (!user || user.role !== "EXECUTIVE") {
@@ -297,6 +293,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
           const monthVal = normalizeNumberInput(filters.month);
 
           if (!yearVal) {
+            // 연도가 선택되지 않았다면 조회하지 않음
             setLoading(false);
             setReport([]);
             return;
@@ -444,7 +441,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
     fetchAllMembersForNameCheck();
   }, [user]);
 
-  // ... (권한/로딩/에러 렌더링 동일) ...
   if (!user || user.role !== "EXECUTIVE") {
     return (
       <div className="bg-gray-50 min-h-screen flex justify-center items-center px-4">
@@ -490,7 +486,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="container mx-auto max-w-6xl px-3 sm:px-4 py-6 sm:py-8">
-        {/* ... (헤더 및 필터 영역 동일) ... */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 sm:mb-8">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
@@ -664,7 +659,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
           </div>
         ) : (
           <>
-            {/* ✅ Mobile View (수정됨) */}
+            {/* Mobile View */}
             <div className="md:hidden space-y-3 mb-4">
               {report.map((item: any) => {
                 const leaderMember = allMembersForNameCheck.find(
@@ -684,7 +679,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                 return (
                   <div
                     key={item.leaderId}
-                    // 📌 클릭 핸들러 및 스타일 추가
                     onClick={() => navigate(`/admin/cells/${item.cellId}`)}
                     className="bg-white rounded-lg shadow border border-gray-100 p-4 text-xs space-y-2 cursor-pointer hover:bg-gray-50 transition-colors"
                   >
@@ -720,6 +714,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                                 className="flex items-center text-[11px] text-gray-700"
                               >
                                 <span className="mr-1 text-gray-400">•</span>
+                                {/* ✅ safeFormatDate 적용 */}
                                 <span>{formatShortDate(date)}</span>
                               </li>
                             )
@@ -732,7 +727,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
               })}
             </div>
 
-            {/* ✅ Desktop View (수정됨) */}
+            {/* Desktop View */}
             <div className="hidden md:block bg-white shadow-md rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
@@ -756,7 +751,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                     {report.map((item: any) => (
                       <tr
                         key={item.leaderId}
-                        // 📌 클릭 핸들러 및 스타일 추가
                         onClick={() => navigate(`/admin/cells/${item.cellId}`)}
                         className="cursor-pointer hover:bg-gray-50 transition-colors"
                       >
@@ -804,6 +798,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                                     <span className="mr-1 text-gray-400">
                                       •
                                     </span>
+                                    {/* ✅ safeFormatDate 적용 */}
                                     <span>{formatShortDate(date)}</span>
                                   </li>
                                 )

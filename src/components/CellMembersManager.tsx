@@ -16,11 +16,30 @@ interface CellMembersManagerProps {
   allMembers: { id: number; name: string; birthDate?: string }[];
 }
 
-// 만 나이 계산 함수
+// ✅ [추가] 날짜 포맷팅 함수 (KST 적용)
+const safeFormatDate = (dateStr: string | null | undefined) => {
+  if (!dateStr) return "";
+  // T는 있는데 Z가 없으면 Z를 붙여줌 (UTC 인식 유도 -> 브라우저가 KST 변환)
+  const targetStr =
+    dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
+
+  const date = new Date(targetStr);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+// ✅ [수정] 만 나이 계산 함수 (safeFormatDate 사용)
 const calculateAge = (birthDateString: string): number | null => {
   if (!birthDateString) return null;
-  const birthDate = new Date(birthDateString);
+  // KST로 변환된 날짜 문자열 사용
+  const formattedDate = safeFormatDate(birthDateString);
+  if (!formattedDate) return null;
+
+  const birthDate = new Date(formattedDate);
   const today = new Date();
+
   let age = today.getFullYear() - birthDate.getFullYear();
   const m = today.getMonth() - birthDate.getMonth();
   if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
@@ -145,14 +164,16 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
           {/* ✅ 모바일: 카드형 리스트 */}
           <div className="sm:hidden space-y-3">
             {sortedMembers.map((member) => {
-              const age =
-                member.birthDate && calculateAge(member.birthDate || "");
+              const age = calculateAge(member.birthDate || "");
               const isMe = user.memberId === member.id;
 
               const found = allMembers.find((am) => am.id === member.id);
               const displayName = found
                 ? formatDisplayName(found, allMembers)
                 : member.name;
+
+              // ✅ 날짜 포맷팅 적용
+              const displayBirthDate = safeFormatDate(member.birthDate);
 
               return (
                 <div
@@ -190,8 +211,8 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                     <div className="flex justify-between">
                       <span className="text-gray-500">생년월일</span>
                       <span>
-                        {member.birthDate
-                          ? `${member.birthDate}${
+                        {displayBirthDate
+                          ? `${displayBirthDate}${
                               age != null ? ` (만 ${age}세)` : ""
                             }`
                           : "-"}
@@ -202,8 +223,6 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                       <span>{member.joinYear ?? "-"}</span>
                     </div>
                   </div>
-
-                  {/* 하단 수정 버튼 영역 제거됨 */}
                 </div>
               );
             })}
@@ -267,6 +286,12 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                     ? formatDisplayName(found, allMembers)
                     : member.name;
 
+                  // ✅ 날짜 포맷팅 적용
+                  const displayBirthDate = safeFormatDate(member.birthDate);
+                  const displayAssignedDate = safeFormatDate(
+                    member.cellAssignmentDate
+                  );
+
                   return (
                     <tr
                       key={member.id}
@@ -300,15 +325,15 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                         </span>
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
-                        {member.birthDate}{" "}
-                        {member.birthDate &&
-                          `(만 ${calculateAge(member.birthDate)}세)`}
+                        {displayBirthDate}{" "}
+                        {displayBirthDate &&
+                          `(만 ${calculateAge(member.birthDate || "")}세)`}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
                         {member.joinYear}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
-                        {member.cellAssignmentDate || "미배정"}
+                        {displayAssignedDate || "미배정"}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         {/* 수정 버튼 로직 제거됨 */}
