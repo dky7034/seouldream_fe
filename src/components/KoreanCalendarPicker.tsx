@@ -75,7 +75,7 @@ const KoreanCalendarPicker: React.FC<Props> = ({
   return (
     <div className={wrapperClass}>
       <style>{`
-        /* ─── 색상 커스텀 (기존 동일) ─── */
+        /* ─── 색상 커스텀 ─── */
         .react-datepicker__day-name:first-child { color: #dc2626; }
         .react-datepicker__day-name:last-child { color: #2563eb; }
         .react-datepicker__day.day-sunday { color: #dc2626 !important; }
@@ -88,30 +88,44 @@ const KoreanCalendarPicker: React.FC<Props> = ({
           color: #ffffff !important;
         }
 
+        /* ─── [수정됨] 오늘 날짜 강조 ─── */
+        .react-datepicker__day--today {
+          font-weight: 900 !important;         /* 폰트 아주 굵게 */
+          border: 2px solid #6366f1 !important; /* 진한 인디고 테두리 */
+          background-color: #eef2ff !important; /* 연한 인디고 배경 */
+          color: #4338ca !important;            /* 진한 인디고 글자 */
+          border-radius: 0.3rem !important;     /* 약간 둥글게 */
+        }
+
+        /* 오늘 날짜인데 '선택'까지 된 경우 (선택 스타일 우선) */
+        .react-datepicker__day--today.react-datepicker__day--selected,
+        .react-datepicker__day--today.react-datepicker__day--keyboard-selected {
+          background-color: #216ba5 !important; /* 선택된 배경색 */
+          color: #ffffff !important;            /* 선택된 글자색 */
+          border: 2px solid #216ba5 !important; /* 테두리도 배경색과 동일하게 */
+        }
+
         /* ─── 크기 조절 (Desktop 기본) ─── */
         .react-datepicker {
-          font-family: inherit; /* 폰트 상속 */
-          font-size: 0.85rem;   /* 기본 폰트 줄임 */
+          font-family: inherit;
+          font-size: 0.85rem;
           border: 1px solid #e5e7eb;
           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
         
-        /* 헤더 높이 줄이기 */
         .react-datepicker__header {
           padding-top: 0.4rem;
           padding-bottom: 0.4rem;
         }
 
-        /* 날짜 셀 크기 (정사각형 유지) */
         .react-datepicker__day-name, 
         .react-datepicker__day, 
         .react-datepicker__time-name {
-          width: 2rem;        /* 32px */
-          line-height: 2rem;  /* 32px */
+          width: 2rem;
+          line-height: 2rem;
           margin: 0.1rem;
         }
         
-        /* 현재 월 표시 텍스트 크기 */
         .react-datepicker__current-month {
           font-size: 0.95rem;
           margin-bottom: 0.2rem;
@@ -120,7 +134,7 @@ const KoreanCalendarPicker: React.FC<Props> = ({
         /* ─── 크기 조절 (Mobile 반응형) ─── */
         @media (max-width: 640px) {
           .react-datepicker {
-            font-size: 0.75rem; /* 모바일에서 폰트 더 작게 */
+            font-size: 0.75rem;
           }
           
           .react-datepicker__header {
@@ -128,16 +142,15 @@ const KoreanCalendarPicker: React.FC<Props> = ({
             padding-bottom: 0.2rem;
           }
 
-          /* 모바일 셀 크기 대폭 축소 */
           .react-datepicker__day-name, 
           .react-datepicker__day {
-            width: 1.7rem;       /* 약 27px */
-            line-height: 1.7rem; /* 약 27px */
-            margin: 0;           /* 마진 제거로 밀집도 높임 */
+            width: 1.7rem;
+            line-height: 1.7rem;
+            margin: 0;
           }
           
           .react-datepicker__month {
-            margin: 0.2rem 0.4rem; /* 전체 월 마진 축소 */
+            margin: 0.2rem 0.4rem;
           }
         }
       `}</style>
@@ -160,7 +173,6 @@ const KoreanCalendarPicker: React.FC<Props> = ({
         maxDate={maxDate}
         showPopperArrow={false}
         placeholderText="YYYY-MM-DD"
-        // 입력 필드 스타일
         className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer caret-transparent"
         dayClassName={getDayClassName}
         showYearPicker={mode === "year"}
@@ -219,7 +231,6 @@ const KoreanCalendarPicker: React.FC<Props> = ({
             else setMode("year");
           };
 
-          // 버튼 크기도 함께 축소
           const btnClass =
             "w-7 h-7 flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 active:bg-gray-100 transition-colors";
           const titleClass =
