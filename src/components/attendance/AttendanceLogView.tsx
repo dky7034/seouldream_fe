@@ -174,7 +174,7 @@ const AttendanceMatrixView: React.FC<{
             </p>
             <p className="text-xs text-red-500 mt-1">
               해당 기간 내 총 <strong>{uncheckedCount}개</strong>의 주일에 대해
-              출석 기록이 완벽하지 않습니다.
+              출석 기록이 존재하지 않습니다.
             </p>
           </div>
           <p className="text-3xl font-bold text-red-700 ml-4">
