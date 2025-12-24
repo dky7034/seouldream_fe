@@ -223,9 +223,6 @@ const PrayersCard: React.FC<{ prayers: PrayerDto[] }> = ({ prayers }) => (
 // ─────────────────────────────────────────────────────────────
 // [핵심] 출석 요약 카드 (미체크 정책 적용 완료 + 모바일 UI 개선)
 // ─────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────
-// [핵심] 출석 요약 카드 (통계 UI 패딩 수정으로 글자 잘림 해결)
-// ─────────────────────────────────────────────────────────────
 const AttendanceSummaryCard: React.FC<{
   summary: MemberAttendanceSummaryDto | null;
   memberId: number;
@@ -363,7 +360,7 @@ const AttendanceSummaryCard: React.FC<{
                 </div>
               </div>
 
-              {/* 보기 모드 */}
+              {/* 보기 모드 (모바일: 꽉 찬 버튼) */}
               <div className="flex bg-gray-200 p-1 rounded-lg w-full sm:w-auto">
                 <button
                   onClick={() => onUnitTypeChange("month")}
@@ -388,7 +385,7 @@ const AttendanceSummaryCard: React.FC<{
               </div>
             </div>
 
-            {/* 2행: 월 선택 */}
+            {/* 2행: 월 선택 (가로 스크롤 적용) */}
             {unitType === "month" && activeSemester && (
               <div className="animate-fadeIn mt-1">
                 <span className="text-xs font-bold text-gray-500 block mb-2 px-1">
@@ -413,6 +410,11 @@ const AttendanceSummaryCard: React.FC<{
             )}
           </div>
 
+          {/* [수정된 부분] 실제 기간 표시 
+            - 모바일(flex-col): 2줄 배치 (라벨 위, 날짜 아래)
+            - 데스크탑(sm:flex-row): 1줄 배치 (우측 정렬)
+            - truncate 제거: 날짜가 잘리지 않도록 함
+          */}
           <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-1 sm:gap-2 text-xs text-gray-500 border-t border-gray-200 pt-3 mt-1">
             <div className="flex items-center">
               <FaClock className="mr-1.5 text-gray-400" />
@@ -424,12 +426,11 @@ const AttendanceSummaryCard: React.FC<{
           </div>
         </div>
 
-        {/* --- 통계 요약 (4칸 그리드) - 수정된 부분 --- */}
+        {/* --- 통계 요약 (4칸 그리드) --- */}
         {totalSummary ? (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-center border-t border-b py-4">
-            {/* [수정] 모바일에서 좌우 패딩을 px-1로 줄여서 글자 공간 확보, whitespace-nowrap 적용 */}
-            <div className="py-3 px-1 sm:p-3 bg-indigo-50 rounded-lg flex flex-col items-center justify-center">
-              <p className="text-xs sm:text-sm font-medium text-indigo-500 whitespace-nowrap">
+            <div className="p-3 bg-indigo-50 rounded-lg">
+              <p className="text-xs sm:text-sm font-medium text-indigo-500 break-keep">
                 출석률
               </p>
               <p className="mt-1 text-xl sm:text-3xl font-semibold text-indigo-600">
@@ -437,24 +438,24 @@ const AttendanceSummaryCard: React.FC<{
                 <span className="text-sm sm:text-lg">%</span>
               </p>
             </div>
-            <div className="py-3 px-1 sm:p-3 bg-green-50 rounded-lg flex flex-col items-center justify-center">
-              <p className="text-xs sm:text-sm font-medium text-green-600 whitespace-nowrap">
+            <div className="p-3 bg-green-50 rounded-lg">
+              <p className="text-xs sm:text-sm font-medium text-green-600 break-keep">
                 출석
               </p>
               <p className="mt-1 text-xl sm:text-3xl font-semibold text-green-700">
                 {totalSummary.totalPresent}
               </p>
             </div>
-            <div className="py-3 px-1 sm:p-3 bg-red-50 rounded-lg flex flex-col items-center justify-center">
-              <p className="text-xs sm:text-sm font-medium text-red-600 whitespace-nowrap">
+            <div className="p-3 bg-red-50 rounded-lg">
+              <p className="text-xs sm:text-sm font-medium text-red-600 break-keep">
                 결석
               </p>
               <p className="mt-1 text-xl sm:text-3xl font-semibold text-red-700">
                 {totalSummary.totalAbsent}
               </p>
             </div>
-            <div className="py-3 px-1 sm:p-3 bg-gray-100 rounded-lg flex flex-col items-center justify-center">
-              <p className="text-xs sm:text-sm font-medium text-gray-500 whitespace-nowrap">
+            <div className="p-3 bg-gray-100 rounded-lg">
+              <p className="text-xs sm:text-sm font-medium text-gray-500 break-keep">
                 미체크
               </p>
               <p className="mt-1 text-xl sm:text-3xl font-semibold text-gray-600">

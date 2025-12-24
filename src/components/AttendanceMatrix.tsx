@@ -180,9 +180,10 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                   </th>
                 )}
 
-                {/* ✅ [추가] 3. 출석률 헤더 (우측 고정) */}
+                {/* ✅ [수정] 3. 출석률 헤더 (우측 고정) */}
+                {/* 텍스트를 '율(%)' -> '출석률'로 변경 */}
                 <th className="sticky right-0 z-20 bg-gray-50 p-2 min-w-[60px] text-center font-medium text-gray-500 border-b border-l border-gray-200 shadow-[-1px_0_3px_rgba(0,0,0,0.05)]">
-                  율(%)
+                  출석률
                 </th>
               </tr>
             </thead>
