@@ -269,191 +269,103 @@ const CellMemberList: React.FC<{
 
     if (!sortedMembers || sortedMembers.length === 0) {
       return (
-        <div className="bg-gray-50 text-gray-500 text-sm sm:text-base text-center p-4 rounded-xl border border-gray-200">
+        <div className="bg-gray-50 text-gray-500 text-sm sm:text-base text-center p-4 rounded-xl">
           아직 등록된 셀원이 없습니다.
         </div>
       );
     }
 
     const formatGender = (gender: "MALE" | "FEMALE") =>
-      gender === "MALE" ? "남" : "여";
-
-    // ✅ [신규] 모바일용 카드 아이템 컴포넌트
-    const MobileMemberCard = ({
-      member,
-    }: {
-      member: CellMemberAttendanceSummaryDto;
-    }) => {
-      const displayName =
-        displayNameMap.get(member.memberId) || member.memberName;
-      const stats = memberStatsMap.get(member.memberId) || {
-        present: 0,
-        absent: 0,
-        unchecked: 0,
-      };
-
-      return (
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-3">
-          {/* 상단: 이름 및 기본 정보 */}
-          <div className="flex justify-between items-start">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-base font-bold text-gray-900">
-                  {displayName}
-                </span>
-                <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] font-medium">
-                  {formatGender(member.gender)}
-                </span>
-              </div>
-              <p className="text-xs text-gray-400 mt-1">
-                {formatDateKorean(member.birthDate)} 생 · {member.joinYear}년
-                등록
-              </p>
-            </div>
-
-            {/* 최근 출석일 뱃지 */}
-            <div className="text-right">
-              <span className="block text-[10px] text-gray-400 mb-0.5">
-                최근 출석
-              </span>
-              <span
-                className={`text-xs font-medium ${
-                  member.lastAttendanceDate
-                    ? "text-indigo-600"
-                    : "text-gray-300"
-                }`}
-              >
-                {member.lastAttendanceDate
-                  ? formatDateKorean(member.lastAttendanceDate).slice(5) // 연도 제외하고 월/일만 표시
-                  : "-"}
-              </span>
-            </div>
-          </div>
-
-          {/* 하단: 출석 통계 박스 */}
-          <div className="grid grid-cols-3 gap-2 bg-gray-50 rounded-lg p-2 mt-1">
-            <div className="flex flex-col items-center justify-center border-r border-gray-200 last:border-0">
-              <span className="text-[10px] text-gray-500 mb-0.5">출석</span>
-              <span className="text-sm font-bold text-emerald-600">
-                {stats.present}
-              </span>
-            </div>
-            <div className="flex flex-col items-center justify-center border-r border-gray-200 last:border-0">
-              <span className="text-[10px] text-gray-500 mb-0.5">결석</span>
-              <span className="text-sm font-bold text-rose-500">
-                {stats.absent}
-              </span>
-            </div>
-            <div className="flex flex-col items-center justify-center">
-              <span className="text-[10px] text-gray-500 mb-0.5">미체크</span>
-              <span className="text-sm font-bold text-gray-400">
-                {stats.unchecked}
-              </span>
-            </div>
-          </div>
-        </div>
-      );
-    };
+      gender === "MALE" ? "남자" : "여자";
 
     return (
-      <div className="mt-6">
-        {/* 헤더 영역 */}
-        <div className="flex items-center justify-between mb-3 px-1">
-          <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <FaUsers className="text-indigo-500" />
-            셀원 목록
-          </h3>
-          <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-            총 {sortedMembers.length}명
-          </span>
-        </div>
-
-        {/* 1. 모바일 뷰 (sm 미만에서만 보임) */}
-        <div className="flex flex-col gap-3 sm:hidden">
-          {sortedMembers.map((m) => (
-            <MobileMemberCard key={m.memberId} member={m} />
-          ))}
-        </div>
-
-        {/* 2. 데스크탑 뷰 (sm 이상에서만 보임 - 기존 테이블) */}
-        <div className="hidden sm:block border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    이름
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    성별
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    생년월일
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    등록 연도
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    최근 출석
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    현황 (출/결/미)
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {sortedMembers.map((m) => {
-                  const displayName =
-                    displayNameMap.get(m.memberId) || m.memberName;
-                  const stats = memberStatsMap.get(m.memberId) || {
-                    present: 0,
-                    absent: 0,
-                    unchecked: 0,
-                  };
-
-                  return (
-                    <tr
-                      key={m.memberId}
-                      className="hover:bg-gray-50/80 transition-colors"
-                    >
-                      <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
-                        {displayName}
-                      </td>
-                      <td className="px-4 py-3 text-center text-gray-600">
-                        {formatGender(m.gender)}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                        {formatDateKorean(m.birthDate)}
-                      </td>
-                      <td className="px-4 py-3 text-center text-gray-600">
-                        {m.joinYear}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                        {m.lastAttendanceDate ? (
-                          formatDateKorean(m.lastAttendanceDate)
-                        ) : (
-                          <span className="text-gray-400 text-xs">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center whitespace-nowrap">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 mr-1">
-                          {stats.present}
-                        </span>
-                        <span className="text-gray-300">/</span>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 mx-1">
-                          {stats.absent}
-                        </span>
-                        <span className="text-gray-300">/</span>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 ml-1">
-                          {stats.unchecked}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      <div className="border border-gray-100 rounded-2xl overflow-hidden bg-white shadow-sm mt-6">
+        <div className="px-4 pt-4 pb-2 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm sm:text-base font-semibold text-gray-800">
+              셀원 목록
+            </h3>
           </div>
+          <p className="text-[11px] sm:text-xs text-gray-400">
+            총 {sortedMembers.length}명
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-xs sm:text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-3 py-2 text-left text-gray-500 font-medium">
+                  이름
+                </th>
+                <th className="px-3 py-2 text-center text-gray-500 font-medium hidden sm:table-cell">
+                  성별
+                </th>
+                <th className="px-3 py-2 text-left text-gray-500 font-medium hidden sm:table-cell">
+                  생년월일
+                </th>
+                <th className="px-3 py-2 text-center text-gray-500 font-medium hidden md:table-cell">
+                  등록 연도
+                </th>
+                <th className="px-3 py-2 text-left text-gray-500 font-medium">
+                  최근 출석
+                </th>
+                <th className="px-3 py-2 text-center text-gray-500 font-medium">
+                  출석 / 결석 / 미체크
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedMembers.map((m) => {
+                const displayName =
+                  displayNameMap.get(m.memberId) || m.memberName;
+                const stats = memberStatsMap.get(m.memberId) || {
+                  present: 0,
+                  absent: 0,
+                  unchecked: 0,
+                };
+
+                return (
+                  <tr
+                    key={m.memberId}
+                    className="border-t border-gray-50 hover:bg-gray-50/70"
+                  >
+                    <td className="px-3 py-2 text-gray-800 font-medium whitespace-nowrap">
+                      {displayName}
+                    </td>
+                    <td className="px-3 py-2 text-center text-gray-700 hidden sm:table-cell">
+                      {formatGender(m.gender)}
+                    </td>
+                    <td className="px-3 py-2 text-gray-700 whitespace-nowrap hidden sm:table-cell">
+                      {formatDateKorean(m.birthDate)}
+                    </td>
+                    <td className="px-3 py-2 text-center text-gray-700 hidden md:table-cell">
+                      {m.joinYear}
+                    </td>
+                    <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
+                      {m.lastAttendanceDate ? (
+                        formatDateKorean(m.lastAttendanceDate)
+                      ) : (
+                        <span className="text-gray-400 text-[11px]">-</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-center whitespace-nowrap">
+                      <span className="text-emerald-600 font-bold">
+                        {stats.present}
+                      </span>
+                      <span className="text-gray-300 mx-1.5">/</span>
+                      <span className="text-rose-500 font-bold">
+                        {stats.absent}
+                      </span>
+                      <span className="text-gray-300 mx-1.5">/</span>
+                      <span className="text-gray-400 font-bold">
+                        {stats.unchecked}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
     );

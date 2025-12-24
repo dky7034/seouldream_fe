@@ -637,40 +637,20 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
             {/* 학기 선택 및 단위 선택 */}
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
-                {/* 라벨과 기간 정보를 헤더처럼 배치 */}
-                <div className="flex justify-between items-end mb-1">
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    학기 선택
-                  </label>
-
-                  {/* 데스크탑: 우측 상단에 기간 표시 */}
-                  {selectedSemester && (
-                    <span className="hidden sm:block text-xs text-indigo-600 font-medium">
-                      {selectedSemester.startDate} ~ {selectedSemester.endDate}
-                    </span>
-                  )}
-                </div>
-
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                  학기 선택
+                </label>
                 <select
                   value={filters.semesterId}
                   onChange={(e) => handleSemesterChange(Number(e.target.value))}
-                  className="block w-full border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+                  className="block w-full border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 bg-white"
                 >
                   {semesters.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.name}{" "}
-                      {/* 괄호와 날짜를 제거하여 이름만 깔끔하게 표시 */}
+                      {s.name} ({s.startDate} ~ {s.endDate})
                     </option>
                   ))}
                 </select>
-
-                {/* 모바일: 드롭다운 바로 아래에 기간 표시 */}
-                {selectedSemester && (
-                  <p className="sm:hidden mt-1.5 text-xs text-gray-500 flex items-center">
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 mr-1.5"></span>
-                    {selectedSemester.startDate} ~ {selectedSemester.endDate}
-                  </p>
-                )}
               </div>
 
               <div className="sm:min-w-[180px]">
