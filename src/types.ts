@@ -809,6 +809,15 @@ export interface GetAttendancesParams {
   half?: number;
 }
 
+// ✅ [추가] 출석 경고 조회용 파라미터 타입 (새로 추가해주세요!)
+export interface GetAttendanceAlertsParams {
+  consecutiveAbsences: number; // 필수
+  semesterId?: number; // 선택
+  year?: number; // 선택
+  startDate?: string; // 선택
+  endDate?: string; // 선택
+}
+
 export interface SemesterDto {
   id: number;
   name: string;

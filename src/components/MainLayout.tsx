@@ -139,7 +139,7 @@ const MainLayout: React.FC = () => {
             출석 누락
           </Link>
 
-          {/* 9. 결석 관리 */}
+          {/* 9. 결석 관리 (임원만!) */}
           <Link
             to="/admin/attendance-alerts"
             className={getNavLinkClass("/admin/attendance-alerts", {
@@ -161,8 +161,6 @@ const MainLayout: React.FC = () => {
             기도제목
           </Link>
 
-          {/* ✅ 생일자 링크 제거됨 */}
-
           {/* 11. 공지사항 */}
           <Link
             to="/admin/notices"
@@ -175,7 +173,7 @@ const MainLayout: React.FC = () => {
       );
     }
 
-    // ✅ 2) 셀장 메뉴 구성
+    // ✅ 2) 셀장 메뉴 구성 (수정됨: 결석 관리 제거)
     if (isCellLeader) {
       return (
         <>
@@ -201,17 +199,7 @@ const MainLayout: React.FC = () => {
             내 셀
           </Link>
 
-          <Link
-            to="/admin/attendance-alerts"
-            className={getNavLinkClass("/admin/attendance-alerts", {
-              variant,
-            })}
-            onClick={onLinkClick}
-          >
-            결석 관리
-          </Link>
-
-          {/* ✅ 생일자 링크 제거됨 */}
+          {/* ❌ 결석 관리 링크 삭제됨 */}
 
           <Link
             to="/admin/notices"
@@ -225,7 +213,6 @@ const MainLayout: React.FC = () => {
     }
 
     // ✅ 3) 일반 셀원
-    // 생일자가 유일한 메뉴였으므로, 이제 아무 메뉴도 표시하지 않음 (또는 공지사항 등을 추가 가능)
     return null;
   };
 

@@ -12,7 +12,8 @@ import type {
   GetAttendancesParams,
   Page,
   ProcessAttendanceWithPrayersRequest,
-  CellReportDto, // ✅ [추가] 새로 만든 DTO import
+  CellReportDto,
+  GetAttendanceAlertsParams, // ✅ [추가] 새로 만든 파라미터 타입 import
 } from "../types";
 
 // Define query parameters for the new rate APIs, which don't use 'groupBy'
@@ -65,7 +66,7 @@ export const attendanceService = {
     }
   },
 
-  // ✅ [신규 추가] 특정 날짜의 셀 보고서(나눔, 특이사항) 조회 API
+  // ✅ 특정 날짜의 셀 보고서(나눔, 특이사항) 조회 API
   getCellReport: async (
     cellId: number,
     date: string
@@ -99,12 +100,14 @@ export const attendanceService = {
     }
   },
 
+  // ✅ [수정] 파라미터 객체(GetAttendanceAlertsParams)를 받아서 처리하도록 변경
   getAttendanceAlerts: async (
-    consecutiveAbsences?: number
+    params: GetAttendanceAlertsParams
   ): Promise<MemberAlertDto[]> => {
     try {
+      // params 안에 consecutiveAbsences, year, semesterId 등이 들어있음 -> 쿼리 스트링 변환
       const response = await api.get("/attendances/alerts", {
-        params: { consecutiveAbsences },
+        params,
       });
       return response.data;
     } catch (error: any) {

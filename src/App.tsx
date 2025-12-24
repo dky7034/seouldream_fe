@@ -96,11 +96,7 @@ function App() {
               element={<NoticeDetailPage />}
             />
 
-            {/* 기타 공통 알림 */}
-            <Route
-              path="/admin/attendance-alerts"
-              element={<AttendanceAlertsPage />}
-            />
+            {/* ❌ [제거] 여기서 AttendanceAlertsPage 제거 (임원 전용으로 이동) */}
 
             {/* --- [임원(EXECUTIVE) 전용] --- */}
             <Route element={<ExecOnlyRoute />}>
@@ -140,6 +136,12 @@ function App() {
               <Route
                 path="/admin/incomplete-checks-report"
                 element={<AdminIncompleteChecksReportPage />}
+              />
+
+              {/* ✅ [이동됨] 결석 관리 페이지 (임원 전용) */}
+              <Route
+                path="/admin/attendance-alerts"
+                element={<AttendanceAlertsPage />}
               />
 
               {/* 기도제목 리스트 & 관리 (임원 전용) */}
