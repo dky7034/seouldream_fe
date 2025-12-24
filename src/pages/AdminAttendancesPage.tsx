@@ -333,7 +333,7 @@ const AttendanceMatrixView = memo(
           </div>
           <div className="p-4 bg-gray-100 rounded-xl border border-gray-200">
             <p className="text-xs sm:text-sm font-medium text-gray-500">
-              미체크 (예상)
+              미체크
             </p>
             <p className="mt-1 text-2xl sm:text-3xl font-bold text-gray-600">
               {summary.unchecked}
