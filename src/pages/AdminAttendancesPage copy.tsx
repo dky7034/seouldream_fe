@@ -213,80 +213,54 @@ const AttendanceMatrixView = memo(
     endDate: string;
     unitType: UnitType;
     isLoading: boolean;
+    onNavigate: (direction: "prev" | "next") => void;
   }) => {
-    // ✅ [수정] 정확한 미체크 카운트 로직 (Set 활용)
     const uncheckedCount = useMemo(() => {
       if (!startDate || !endDate || members.length === 0) return 0;
 
-      // 1. 날짜 키 생성 헬퍼 (YYYY-MM-DD)
-      const toDateKey = (d: Date) => {
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        return `${y}-${m}-${day}`;
-      };
+      const filterStart = new Date(startDate);
+      const filterEnd = new Date(endDate);
 
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(0, 0, 0, 0);
+      const sundays: number[] = [];
+      const current = new Date(filterStart);
+      current.setHours(0, 0, 0, 0);
 
-      // 2. 기간 내 일요일 수집
-      const targetSundayKeys: string[] = [];
-      const current = new Date(start);
-
-      // 시작일이 일요일이 아니면 다음 일요일로 이동
-      if (current.getDay() !== 0) {
-        current.setDate(current.getDate() + (7 - current.getDay()));
+      const dayOfWeek = current.getDay();
+      if (dayOfWeek !== 0) {
+        current.setDate(current.getDate() + (7 - dayOfWeek));
       }
 
-      while (current <= end) {
-        targetSundayKeys.push(toDateKey(current));
+      const endTimestamp = filterEnd.getTime();
+      while (current.getTime() <= endTimestamp) {
+        sundays.push(current.getTime());
         current.setDate(current.getDate() + 7);
       }
 
-      // 3. 실제 출석 기록을 Set으로 매핑 ("memberId-YYYY-MM-DD")
-      const attendanceMap = new Set<string>();
-      attendances.forEach((att) => {
-        if (
-          ["PRESENT", "ABSENT"].includes(att.status) &&
-          att.member?.id &&
-          att.date
-        ) {
-          const attDate = new Date(att.date); // 문자열 파싱
-          const key = `${att.member.id}-${toDateKey(attDate)}`;
-          attendanceMap.add(key);
-        }
-      });
-
-      // 4. 빈칸 카운트
-      let missingCount = 0;
+      let totalPossibleChecks = 0;
+      const defaultJoinDate = new Date("2000-01-01").setHours(0, 0, 0, 0);
 
       members.forEach((member) => {
-        // 가입일 기준
-        let joinDate = new Date("2000-01-01");
+        let joinTimestamp = defaultJoinDate;
         if (member.createdAt) {
-          joinDate = new Date(member.createdAt);
+          joinTimestamp = new Date(member.createdAt).setHours(0, 0, 0, 0);
         } else if (member.joinYear) {
-          const year = Number(member.joinYear);
-          if (!isNaN(year)) joinDate = new Date(year, 0, 1);
+          joinTimestamp = new Date(member.joinYear, 0, 1).setHours(0, 0, 0, 0);
         }
-        joinDate.setHours(0, 0, 0, 0);
 
-        targetSundayKeys.forEach((sundayKey) => {
-          const sundayDate = new Date(sundayKey);
-          // 가입일 이후의 일요일만 체크 대상
-          if (sundayDate >= joinDate) {
-            const key = `${member.id}-${sundayKey}`;
-            // Map에 기록이 없으면 미체크로 간주
-            if (!attendanceMap.has(key)) {
-              missingCount++;
-            }
+        let memberValidSundays = 0;
+        for (const sundayTime of sundays) {
+          if (sundayTime >= joinTimestamp) {
+            memberValidSundays++;
           }
-        });
+        }
+        totalPossibleChecks += memberValidSundays;
       });
 
-      return missingCount;
+      const recordedCount = attendances.filter((a) =>
+        ["PRESENT", "ABSENT"].includes(a.status)
+      ).length;
+
+      return Math.max(0, totalPossibleChecks - recordedCount);
     }, [startDate, endDate, members, attendances]);
 
     const summary = useMemo(() => {
@@ -342,7 +316,7 @@ const AttendanceMatrixView = memo(
           </div>
           <div className="p-4 bg-gray-100 rounded-xl border border-gray-200">
             <p className="text-xs sm:text-sm font-medium text-gray-500">
-              미체크 (예상)
+              미체크
             </p>
             <p className="mt-1 text-2xl sm:text-3xl font-bold text-gray-600">
               {summary.unchecked}
@@ -420,6 +394,7 @@ const AdminAttendancesPage: React.FC = () => {
         ? { value: user.cellId, label: user.cellName }
         : null,
     status: "",
+    // ✅ [수정 1] 초기값을 '전체("")'가 아닌 '올해(currentYear)'로 설정
     year: currentYear,
     month: "" as number | "",
     semesterId: "" as number | "",
@@ -431,7 +406,10 @@ const AdminAttendancesPage: React.FC = () => {
   const isExecutive = useMemo(() => user?.role === "EXECUTIVE", [user]);
   const isCellLeader = useMemo(() => user?.role === "CELL_LEADER", [user]);
 
+  // ─────────────────────────────────────────────────────────────
   // Effects & Logic
+  // ─────────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (semesters.length > 0 && !hasAutoSelectedSemester) {
       const today = new Date();
@@ -620,7 +598,38 @@ const AdminAttendancesPage: React.FC = () => {
     }
   }, [user]);
 
-  // ❌ [삭제] 불필요한 handleMonthNavigation 함수 제거됨
+  const handleMonthNavigation = useCallback(
+    (direction: "prev" | "next") => {
+      setFilters((prev) => {
+        if (unitType !== "month" || !prev.year || !prev.month) return prev;
+
+        let newYear = Number(prev.year);
+        let newMonth = Number(prev.month);
+
+        if (direction === "prev") {
+          newMonth -= 1;
+          if (newMonth < 1) {
+            newMonth = 12;
+            newYear -= 1;
+          }
+        } else {
+          newMonth += 1;
+          if (newMonth > 12) {
+            newMonth = 1;
+            newYear += 1;
+          }
+        }
+
+        return {
+          ...prev,
+          year: newYear,
+          month: newMonth,
+          semesterId: "",
+        };
+      });
+    },
+    [unitType]
+  );
 
   const handleFilterChange = (key: keyof Filters, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -657,6 +666,7 @@ const AdminAttendancesPage: React.FC = () => {
           typeof prev.year === "number" ? prev.year : currentYear;
         const next: Filters = { ...prev };
         if (type === "year") {
+          // ✅ [수정 2] 연간 선택 시 year가 없으면 현재년도로 강제 설정 (전체 연도 불허)
           next.year = baseYear || currentYear;
           next.month = "";
           next.semesterId = "";
@@ -726,10 +736,12 @@ const AdminAttendancesPage: React.FC = () => {
     ];
   }, [allMembers, isCellLeader, user?.cellId]);
 
+  // ✅ [수정 3] "전체 연도" 옵션 제거하고 DB 연도들만 표시 (없으면 올해라도 표시)
   const yearOptions = useMemo(() => {
     if (availableYears.length === 0) {
       return [{ value: currentYear, label: `${currentYear}년` }];
     }
+    // "전체 연도" { value: "", label: "전체 연도" } 제거
     return availableYears.map((y) => ({ value: y, label: `${y}년` }));
   }, [availableYears, currentYear]);
 
@@ -1015,7 +1027,6 @@ const AdminAttendancesPage: React.FC = () => {
         <p className="mb-4 text-center text-sm text-red-600">{error}</p>
       )}
 
-      {/* ✅ [수정] onNavigate prop 제거됨 */}
       <AttendanceMatrixView
         members={targetMembers}
         attendances={matrixAttendances}
@@ -1023,6 +1034,7 @@ const AdminAttendancesPage: React.FC = () => {
         endDate={effectiveDateRange?.endDate || ""}
         unitType={unitType}
         isLoading={loading}
+        onNavigate={handleMonthNavigation}
       />
     </div>
   );
