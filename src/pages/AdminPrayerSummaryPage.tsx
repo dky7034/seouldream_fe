@@ -103,12 +103,16 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     savedState?.unitType ?? "semester"
   );
 
+  // [수정] year 타입을 'number'에서 'number | ""'로 변경해야 학기 모드일 때 빈 값("") 할당 가능
   const [filters, setFilters] = useState({
     cell: savedState?.filters?.cell ?? "all",
     member: savedState?.filters?.member ?? "all",
     startDate: savedState?.filters?.startDate ?? "",
     endDate: savedState?.filters?.endDate ?? "",
-    year: (savedState?.filters?.year ?? "") as number | "",
+    // ▼ 여기가 문제였습니다. as number 뒤에 | "" 를 추가해주세요.
+    year: (savedState?.filters?.year ?? new Date().getFullYear()) as
+      | number
+      | "",
     month: (savedState?.filters?.month ?? "") as number | "",
     semesterId: (savedState?.filters?.semesterId ?? "") as number | "",
   });
@@ -126,15 +130,10 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
   const memberOptions: { value: number; label: string }[] = [];
   const cellOptions: { value: number; label: string }[] = [];
 
-  // ✅ [수정 1] 날짜 포맷팅 함수 개선 (타임존 문제 해결)
-  // 입력값에 'Z'가 없으면 강제로 붙여서 UTC로 인식하게 함 -> 브라우저가 KST로 자동 변환
   const safeFormatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return "-";
-
-    // T는 있는데 Z가 없으면 Z를 붙여줌 (Spring Boot 기본 LocalDateTime 대응)
     const targetStr =
       dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
-
     const date = new Date(targetStr);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -184,22 +183,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     fetchAllMembers();
   }, [user]);
 
-  // ❌ [수정 2] 자동 연도 선택 로직 삭제
-  // '전체 연도'("") 상태를 유지해야 하므로, 데이터 로딩 후 강제로 최신 연도로 바꾸는 이 Effect는 제거합니다.
-  /* useEffect(() => {
-    if (
-      filterType === "unit" &&
-      unitType === "year" &&
-      !filters.year &&
-      availableYears.length > 0
-    ) {
-      const latestYear = Math.max(...availableYears);
-      setFilters((prev) => ({ ...prev, year: latestYear }));
-      setCurrentPage(0);
-    }
-  }, [filterType, unitType, filters.year, availableYears]);
-  */
-
   const buildBaseParams = useCallback((): GetPrayersParams => {
     const params: GetPrayersParams = {
       page: currentPage,
@@ -220,7 +203,9 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
           params.endDate = semester.endDate;
         }
       } else {
-        // filters.year가 ""이면 normalizeNumberInput이 undefined 반환 -> 파라미터 제외됨 -> 백엔드 전체 조회
+        // year가 숫자면 normalizeNumberInput이 숫자 반환
+        // 만약 비어있다면 normalize가 undefined 반환 -> 백엔드가 전체 조회하려 하겠지만
+        // UI에서 연도를 강제하므로 여기엔 항상 값이 들어옴.
         params.year = normalizeNumberInput(filters.year);
         params.month = normalizeNumberInput(filters.month);
       }
@@ -295,9 +280,11 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     sessionStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(stateToSave));
   }, [mode, filterType, unitType, filters, currentPage, sortConfig]);
 
+  // 첫 진입 시 학기 자동 선택 로직
   useEffect(() => {
     if (!savedState && semesters.length > 0 && !hasAutoSelectedSemester) {
       const now = new Date();
+      // ✅ [수정] 월 단위 비교 (YYYY-MM)
       const currentYearMonth = `${now.getFullYear()}-${String(
         now.getMonth() + 1
       ).padStart(2, "0")}`;
@@ -319,7 +306,7 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
         setFilters((prev) => ({
           ...prev,
           semesterId: targetSemester!.id,
-          year: "",
+          year: "", // 학기 모드에선 연도 무시
           month: "",
         }));
       } else {
@@ -340,6 +327,7 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     setCurrentPage(0);
   };
 
+  // ✅ [수정] 단위 변경 핸들러
   const handleUnitTypeClick = (type: UnitType) => {
     setUnitType(type);
     setFilters((prev) => {
@@ -349,23 +337,22 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
       const currentMonth = now.getMonth() + 1;
 
       if (type === "year") {
-        // ✅ [수정 3] "전체 연도"("") 상태 유지. 없으면(null) 현재년도 대신 ""(전체)로 설정해도 됨
-        // 여기서는 기존 값이 있으면 유지하고, 없으면 빈값(전체) 유지.
-        next.year = next.year === "" ? "" : next.year || currentYear;
+        // [수정] '전체 연도' 불가 -> 저장된 연도 없으면 현재 연도
+        next.year = next.year || currentYear;
         next.month = "";
         next.semesterId = "";
       } else if (type === "month") {
-        // 월간은 연도 필수 -> 전체 연도("") 상태라면 현재 연도로 강제 설정
-        const targetYear =
-          next.year === "" ? currentYear : next.year || currentYear;
-        next.year = targetYear;
+        // [수정] 연도 필수 -> 저장된 연도 없으면 현재 연도
+        next.year = next.year || currentYear;
         next.month = next.month || currentMonth;
         next.semesterId = "";
       } else if (type === "semester") {
+        // 학기 선택 시 내부적으로 연도는 비워둠 (UI에서 비활성화됨)
         next.year = "";
         next.month = "";
 
         if (semesters.length > 0) {
+          // [수정] '일' 무시, '월' 포함 여부로 학기 찾기
           const currentYearMonth = `${now.getFullYear()}-${String(
             now.getMonth() + 1
           ).padStart(2, "0")}`;
@@ -373,9 +360,11 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
           let target = semesters.find((s) => {
             const start = s.startDate.substring(0, 7);
             const end = s.endDate.substring(0, 7);
+            // 문자열 비교 (예: "2025-12" >= "2025-09" && "2025-12" <= "2025-12")
             return currentYearMonth >= start && currentYearMonth <= end;
           });
 
+          // 해당하는 학기 없으면 최신 학기
           if (!target) {
             const sorted = [...semesters].sort((a, b) => b.id - a.id);
             target = sorted[0];
@@ -464,7 +453,8 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
         if (semester) return `조회 단위: 학기 (${semester.name})`;
       }
 
-      const yearText = filters.year ? `${filters.year}년` : "전체 연도";
+      // [수정] year가 비어있을 수 없지만, 만약 비어있다면 표시 처리
+      const yearText = filters.year ? `${filters.year}년` : "연도 미선택";
 
       if (unitType === "year") return `조회 단위: 연간 (${yearText})`;
       if (unitType === "month" && filters.month)
@@ -656,15 +646,13 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                   <select
                     value={filters.year}
                     onChange={(e) =>
-                      handleFilterChange(
-                        "year",
-                        e.target.value ? Number(e.target.value) : ""
-                      )
+                      // [수정] 빈 값 없이 무조건 숫자로 변환
+                      handleFilterChange("year", Number(e.target.value))
                     }
                     className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
                     disabled={unitType === "semester"}
                   >
-                    <option value="">전체 연도</option>
+                    {/* [수정] 전체 연도 <option value=""> 제거됨 */}
                     {yearOptions.map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.label}
@@ -836,7 +824,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                         <div className="text-right text-[11px] text-gray-500">
                           최근 작성일
                           <br />
-                          {/* ✅ safeFormatDate 적용 */}
                           <span className="font-medium text-gray-800">
                             {safeFormatDate(row.latestCreatedAt)}
                           </span>
@@ -953,7 +940,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                             {row.totalCount.toLocaleString()}건
                           </td>
                           <td className="px-3 sm:px-6 py-2 sm:py-3 whitespace-nowrap">
-                            {/* ✅ safeFormatDate 적용 */}
                             {safeFormatDate(row.latestCreatedAt)}
                           </td>
                         </tr>
@@ -1000,7 +986,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                       <div className="text-right text-[11px] text-gray-500">
                         최근 작성일
                         <br />
-                        {/* ✅ safeFormatDate 적용 */}
                         <span className="font-medium text-gray-800">
                           {safeFormatDate(row.latestCreatedAt)}
                         </span>
@@ -1081,7 +1066,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                           {row.totalCount.toLocaleString()}건
                         </td>
                         <td className="px-3 sm:px-6 py-2 sm:py-3 whitespace-nowrap">
-                          {/* ✅ safeFormatDate 적용 */}
                           {safeFormatDate(row.latestCreatedAt)}
                         </td>
                       </tr>
