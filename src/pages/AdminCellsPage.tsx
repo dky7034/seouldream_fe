@@ -67,22 +67,13 @@ const AdminCellsPage: React.FC = () => {
     { name: string; birthDate?: string }[]
   >([]);
 
-  // const now = new Date();
-  // const currentYear = now.getFullYear();
-
-  // ✅ [Helper] 날짜 포맷팅 함수 (KST 적용)
-  // const safeFormatDate = (dateStr: string | null | undefined) => {
-  //   if (!dateStr) return "-";
-  //   // T는 있는데 Z가 없으면 Z를 붙여줌 (UTC 인식 유도 -> 브라우저가 KST 변환)
-  //   const targetStr =
-  //     dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
-
-  //   const date = new Date(targetStr);
-  //   const year = date.getFullYear();
-  //   const month = String(date.getMonth() + 1).padStart(2, "0");
-  //   const day = String(date.getDate()).padStart(2, "0");
-  //   return `${year}.${month}.${day}`;
-  // };
+  // ───────────────── 검색어 IME(한글) 버그 해결을 위한 로컬 상태 ─────────────────
+  // URL의 'name' 파라미터와 분리하여 입력 UI를 제어합니다.
+  const [localSearchName, setLocalSearchName] = useState(
+    searchParams.get("name") || ""
+  );
+  // 로컬 입력값에 대해 0.5초 디바운스 적용
+  const debouncedSearchName = useDebounce(localSearchName, 500);
 
   // ───────────────── 필터 상태 (URL 기반 초기값) ─────────────────
   const [filters, setFilters] = useState<Filters>(() => {
@@ -94,7 +85,6 @@ const AdminCellsPage: React.FC = () => {
     const monthParam = searchParams.get("month");
     const semesterIdParam = searchParams.get("semesterId");
 
-    // ✅ 초기값을 '전체 연도'("")로 설정
     let initialYear: number | "" = "";
     if (yearParam && yearParam !== "all") {
       const parsed = Number(yearParam);
@@ -117,7 +107,6 @@ const AdminCellsPage: React.FC = () => {
     "semester"
   );
 
-  const debouncedNameFilter = useDebounce(filters.name, 500);
   const hasActiveSemesters = semesters.length > 0;
 
   const updateQueryParams = useCallback(
@@ -168,6 +157,24 @@ const AdminCellsPage: React.FC = () => {
     return Number.isNaN(pageNum) || pageNum < 0 ? 0 : pageNum;
   });
 
+  // 1. 디바운스된 검색어가 변경되면 URL 업데이트 (검색 실행)
+  useEffect(() => {
+    const currentParamsName = searchParams.get("name") || "";
+    if (debouncedSearchName !== currentParamsName) {
+      updateQueryParams({ name: debouncedSearchName });
+    }
+  }, [debouncedSearchName, searchParams, updateQueryParams]);
+
+  // 2. 브라우저 뒤로가기 등으로 URL이 변경되었을 때 입력창 동기화
+  useEffect(() => {
+    const paramsName = searchParams.get("name") || "";
+    if (paramsName !== localSearchName) {
+      setLocalSearchName(paramsName);
+    }
+    // localSearchName을 의존성에 넣으면 루프 돌 수 있으므로 제외 (단방향 동기화)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   useEffect(() => {
     const key = getValidSortKey(searchParams.get("sortKey"));
     const dirParam = searchParams.get("sortDir");
@@ -195,6 +202,7 @@ const AdminCellsPage: React.FC = () => {
 
     setFilters((prev) => ({
       ...prev,
+      // name은 로컬 스테이트가 관리하지만 filters 객체 동기화를 위해 업데이트
       name: searchParams.get("name") || "",
       active: (searchParams.get("active") as Filters["active"]) || "all",
       startDate: searchParams.get("startDate") || "",
@@ -250,9 +258,6 @@ const AdminCellsPage: React.FC = () => {
     }
 
     const year = typeof filters.year === "number" ? filters.year : undefined;
-
-    // ✅ [수정 3] 로직 단순화: year가 없으면 무조건 null 반환
-    // (이전 코드에서 불필요했던 unitType 체크를 제거하여 Linter 경고 해결)
     if (!year) {
       return null;
     }
@@ -269,7 +274,7 @@ const AdminCellsPage: React.FC = () => {
 
     const last = lastDayOfMonth(year, 12);
     return { startDate: `${year}-01-01`, endDate: `${year}-12-${pad(last)}` };
-  }, [filterType, filters, semesters]); // unitType 의존성 제거됨
+  }, [filterType, filters, semesters]);
 
   const fetchCells = useCallback(async () => {
     if (!user || user.role !== "EXECUTIVE") return;
@@ -282,16 +287,15 @@ const AdminCellsPage: React.FC = () => {
     const sortKeyMap: Record<string, string> = {
       leaderName: "leader.name",
       viceLeaderName: "viceLeader.name",
+      // attendanceRate도 서버 필드명과 일치한다고 가정 (불일치 시 매핑 추가 필요)
     };
 
-    let sortParam: string | undefined = undefined;
-    if (sortConfig.key !== "attendanceRate") {
-      const backendSortKey =
-        sortKeyMap[sortConfig.key as string] || sortConfig.key;
-      sortParam = `${backendSortKey},${
-        sortConfig.direction === "ascending" ? "asc" : "desc"
-      }`;
-    }
+    // ✅ [버그 수정 1] attendanceRate일 때도 항상 서버로 정렬 파라미터 전송
+    const backendSortKey =
+      sortKeyMap[sortConfig.key as string] || sortConfig.key;
+    const sortParam = `${backendSortKey},${
+      sortConfig.direction === "ascending" ? "asc" : "desc"
+    }`;
 
     const dateRange = getDateRangeFromFilters();
 
@@ -299,9 +303,8 @@ const AdminCellsPage: React.FC = () => {
       page: currentPage,
       size: 10,
       sort: sortParam,
-      name: debouncedNameFilter,
+      name: debouncedSearchName, // ✅ URL과 동기화된 디바운스 값 사용
       active: filters.active === "all" ? undefined : filters.active === "true",
-      // ✅ dateRange가 null이면 undefined 처리 (전체 기간 조회)
       startDate: dateRange?.startDate || undefined,
       endDate: dateRange?.endDate || undefined,
     };
@@ -324,7 +327,7 @@ const AdminCellsPage: React.FC = () => {
     user,
     currentPage,
     sortConfig,
-    debouncedNameFilter,
+    debouncedSearchName,
     filters.active,
     getDateRangeFromFilters,
     unitType,
@@ -421,19 +424,12 @@ const AdminCellsPage: React.FC = () => {
     [availableYears]
   );
 
+  // ✅ [버그 수정 1 관련] 프론트엔드 정렬 로직 제거
+  // 서버에서 이미 정렬되어 오므로 그대로 렌더링
   const sortedCells = useMemo(() => {
     if (!cellPage) return [];
-    const rows = [...cellPage.content];
-    if (sortConfig.key === "attendanceRate") {
-      rows.sort((a, b) => {
-        const rateA = a.attendanceRate ?? -1;
-        const rateB = b.attendanceRate ?? -1;
-        if (sortConfig.direction === "ascending") return rateA - rateB;
-        else return rateB - rateA;
-      });
-    }
-    return rows;
-  }, [cellPage, sortConfig]);
+    return cellPage.content;
+  }, [cellPage]);
 
   // --- Event Handlers ---
 
@@ -499,7 +495,6 @@ const AdminCellsPage: React.FC = () => {
     };
 
     if (type === "year") {
-      // ✅ [수정 4] "전체 연도"("") 상태 유지 (없으면 빈값)
       updates.year = filters.year === "" ? "" : filters.year || "";
       updates.month = "";
       updates.semesterId = "";
@@ -730,8 +725,9 @@ const AdminCellsPage: React.FC = () => {
               <input
                 type="text"
                 placeholder="이름으로 검색..."
-                value={filters.name}
-                onChange={(e) => handleFilterChange("name", e.target.value)}
+                // ✅ [버그 수정 2] 로컬 state 사용 및 onChange 분리
+                value={localSearchName}
+                onChange={(e) => setLocalSearchName(e.target.value)}
                 className="p-2 border rounded-md w-full text-sm"
               />
             </div>
@@ -787,7 +783,6 @@ const AdminCellsPage: React.FC = () => {
                       )
                     : "미정";
 
-                  // 소수점 1자리(toFixed(1)) -> 정수 반올림(Math.round)
                   const rateText =
                     cell.attendanceRate !== undefined
                       ? `${Math.round(cell.attendanceRate)}%`
@@ -991,7 +986,6 @@ const AdminCellsPage: React.FC = () => {
                 정말로 &quot;{cellToDelete?.name}&quot; 셀을 삭제하시겠습니까?
               </p>
 
-              {/* deleteError 상태 사용 (unused var 에러 해결) */}
               {deleteError && (
                 <div className="mt-2 p-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded">
                   {deleteError}
