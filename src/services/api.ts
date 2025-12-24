@@ -13,14 +13,13 @@ const api = axios.create({
   },
 });
 
-// 2. 요청 인터셉터 (여기가 문제였습니다!)
-// authService를 통해 가져오지 말고, 스토리지에서 '직접' 꺼내야 순환 참조 문제를 피합니다.
+// 2. 요청 인터셉터
 api.interceptors.request.use(
   (config) => {
-    // authService.getAccessToken() 대신 직접 조회
+    // ✅ [수정됨] 우선순위 변경: Session(현재 로그인) -> Local(유지된 로그인)
     const token =
-      localStorage.getItem("accessToken") ||
-      sessionStorage.getItem("accessToken");
+      sessionStorage.getItem("accessToken") ||
+      localStorage.getItem("accessToken");
 
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;

@@ -223,8 +223,12 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
         setMembers(relevantMembers);
 
         const existingAttendances = existingAttendancesPage.content;
-        const hasExistingData =
-          existingAttendances.length > 0 || !!cellReportData;
+
+        // [수정됨] 출석 데이터가 있더라도, 보고서 내용(cellReportData)이 없으면 아직 제출 안 한 것으로 간주
+        const hasExistingData = !!cellReportData;
+
+        // 만약 빈 껍데기 객체가 올 수도 있다면 아래처럼 더 확실하게 체크
+        // const hasExistingData = !!cellReportData && !!cellReportData.cellShare;
 
         setIsEditMode(hasExistingData);
 

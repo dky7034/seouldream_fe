@@ -173,8 +173,8 @@ const AttendanceMatrixView: React.FC<{
               ⚠️ 출석 체크가 누락된 주가 있습니다.
             </p>
             <p className="text-xs text-red-500 mt-1">
-              해당 기간 내 총 <strong>{uncheckedCount}개</strong>의
-              주일(Sunday)에 대해 출석 기록이 완벽하지 않습니다.
+              해당 기간 내 총 <strong>{uncheckedCount}개</strong>의 주일에 대해
+              출석 기록이 완벽하지 않습니다.
             </p>
           </div>
           <p className="text-3xl font-bold text-red-700 ml-4">

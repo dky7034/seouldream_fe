@@ -10,32 +10,33 @@ import type {
   UserRole,
 } from "../types";
 
-// ✅ 환경에 따라 주소가 자동으로 바뀝니다!
-// PROD(배포상태)일 땐 "https://nextdream.store/api" 사용
-// DEV(개발상태)일 땐 "/api" (Vite의 Proxy 설정을 타서 localhost:8080으로 연결됨)
+// PROD/DEV 환경 분기
 const API_BASE_URL = import.meta.env.PROD
   ? "https://nextdream.store/api"
   : "/api";
 
-// Use a separate axios instance for refresh to avoid interceptor loops
+// 리프레시 토큰용 별도 인스턴스 (인터셉터 무한 루프 방지)
 const refreshAxiosInstance = axios.create({
   baseURL: API_BASE_URL,
 });
 
-// Helper functions for storage abstraction
+// ----------------------------------------------------
+// Storage Helpers
+// ----------------------------------------------------
+
 const _setTokens = (
   accessToken: string,
   refreshToken: string,
   user: User,
   rememberMe: boolean
 ) => {
-  const storage = rememberMe ? localStorage : sessionStorage;
-  storage.setItem("accessToken", accessToken);
-  storage.setItem("refreshToken", refreshToken);
-  storage.setItem("user", JSON.stringify(user));
-
-  // Clear from other storage if present
+  const targetStorage = rememberMe ? localStorage : sessionStorage;
   const otherStorage = rememberMe ? sessionStorage : localStorage;
+
+  targetStorage.setItem("accessToken", accessToken);
+  targetStorage.setItem("refreshToken", refreshToken);
+  targetStorage.setItem("user", JSON.stringify(user));
+
   otherStorage.removeItem("accessToken");
   otherStorage.removeItem("refreshToken");
   otherStorage.removeItem("user");
@@ -46,24 +47,26 @@ const _getTokens = (): {
   refreshToken: string | null;
   user: User | null;
 } => {
-  let accessToken = localStorage.getItem("accessToken");
-  let refreshToken = localStorage.getItem("refreshToken");
-  let userStr = localStorage.getItem("user");
+  let accessToken = sessionStorage.getItem("accessToken");
+  let refreshToken = sessionStorage.getItem("refreshToken");
+  let userStr = sessionStorage.getItem("user");
 
   if (!accessToken || !refreshToken || !userStr) {
-    accessToken = sessionStorage.getItem("accessToken");
-    refreshToken = sessionStorage.getItem("refreshToken");
-    userStr = sessionStorage.getItem("user");
+    accessToken = localStorage.getItem("accessToken");
+    refreshToken = localStorage.getItem("refreshToken");
+    userStr = localStorage.getItem("user");
+  }
+
+  if (!accessToken || !refreshToken || !userStr) {
+    return { accessToken: null, refreshToken: null, user: null };
   }
 
   let user: User | null = null;
-  if (userStr) {
-    try {
-      user = JSON.parse(userStr) as User;
-    } catch (e) {
-      console.error("Failed to parse user from storage", e);
-      _clearTokens(); // Clear invalid data
-    }
+  try {
+    user = JSON.parse(userStr) as User;
+  } catch (e) {
+    console.error("User parsing failed", e);
+    _clearTokens();
   }
 
   return { accessToken, refreshToken, user };
@@ -78,33 +81,21 @@ const _clearTokens = () => {
   sessionStorage.removeItem("user");
 };
 
+// ----------------------------------------------------
+// Auth Service
+// ----------------------------------------------------
+
 const authService = {
   checkUsername: async (username: string): Promise<boolean> => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/auth/check-username`, {
-        params: { username },
-      });
-      return response.data.isAvailable;
-    } catch (error: any) {
-      console.error(
-        "Username check error:",
-        error.response?.data || error.message
-      );
-      throw error;
-    }
+    const response = await axios.get(`${API_BASE_URL}/auth/check-username`, {
+      params: { username },
+    });
+    return response.data.isAvailable;
   },
 
   register: async (memberData: CreateMemberRequest) => {
-    try {
-      const response = await axios.post(`${API_BASE_URL}/members`, memberData);
-      return response.data;
-    } catch (error: any) {
-      console.error(
-        "Registration error:",
-        error.response?.data || error.message
-      );
-      throw error;
-    }
+    const response = await axios.post(`${API_BASE_URL}/members`, memberData);
+    return response.data;
   },
 
   login: async (
@@ -113,10 +104,12 @@ const authService = {
     rememberMe: boolean = false
   ): Promise<User> => {
     try {
+      // ✅ [변경 1] 백엔드에 rememberMe 값 전달 (30일 토큰 발급 요청)
       const response: AxiosResponse<JwtAuthenticationResponse> =
         await axios.post(`${API_BASE_URL}/auth/login`, {
           username,
           password,
+          rememberMe, // 추가됨
         });
 
       const {
@@ -124,7 +117,7 @@ const authService = {
         refreshToken,
         userId,
         memberId,
-        role: responseRole, // ← 이름 살짝 바꿔줌
+        role: responseRole,
         name,
         cellId,
         cellName,
@@ -135,22 +128,19 @@ const authService = {
       }
 
       const decodedToken = jwtDecode<JwtPayload>(accessToken);
-
-      // ✅ 백엔드에서 온 문자열 role을 UserRole로 안전하게 변환
       const allowedRoles: UserRole[] = ["EXECUTIVE", "CELL_LEADER", "MEMBER"];
-
       const normalizedRole: UserRole = allowedRoles.includes(
         responseRole as UserRole
       )
         ? (responseRole as UserRole)
-        : "MEMBER"; // 혹시 이상한 값 오면 기본값을 MEMBER로
+        : "MEMBER";
 
       const user: User = {
         id: userId,
         memberId: memberId,
         username: decodedToken.sub,
         name: name,
-        role: normalizedRole, // ✅ 이제 UserRole
+        role: normalizedRole,
         cellId: cellId,
         cellName: cellName,
       };
@@ -164,90 +154,75 @@ const authService = {
   },
 
   logout: async () => {
-    const token = authService.getAccessToken(); // Use getAccessToken to retrieve token correctly
+    const token = authService.getAccessToken();
     if (token) {
       try {
         await axios.post(
           `${API_BASE_URL}/auth/logout`,
           {},
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
+          { headers: { Authorization: `Bearer ${token}` } }
         );
-      } catch (error: any) {
-        console.error(
-          "Logout API call failed:",
-          error.response?.data || error.message
-        );
+      } catch (error) {
+        console.error("Logout API failed");
       }
     }
     _clearTokens();
   },
 
   refreshToken: async (): Promise<string | null> => {
-    const { refreshToken } = _getTokens(); // Use _getTokens
+    let refreshToken = sessionStorage.getItem("refreshToken");
+    let targetStorage = sessionStorage;
+
     if (!refreshToken) {
-      return null;
+      refreshToken = localStorage.getItem("refreshToken");
+      targetStorage = localStorage;
     }
+
+    if (!refreshToken) return null;
 
     try {
       const response = await refreshAxiosInstance.post("/auth/refresh", {
         refreshToken,
       });
-      const { accessToken } = response.data;
 
-      if (accessToken) {
-        // When refreshing token, assume the previous 'rememberMe' state
-        // and re-save tokens with the same preference.
-        // We need to re-fetch the user object to pass to _setTokens
-        const { user } = _getTokens();
-        const rememberMe = localStorage.getItem("accessToken") !== null; // Check if it was saved in local storage
-        if (user) {
-          _setTokens(accessToken, refreshToken, user, rememberMe);
-        } else {
-          // This case should ideally not happen if user is properly stored
-          localStorage.setItem("accessToken", accessToken); // Fallback to localStorage if user is missing
-        }
-        return accessToken;
+      // ✅ [변경 2] Access Token 뿐만 아니라 Refresh Token도 받아서 갱신 (Rotation)
+      const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
+        response.data;
+
+      if (newAccessToken && newRefreshToken) {
+        targetStorage.setItem("accessToken", newAccessToken);
+        targetStorage.setItem("refreshToken", newRefreshToken); // Refresh Token 교체
+        return newAccessToken;
       }
+
       return null;
     } catch (error) {
-      console.error("Failed to refresh token", error);
-      // If refresh fails, log the user out
+      console.error("Refresh failed", error);
       authService.logout();
       return null;
     }
   },
 
   getCurrentUser: (): User | null => {
-    const { user } = _getTokens(); // Use _getTokens
+    const { user } = _getTokens();
     return user;
+  },
+
+  getAccessToken: () => {
+    const { accessToken } = _getTokens();
+    return accessToken;
+  },
+
+  getRefreshToken: () => {
+    const { refreshToken } = _getTokens();
+    return refreshToken;
   },
 
   changePassword: async (
     userId: number,
     data: ChangePasswordRequest
   ): Promise<void> => {
-    try {
-      // 이미 위에서 import한 api 사용
-      await api.post(`/auth/change-password/${userId}`, data);
-    } catch (error: any) {
-      console.error(
-        "Password change error:",
-        error.response?.data || error.message
-      );
-      throw error;
-    }
-  },
-
-  getAccessToken: () => {
-    const { accessToken } = _getTokens(); // Use _getTokens
-    return accessToken;
-  },
-
-  getRefreshToken: () => {
-    const { refreshToken } = _getTokens(); // Use _getTokens
-    return refreshToken;
+    await api.post(`/auth/change-password/${userId}`, data);
   },
 };
 
