@@ -28,7 +28,7 @@ const AdminNoticesPage: React.FC = () => {
 
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
+  // const currentYear = now.getFullYear(); // ❌ 초기값 로직에서 제거 (사용 안 함)
 
   const [noticePage, setNoticePage] = useState<Page<NoticeDto> | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -47,19 +47,19 @@ const AdminNoticesPage: React.FC = () => {
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const hasActiveSemesters = semesters.length > 0;
 
-  // ✅ [수정] 한국 시간(KST) 적용 날짜 포맷터
+  // ✅ [수정 2] 날짜 포맷팅 함수 개선 (타임존 문제 해결)
+  // 입력값에 'Z'가 없으면 강제로 붙여서 UTC로 인식하게 함 -> 브라우저가 KST로 자동 변환
   const safeFormatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return "-";
 
-    // 1. 문자열을 Date 객체로 변환 (이때 브라우저 시간대=한국시간 반영됨)
-    const date = new Date(dateStr);
+    // T는 있는데 Z가 없으면 Z를 붙여줌 (Spring Boot 기본 LocalDateTime 대응)
+    const targetStr =
+      dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
 
-    // 2. 연, 월, 일 추출 (한국 시간 기준)
+    const date = new Date(targetStr);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
-
-    // 3. 포맷팅 반환
     return `${year}.${month}.${day}`;
   };
 
@@ -83,11 +83,12 @@ const AdminNoticesPage: React.FC = () => {
       return isNaN(num) ? "" : num;
     };
 
-    // 'all'이면 빈문자열(전체), 없으면 현재연도, 있으면 해당 숫자
-    let initialYear: number | "" = currentYear;
-    if (yearParam === "all") {
-      initialYear = "";
-    } else if (yearParam) {
+    // ✅ [수정 1] 초기값을 무조건 "" (전체 연도)로 설정
+    // URL에 year 파라미터가 없으면 -> 전체 연도("")
+    // URL에 year 파라미터가 있으면 -> 해당 연도 숫자
+    let initialYear: number | "" = ""; // 기본값을 전체 연도로 변경!
+
+    if (yearParam && yearParam !== "all") {
       const parsed = Number(yearParam);
       if (!isNaN(parsed)) initialYear = parsed;
     }
@@ -228,7 +229,6 @@ const AdminNoticesPage: React.FC = () => {
     }
   }, []);
 
-  // ✅ [수정된 Fetch 로직] '전체 연도' 선택 시 year 파라미터를 확실하게 제거
   const fetchNotices = useCallback(async () => {
     if (!user) {
       setLoading(false);
@@ -266,7 +266,7 @@ const AdminNoticesPage: React.FC = () => {
       } else {
         params = {
           ...params,
-          // ✅ [핵심 수정] filters.year가 ""(빈문자열)이면 undefined를 할당하여 API 요청에서 제외
+          // filters.year가 ""(빈문자열)이면 undefined를 할당하여 API 요청에서 제외
           year:
             filters.year === ""
               ? undefined
@@ -276,7 +276,6 @@ const AdminNoticesPage: React.FC = () => {
       }
     }
 
-    // undefined, null, 빈문자열 제거 (파라미터 정리)
     const cleanedParams = Object.fromEntries(
       Object.entries(params).filter(
         ([, v]) => v !== null && v !== "" && v !== undefined
@@ -386,8 +385,8 @@ const AdminNoticesPage: React.FC = () => {
 
   const handleUnitTypeClick = (type: UnitType) => {
     const cy = new Date().getFullYear();
-    // ✅ filters.year가 ""이면 "" 유지, 아니면 값 유지 (없으면 현재년도)
-    const baseYear = filters.year === "" ? "" : filters.year || cy;
+    // ✅ 단위 변경 시에도 기본값은 "전체 연도"("")로 설정
+    const baseYear = filters.year === "" ? "" : filters.year || "";
     let nextFilters = { ...filters };
 
     if (type === "year") {
@@ -398,7 +397,7 @@ const AdminNoticesPage: React.FC = () => {
         semesterId: "" as const,
       };
     } else if (type === "month") {
-      // 월간 선택 시: '전체 연도' 상태라면 올해로 강제 변경 (월 조회는 연도가 필수이므로)
+      // 월간 선택 시에는 연도가 필수이므로, 없다면 현재 연도로 강제 설정
       const targetYear = baseYear === "" ? cy : baseYear;
       nextFilters = {
         ...filters,
