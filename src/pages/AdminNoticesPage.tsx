@@ -47,8 +47,7 @@ const AdminNoticesPage: React.FC = () => {
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const hasActiveSemesters = semesters.length > 0;
 
-  // ✅ [Helper] 날짜 포맷팅 함수 (백엔드 LocalDate/LocalDateTime 대응)
-  // "2025-05-20T..." -> "2025.05.20" 변환 (타임존 이슈 방지)
+  // ✅ [Helper] 날짜 포맷팅 함수
   const safeFormatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return "-";
     return dateStr.split("T")[0].replace(/-/g, ".");
@@ -74,7 +73,7 @@ const AdminNoticesPage: React.FC = () => {
       return isNaN(num) ? "" : num;
     };
 
-    // yearParam이 'all'이면 빈문자열(전체), 없으면 현재연도, 있으면 해당 숫자
+    // 'all'이면 빈문자열(전체), 없으면 현재연도, 있으면 해당 숫자
     let initialYear: number | "" = currentYear;
     if (yearParam === "all") {
       initialYear = "";
@@ -219,6 +218,7 @@ const AdminNoticesPage: React.FC = () => {
     }
   }, []);
 
+  // ✅ [수정된 Fetch 로직] '전체 연도' 선택 시 year 파라미터를 확실하게 제거
   const fetchNotices = useCallback(async () => {
     if (!user) {
       setLoading(false);
@@ -256,12 +256,17 @@ const AdminNoticesPage: React.FC = () => {
       } else {
         params = {
           ...params,
-          year: normalizeNumberInput(filters.year),
+          // ✅ [핵심 수정] filters.year가 ""(빈문자열)이면 undefined를 할당하여 API 요청에서 제외
+          year:
+            filters.year === ""
+              ? undefined
+              : normalizeNumberInput(filters.year),
           month: normalizeNumberInput(filters.month),
         };
       }
     }
 
+    // undefined, null, 빈문자열 제거 (파라미터 정리)
     const cleanedParams = Object.fromEntries(
       Object.entries(params).filter(
         ([, v]) => v !== null && v !== "" && v !== undefined
@@ -371,6 +376,7 @@ const AdminNoticesPage: React.FC = () => {
 
   const handleUnitTypeClick = (type: UnitType) => {
     const cy = new Date().getFullYear();
+    // ✅ filters.year가 ""이면 "" 유지, 아니면 값 유지 (없으면 현재년도)
     const baseYear = filters.year === "" ? "" : filters.year || cy;
     let nextFilters = { ...filters };
 
@@ -382,6 +388,7 @@ const AdminNoticesPage: React.FC = () => {
         semesterId: "" as const,
       };
     } else if (type === "month") {
+      // 월간 선택 시: '전체 연도' 상태라면 올해로 강제 변경 (월 조회는 연도가 필수이므로)
       const targetYear = baseYear === "" ? cy : baseYear;
       nextFilters = {
         ...filters,
@@ -684,6 +691,7 @@ const AdminNoticesPage: React.FC = () => {
                     연도
                   </label>
                   <select
+                    // ✅ value 처리: filters.year가 ""이면 ""로 매핑 (전체 연도)
                     value={filters.year === "" ? "" : filters.year}
                     onChange={(e) =>
                       handleFilterChange(
@@ -798,19 +806,7 @@ const AdminNoticesPage: React.FC = () => {
               </label>
               <div className="flex space-x-1 bg-gray-200 p-1 rounded-lg">
                 <button
-                  onClick={() => {
-                    const nextSort = "createdAt,desc";
-                    const nextPage = 0;
-                    setSortOrder(nextSort);
-                    setCurrentPage(nextPage);
-                    syncSearchParams(
-                      filters,
-                      filterType,
-                      unitType,
-                      nextSort,
-                      nextPage
-                    );
-                  }}
+                  onClick={() => requestSort("createdAt")}
                   className={`w-full px-4 py-1.5 text-xs sm:text-sm font-medium rounded-md ${
                     sortOrder === "createdAt,desc"
                       ? "bg-white text-indigo-700 shadow"
