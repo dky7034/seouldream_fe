@@ -47,15 +47,19 @@ const AdminNoticesPage: React.FC = () => {
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const hasActiveSemesters = semesters.length > 0;
 
-  // ✅ [Helper] 날짜 포맷팅 함수
-  // ✅ [수정된 Helper] Timezone을 적용하여 날짜 변환
-  // UTC 문자열을 브라우저 로컬 시간(한국 시간)으로 변환하여 표시
+  // ✅ [수정] 한국 시간(KST) 적용 날짜 포맷터
   const safeFormatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return "-";
+
+    // 1. 문자열을 Date 객체로 변환 (이때 브라우저 시간대=한국시간 반영됨)
     const date = new Date(dateStr);
+
+    // 2. 연, 월, 일 추출 (한국 시간 기준)
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
+
+    // 3. 포맷팅 반환
     return `${year}.${month}.${day}`;
   };
 
