@@ -38,6 +38,25 @@ import type {
   DashboardDemographicsDto,
 } from "../types";
 
+// ✅ [추가] 섹션 헤더 컴포넌트 (설명 문구 포함)
+const SectionHeader: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  description?: string;
+  colorClass: string; // 예: "text-indigo-600 bg-indigo-100"
+}> = ({ icon, title, description, colorClass }) => (
+  <div className="mb-6">
+    <div className="flex items-center gap-2 mb-1">
+      <div className={`p-2 rounded-lg ${colorClass}`}>{icon}</div>
+      <h2 className="text-xl font-bold text-gray-800">{title}</h2>
+    </div>
+    {/* 설명 문구가 있을 때만 렌더링 */}
+    {description && (
+      <p className="text-sm text-gray-500 ml-11">{description}</p>
+    )}
+  </div>
+);
+
 // ✅ 만 나이 계산 헬퍼 함수
 const calculateAge = (member: UnassignedMemberDto): number | null => {
   if (member.age !== undefined && member.age !== null && member.age !== 0) {
@@ -480,18 +499,20 @@ const StatisticsPage: React.FC = () => {
 
         {/* 메인 컨텐츠 영역 */}
         <div
-          className={`space-y-8 transition-opacity duration-200 ${
+          className={`space-y-10 transition-opacity duration-200 ${
+            // space-y-8 -> space-y-10 으로 간격 조금 늘림
             isRefetching ? "opacity-50 pointer-events-none" : "opacity-100"
           }`}
         >
           {/* 섹션 1: 변화 리포트 */}
           <section>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600">
-                <FaChartLine size={20} />
-              </div>
-              <h2 className="text-xl font-bold text-gray-800">변화 리포트</h2>
-            </div>
+            {/* ✅ [수정] SectionHeader 사용 및 설명 추가 */}
+            <SectionHeader
+              icon={<FaChartLine size={20} />}
+              title="변화 리포트"
+              description="이번 학기 월별 등록 추이와 전월 대비 성장률을 분석하여 공동체의 양적 성장 흐름을 파악합니다."
+              colorClass="bg-indigo-100 text-indigo-600"
+            />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
@@ -546,14 +567,13 @@ const StatisticsPage: React.FC = () => {
 
           {/* 섹션 2: 구성원 통계 분석 */}
           <section>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="p-2 bg-green-100 rounded-lg text-green-600">
-                <FaUserFriends size={20} />
-              </div>
-              <h2 className="text-xl font-bold text-gray-800">
-                구성원 통계 분석
-              </h2>
-            </div>
+            {/* ✅ [수정] SectionHeader 사용 및 설명 추가 */}
+            <SectionHeader
+              icon={<FaUserFriends size={20} />}
+              title="구성원 통계 분석"
+              description="공동체의 연령대 및 성별 분포를 확인할 수 있습니다."
+              colorClass="bg-green-100 text-green-600"
+            />
 
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -626,14 +646,13 @@ const StatisticsPage: React.FC = () => {
 
           {/* 섹션 3: 셀 미배정 인원 관리 */}
           <section id="unassigned-section">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="p-2 bg-orange-100 rounded-lg text-orange-600">
-                <FaUserSlash size={20} />
-              </div>
-              <h2 className="text-xl font-bold text-gray-800">
-                셀 미배정 인원 관리
-              </h2>
-            </div>
+            {/* ✅ [수정] SectionHeader 사용 및 설명 추가 */}
+            <SectionHeader
+              icon={<FaUserSlash size={20} />}
+              title="셀 미배정 인원 관리"
+              description="등록되었으나 아직 셀에 소속되지 않은 인원 목록입니다."
+              colorClass="bg-orange-100 text-orange-600"
+            />
 
             <div className="bg-white rounded-xl shadow border border-gray-100 overflow-hidden">
               <div className="p-4 border-b border-gray-100 flex justify-between items-center">

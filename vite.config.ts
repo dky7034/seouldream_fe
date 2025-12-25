@@ -12,4 +12,17 @@ export default defineConfig({
       },
     },
   },
+  // 👇 아래 build 설정 전체를 추가하세요
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // node_modules(라이브러리)를 'vendor'라는 별도 파일로 분리
+          if (id.includes("node_modules")) {
+            return "vendor";
+          }
+        },
+      },
+    },
+  },
 });

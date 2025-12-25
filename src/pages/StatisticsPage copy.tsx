@@ -59,58 +59,145 @@ const calculateAge = (member: UnassignedMemberDto): number | null => {
   return null;
 };
 
-// ✅ 새가족 성장 차트
+// ✅ [수정 1] CustomTooltip 안전하게 변경 (TypeError 해결)
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    // 인덱스로 접근하지 않고 dataKey로 안전하게 찾음
+    const countData = payload.find((p: any) => p.dataKey === "count");
+    const growthData = payload.find((p: any) => p.dataKey === "growthRate");
+
+    return (
+      <div className="bg-white p-4 border border-gray-100 shadow-xl rounded-xl min-w-[150px]">
+        <p className="text-sm font-bold text-gray-700 mb-2">{label}</p>
+        <div className="space-y-1">
+          {/* 막대 데이터 (등록 인원) */}
+          {countData && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center text-gray-500">
+                <div className="w-2 h-2 rounded-full bg-indigo-500 mr-2" />
+                등록 인원
+              </span>
+              <span className="font-bold text-gray-800">
+                {countData.value}명
+              </span>
+            </div>
+          )}
+          {/* 라인 데이터 (증감률) */}
+          {growthData && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center text-gray-500">
+                <div className="w-2 h-2 rounded-full bg-emerald-400 mr-2" />
+                증감률
+              </span>
+              <span
+                className={`font-bold ${
+                  growthData.value > 0
+                    ? "text-red-500" // 성장
+                    : growthData.value < 0
+                    ? "text-blue-500" // 감소
+                    : "text-gray-500"
+                }`}
+              >
+                {growthData.value}%
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+// ✅ [수정 2] 차트 컨테이너 높이 명시 (width/height 에러 해결)
 const NewcomerGrowthChart = React.memo(
   ({ data }: { data: NewcomerStatDto[] }) => {
     if (!data || data.length === 0) {
       return (
-        <div className="h-[300px] w-full bg-white p-4 rounded-lg shadow border border-gray-100 flex items-center justify-center text-gray-400">
-          데이터가 없습니다.
+        <div className="h-[350px] w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-gray-400 bg-opacity-50">
+          <FaChartLine size={48} className="mb-4 opacity-20" />
+          <p>데이터가 없습니다.</p>
         </div>
       );
     }
 
     return (
-      <div className="h-[300px] w-full bg-white p-4 rounded-lg shadow border border-gray-100">
-        <div style={{ width: "100%", height: "100%", minHeight: "250px" }}>
+      <div className="h-[350px] w-full bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
+        <h3 className="text-sm font-semibold text-gray-500 mb-2 px-2">
+          월별 등록 추이 분석
+        </h3>
+        {/* flex-1로 남은 공간을 모두 차지하게 하거나, 고정 높이를 줍니다. */}
+        <div className="flex-1 w-full min-h-0">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
               data={data}
-              margin={{ top: 20, right: 20, bottom: 20, left: 0 }}
+              margin={{ top: 10, right: 10, bottom: 0, left: 0 }}
             >
-              <CartesianGrid stroke="#f5f5f5" vertical={false} />
-              <XAxis dataKey="label" scale="band" tick={{ fontSize: 12 }} />
-              <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
+              <defs>
+                <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0.1} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="#f0f0f0"
+              />
+              <XAxis
+                dataKey="label"
+                scale="band"
+                tick={{ fontSize: 12, fill: "#9ca3af" }}
+                axisLine={false}
+                tickLine={false}
+                dy={10}
+              />
+              <YAxis
+                yAxisId="left"
+                orientation="left"
+                tick={{ fontSize: 11, fill: "#9ca3af" }}
+                axisLine={false}
+                tickLine={false}
+                dx={-10}
+              />
               <YAxis
                 yAxisId="right"
                 orientation="right"
-                stroke="#82ca9d"
                 unit="%"
+                tick={{ fontSize: 11, fill: "#9ca3af" }}
+                axisLine={false}
+                tickLine={false}
+                dx={10}
               />
               <Tooltip
-                contentStyle={{
-                  borderRadius: "8px",
-                  border: "none",
-                  boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
-                }}
+                content={<CustomTooltip />}
+                cursor={{ fill: "transparent" }}
               />
-              <Legend wrapperStyle={{ paddingTop: "10px" }} />
+              <Legend
+                wrapperStyle={{ paddingTop: "20px" }}
+                formatter={(value) => (
+                  <span className="text-sm text-gray-500 font-medium ml-1">
+                    {value}
+                  </span>
+                )}
+              />
               <Bar
                 yAxisId="left"
                 dataKey="count"
                 name="등록 인원"
-                barSize={30}
-                fill="#8884d8"
-                radius={[4, 4, 0, 0]}
+                barSize={32}
+                fill="url(#colorCount)"
+                radius={[6, 6, 0, 0]}
               />
               <Line
                 yAxisId="right"
                 type="monotone"
                 dataKey="growthRate"
                 name="증감률"
-                stroke="#82ca9d"
-                strokeWidth={2}
-                dot={{ r: 4 }}
+                stroke="#10b981"
+                strokeWidth={3}
+                dot={{ r: 4, fill: "#10b981", strokeWidth: 2, stroke: "#fff" }}
+                activeDot={{ r: 6, strokeWidth: 0 }}
               />
             </ComposedChart>
           </ResponsiveContainer>
@@ -120,7 +207,7 @@ const NewcomerGrowthChart = React.memo(
   }
 );
 
-// ✅ 연령대(2030) 파이 차트
+// ✅ [수정 3] 파이 차트 컨테이너 높이 명시
 const AgeGroupPieChart = React.memo(
   ({ data }: { data: SemesterSummaryDto["ageGroupSummary"] }) => {
     const total = data.twenties + data.thirties;
@@ -140,7 +227,8 @@ const AgeGroupPieChart = React.memo(
 
     return (
       <div className="h-[200px] w-full flex items-center justify-center">
-        <div style={{ width: "100%", height: "100%" }}>
+        {/* 높이를 100%로 설정하되 부모가 h-[200px]이므로 안전함 */}
+        <div className="w-full h-full">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -166,10 +254,8 @@ const AgeGroupPieChart = React.memo(
   }
 );
 
-// ✅ [추가] 성별 비율 차트 (GenderRatioChart)
 const GenderRatioChart = React.memo(
   ({ data }: { data: DashboardDemographicsDto }) => {
-    // distribution 배열에서 남/녀 합산 계산
     const { male, female } = useMemo(() => {
       let m = 0;
       let f = 0;
@@ -191,13 +277,13 @@ const GenderRatioChart = React.memo(
     }
 
     const chartData = [
-      { name: "남자", value: male, color: "#60a5fa" }, // Blue
-      { name: "여자", value: female, color: "#f472b6" }, // Pink
+      { name: "남자", value: male, color: "#60a5fa" },
+      { name: "여자", value: female, color: "#f472b6" },
     ];
 
     return (
       <div className="h-[200px] w-full flex items-center justify-center">
-        <div style={{ width: "100%", height: "100%" }}>
+        <div className="w-full h-full">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -470,7 +556,6 @@ const StatisticsPage: React.FC = () => {
             </div>
 
             <div className="space-y-6">
-              {/* ✅ [수정] 2개의 차트를 나란히 배치 (grid-cols-2) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* 1. 이번 학기 연령 구성비 (왼쪽) */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-between">
@@ -498,7 +583,7 @@ const StatisticsPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* 2. 성별 비율 (오른쪽 - 새로 추가됨) */}
+                {/* 2. 성별 비율 (오른쪽) */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-between">
                   <div className="w-full text-left mb-2">
                     <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -523,7 +608,7 @@ const StatisticsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* 3. 상세 지표 (DemographicsSection) */}
+              {/* 3. 상세 지표 */}
               <div className="w-full">
                 {detailDemographics ? (
                   <DemographicsSection

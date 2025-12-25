@@ -675,7 +675,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
               <div className="p-4 sm:p-6 space-y-5">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    셀 은혜나눔
+                    셀 은혜나눔 <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     required
@@ -694,7 +694,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    셀 특이사항
+                    셀 특이사항 <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     required

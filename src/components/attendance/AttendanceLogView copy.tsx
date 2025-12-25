@@ -94,7 +94,7 @@ const AttendanceMatrixView: React.FC<{
   allMembers,
   userRole,
 }) => {
-  // ✅ [복구] 미체크 계산 로직 (누락된 주차 확인용)
+  // ✅ [수정] 미체크 계산 로직 (셀 배정일 고려)
   const uncheckedCount = useMemo(() => {
     if (!startDate || !endDate || members.length === 0) return 0;
 
@@ -108,7 +108,7 @@ const AttendanceMatrixView: React.FC<{
 
     if (start > end) return 0;
 
-    // 기간 내 일요일 수집
+    // 1. 기간 내 일요일(Sunday) 목록 수집
     const targetSundays: string[] = [];
     const cur = new Date(start);
     while (cur <= end) {
@@ -118,26 +118,44 @@ const AttendanceMatrixView: React.FC<{
       cur.setDate(cur.getDate() + 1);
     }
 
-    // 출석 기록 Set (MemberId-YYYY-MM-DD)
+    if (targetSundays.length === 0) return 0;
+
+    // 2. 출석 기록 Set 생성 (MemberId-YYYY-MM-DD)
     const attendanceSet = new Set<string>();
     for (const a of attendances) {
       const mId = getAttendanceMemberId(a);
       const dateKey = safeFormatDate(a.date, "-");
 
       if (mId === null || !dateKey) continue;
-      if (!["PRESENT", "ABSENT"].includes(a.status)) continue;
-
-      attendanceSet.add(`${mId}-${dateKey}`);
+      // 출석(PRESENT) 혹은 결석(ABSENT) 상태인 경우에만 '체크됨'으로 간주
+      if (a.status === "PRESENT" || a.status === "ABSENT") {
+        attendanceSet.add(`${mId}-${dateKey}`);
+      }
     }
 
     let incompleteWeeks = 0;
 
+    // 3. 각 일요일별로 검사
     for (const sundayStr of targetSundays) {
-      const activeMembers = members;
-      if (activeMembers.length === 0) continue;
+      const sundayDate = new Date(sundayStr);
+      sundayDate.setHours(0, 0, 0, 0);
 
-      // 해당 주차(일요일)에 기록이 없는 멤버가 한 명이라도 있으면 누락으로 간주
-      const isWeekIncomplete = activeMembers.some((m) => {
+      // ✅ [핵심 변경] 해당 주일(Sunday) 시점에 '활동 중이어야 하는' 멤버만 필터링
+      const activeMembersForWeek = members.filter((m: any) => {
+        // 셀 배정일이 있으면 그 날짜, 없으면 가입 연도 1월 1일 기준
+        const rawDate = m.cellAssignmentDate || `${m.joinYear}-01-01`;
+        const assignmentDate = new Date(rawDate);
+        assignmentDate.setHours(0, 0, 0, 0);
+
+        // 배정일 <= 해당 주일 이면 체크 대상
+        return assignmentDate <= sundayDate;
+      });
+
+      // 해당 주에 체크해야 할 인원이 아무도 없다면(모두 배정 전이라면) 누락 아님
+      if (activeMembersForWeek.length === 0) continue;
+
+      // 필터링된 멤버 중 한 명이라도 기록이 없으면 누락 주차로 카운트
+      const isWeekIncomplete = activeMembersForWeek.some((m) => {
         const key = `${m.id}-${sundayStr}`;
         return !attendanceSet.has(key);
       });
@@ -165,7 +183,7 @@ const AttendanceMatrixView: React.FC<{
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* ✅ [수정] 통계 카드: 출석/결석 제거하고 '누락(주)'만 단독 표시 */}
+      {/* 통계 카드 */}
       {uncheckedCount > 0 ? (
         <div className="p-3 sm:p-4 bg-red-50 rounded-xl border border-red-200 flex items-center justify-between">
           <div>
@@ -173,8 +191,8 @@ const AttendanceMatrixView: React.FC<{
               ⚠️ 출석 체크가 누락된 주가 있습니다.
             </p>
             <p className="text-xs text-red-500 mt-1">
-              해당 기간 내 총 <strong>{uncheckedCount}개</strong>의
-              주일(Sunday)에 대해 출석 기록이 완벽하지 않습니다.
+              해당 기간 내 총 <strong>{uncheckedCount}개</strong>의 주일에 대해
+              출석 기록이 존재하지 않습니다.
             </p>
           </div>
           <p className="text-3xl font-bold text-red-700 ml-4">
@@ -637,20 +655,40 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
             {/* 학기 선택 및 단위 선택 */}
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                  학기 선택
-                </label>
+                {/* 라벨과 기간 정보를 헤더처럼 배치 */}
+                <div className="flex justify-between items-end mb-1">
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    학기 선택
+                  </label>
+
+                  {/* 데스크탑: 우측 상단에 기간 표시 */}
+                  {selectedSemester && (
+                    <span className="hidden sm:block text-xs text-indigo-600 font-medium">
+                      {selectedSemester.startDate} ~ {selectedSemester.endDate}
+                    </span>
+                  )}
+                </div>
+
                 <select
                   value={filters.semesterId}
                   onChange={(e) => handleSemesterChange(Number(e.target.value))}
-                  className="block w-full border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  className="block w-full border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
                 >
                   {semesters.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.name} ({s.startDate} ~ {s.endDate})
+                      {s.name}{" "}
+                      {/* 괄호와 날짜를 제거하여 이름만 깔끔하게 표시 */}
                     </option>
                   ))}
                 </select>
+
+                {/* 모바일: 드롭다운 바로 아래에 기간 표시 */}
+                {selectedSemester && (
+                  <p className="sm:hidden mt-1.5 text-xs text-gray-500 flex items-center">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 mr-1.5"></span>
+                    {selectedSemester.startDate} ~ {selectedSemester.endDate}
+                  </p>
+                )}
               </div>
 
               <div className="sm:min-w-[180px]">
