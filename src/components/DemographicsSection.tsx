@@ -52,7 +52,7 @@ export const DemographicsSection: React.FC<Props> = ({
 
   return (
     <div className="space-y-6">
-      {/* 🔹 1. 상단 요약 카드 그리드 (기존 유지) */}
+      {/* 🔹 1. 상단 요약 카드 그리드 */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
         {/* 전체 인원 */}
         <SummaryCard label="전체 인원" value={data.totalMemberCount} />
@@ -107,12 +107,10 @@ export const DemographicsSection: React.FC<Props> = ({
         />
       </div>
 
-      {/* 🔹 2. 하단 상세 내용 (레이아웃 변경: 좌우 분할 -> 위아래 배치) */}
-
-      {/* (1) 연령대별 현황 - 가로 전체 차지 */}
+      {/* 🔹 2. 하단 상세 내용 */}
+      {/* (1) 연령대별 현황 */}
       <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
         <h3 className="text-lg font-bold text-gray-800 mb-4">연령대별 현황</h3>
-        {/* 20대/30대 카드를 가로로 배치 (모바일은 세로, 데스크톱은 가로 2열) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <DetailAgeCard
             label="20대"
@@ -133,7 +131,7 @@ export const DemographicsSection: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* (2) 출생년도별 분포 차트 - 가로 전체 차지 */}
+      {/* (2) 출생년도별 분포 차트 */}
       <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
         <div className="mb-4">
           <h3 className="text-lg font-bold text-gray-800">출생년도별 분포</h3>
@@ -142,13 +140,14 @@ export const DemographicsSection: React.FC<Props> = ({
           </p>
         </div>
 
-        {/* 차트 영역 (가로 스크롤 적용) */}
+        {/* 차트 영역 */}
         <div className="w-full overflow-x-auto pb-2 scrollbar-hide">
           <div style={{ height: "400px", minWidth: `${minChartWidth}px` }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={data.distribution}
-                margin={{ top: 20, right: 10, left: 0, bottom: 5 }}
+                // 💡 상단 마진을 30으로 늘려 '(명)' 라벨 공간 확보
+                margin={{ top: 30, right: 10, left: 0, bottom: 5 }}
                 barSize={12}
               >
                 <CartesianGrid
@@ -169,6 +168,13 @@ export const DemographicsSection: React.FC<Props> = ({
                   tick={{ fontSize: 12, fill: "#9ca3af" }}
                   axisLine={false}
                   tickLine={false}
+                  // 💡 [변경됨] Y축 상단에 단위 표시 추가
+                  label={{
+                    value: "(명)",
+                    position: "top",
+                    offset: 15,
+                    style: { fill: "#9ca3af", fontSize: "12px" },
+                  }}
                 />
                 <Tooltip
                   cursor={{ fill: "rgba(243, 244, 246, 0.6)" }}
@@ -177,6 +183,8 @@ export const DemographicsSection: React.FC<Props> = ({
                     border: "none",
                     boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
                   }}
+                  // 💡 [변경됨] 툴팁 수치 뒤에도 '명' 붙이기
+                  formatter={(value: number) => [`${value}명`, undefined]}
                 />
                 <Legend verticalAlign="top" height={36} />
                 <Bar
