@@ -371,7 +371,7 @@ const EditMemberPage: React.FC = () => {
             {/* 성별 */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                성별
+                성별 <span className="text-red-500">*</span>
               </label>
               <select
                 name="gender"
@@ -448,7 +448,7 @@ const EditMemberPage: React.FC = () => {
             {/* 역할 */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                역할
+                역할 <span className="text-red-500">*</span>
               </label>
               <select
                 name="role"
@@ -471,7 +471,7 @@ const EditMemberPage: React.FC = () => {
             {/* 등록 연도 */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                등록 연도
+                등록 연도 <span className="text-red-500">*</span>
               </label>
               <input
                 name="joinYear"
@@ -508,7 +508,7 @@ const EditMemberPage: React.FC = () => {
           </div>
 
           {/* 메모 */}
-          <div>
+          {/* <div>
             <label className="block text-sm font-medium text-gray-700">
               메모
             </label>
@@ -519,7 +519,7 @@ const EditMemberPage: React.FC = () => {
               onChange={handleFormChange}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
             />
-          </div>
+          </div> */}
         </fieldset>
 
         {/* 팀 소속 - EXECUTIVE 전용 */}

@@ -52,7 +52,7 @@ import { DemographicsSection } from "../components/DemographicsSection";
 type SummaryMode = "SEMESTER" | "YEAR";
 type IncompleteFilter = "WEEK" | "MONTH" | "SEMESTER";
 
-// ✅ [추가] 날짜 포맷팅 함수 (타임존 문제 해결 및 일관성 유지)
+// ✅ 날짜 포맷팅 함수 (타임존 문제 해결 및 일관성 유지)
 const safeFormatDate = (dateStr: string | null | undefined) => {
   if (!dateStr) return "-";
   // T는 있는데 Z가 없으면 Z를 붙여줌 (UTC 인식 유도 -> 브라우저가 KST 변환)
@@ -219,7 +219,6 @@ const DashboardFilterToolbar: React.FC<{
           그래프 단위:
         </span>
         <div className="flex bg-white rounded-md shadow-sm border border-gray-200 p-1">
-          {/* ✅ 변경됨: 'WEEK' 제거하고 'DAY', 'MONTH'만 남김 */}
           {(["DAY", "MONTH"] as const).map((opt) => (
             <button
               key={opt}
@@ -230,7 +229,6 @@ const DashboardFilterToolbar: React.FC<{
                   : "text-gray-500 hover:bg-gray-50"
               }`}
             >
-              {/* 라벨도 '일' 대신 조금 더 명확하게 '주별(일자)'로 하거나 그대로 '일'로 둬도 됩니다. 여기선 심플하게 유지 */}
               {opt === "DAY" ? "일" : "월"}
             </button>
           ))}
@@ -374,7 +372,6 @@ const AttendanceTrend: React.FC<{
         </h2>
         {dateRange && (
           <span className="text-[10px] text-gray-400">
-            {/* ✅ safeFormatDate 적용 */}
             {safeFormatDate(dateRange.startDate)} ~{" "}
             {safeFormatDate(dateRange.endDate)}
           </span>
@@ -451,7 +448,6 @@ const IncompleteAttendanceSection: React.FC<{
                   {r.missedDatesCount}
                 </td>
                 <td className="px-3 py-2 text-gray-500">
-                  {/* ✅ safeFormatDate 적용 */}
                   {safeFormatDate(r.missedDates[r.missedDates.length - 1])}
                 </td>
               </tr>
@@ -633,11 +629,6 @@ const DashboardPage: React.FC = () => {
         endDate,
       });
 
-      setDashboardData((prev) =>
-        prev ? { ...prev, ...mainData } : { ...(mainData as DashboardDto) }
-      );
-      setLoadingMain(false);
-
       // 2) 차트 + Summary
       setLoadingCharts(true);
       const chartPromise = statisticsService.getAttendanceTrend({
@@ -670,18 +661,6 @@ const DashboardPage: React.FC = () => {
         summaryPromise,
       ]);
 
-      setDashboardData((prev) =>
-        prev
-          ? {
-              ...prev,
-              overallAttendanceSummary:
-                finalSummary ?? prev.overallAttendanceSummary,
-              attendanceTrend: trendData,
-            }
-          : null
-      );
-      setLoadingCharts(false);
-
       // 3) 부가 데이터
       setLoadingSub(true);
       const [noticesPage, prayersPage, unassignedData] = await Promise.all([
@@ -692,9 +671,26 @@ const DashboardPage: React.FC = () => {
           : Promise.resolve([]),
       ]);
 
+      // ✅ [수정 1] 미배정 인원에서 임원단(EXECUTIVE) 제외
+      const filteredUnassigned = (unassignedData as any[]).filter(
+        (m) => m.role !== "EXECUTIVE"
+      );
+
       setTotalNotices(noticesPage.totalElements);
       setTotalPrayers(prayersPage.totalElements);
-      setUnassignedList(unassignedData as UnassignedMemberDto[]);
+      setUnassignedList(filteredUnassigned);
+
+      // ✅ [수정] Dashboard 데이터 업데이트 시 필터링된 미배정 인원 수 반영
+      setDashboardData({
+        ...mainData,
+        overallAttendanceSummary:
+          finalSummary ?? mainData.overallAttendanceSummary,
+        attendanceTrend: trendData,
+        unassignedMemberCount: filteredUnassigned.length,
+      });
+
+      setLoadingMain(false);
+      setLoadingCharts(false);
       setLoadingSub(false);
     } catch (err) {
       console.error(err);
@@ -884,24 +880,7 @@ const DashboardPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* 공동체 구성 통계 */}
-                {loadingCharts
-                  ? null
-                  : dashboardData?.demographics && (
-                      <div className="mt-8 border-t pt-6">
-                        <div className="flex items-center gap-2 mb-4">
-                          <FaUserFriends className="text-blue-500 text-lg" />
-                          <h4 className="font-semibold text-gray-800">
-                            공동체 구성 통계
-                          </h4>
-                        </div>
-                        <DemographicsSection
-                          data={dashboardData.demographics}
-                        />
-                      </div>
-                    )}
-
-                {/* 미배정 인원 상세 리스트 */}
+                {/* ✅ [수정 2] 미배정 인원 상세 리스트 (위치 이동: 통계 위로) */}
                 <div id="unassigned-section" className="mt-8 border-t pt-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
@@ -918,6 +897,7 @@ const DashboardPage: React.FC = () => {
                     </div>
                   ) : (
                     <>
+                      {/* 모바일 뷰 */}
                       <div className="block md:hidden bg-gray-50 p-3 space-y-3 rounded-lg">
                         {unassignedList.slice(0, 5).map((member) => {
                           return (
@@ -999,6 +979,7 @@ const DashboardPage: React.FC = () => {
                         )}
                       </div>
 
+                      {/* 데스크탑 뷰 */}
                       <div className="hidden md:block overflow-x-auto border border-gray-100 rounded-lg">
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50">
@@ -1100,6 +1081,23 @@ const DashboardPage: React.FC = () => {
                     </>
                   )}
                 </div>
+
+                {/* 공동체 구성 통계 (미배정 인원 아래로 이동) */}
+                {loadingCharts
+                  ? null
+                  : dashboardData?.demographics && (
+                      <div className="mt-8 border-t pt-6">
+                        <div className="flex items-center gap-2 mb-4">
+                          <FaUserFriends className="text-blue-500 text-lg" />
+                          <h4 className="font-semibold text-gray-800">
+                            공동체 구성 통계
+                          </h4>
+                        </div>
+                        <DemographicsSection
+                          data={dashboardData.demographics}
+                        />
+                      </div>
+                    )}
               </Card>
             )}
 

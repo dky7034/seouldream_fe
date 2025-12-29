@@ -21,11 +21,12 @@ export const DemographicsSection: React.FC<Props> = ({
   data,
   onUnassignedClick,
 }) => {
-  // 1. 차트 너비 계산 (항목당 너비 확보)
+  // 1. 차트 너비 계산
   const minChartWidth = Math.max(data.distribution.length * 40, 800);
 
-  // 2. 미배정 인원 계산
-  const unassignedCount = data.totalMemberCount - data.cellMemberCount;
+  // 2. 미배정 인원 계산 (전체 - 셀 배정 - 임원단)
+  const unassignedCount =
+    data.totalMemberCount - data.cellMemberCount - (data.executiveCount ?? 0);
 
   // 3. 연령대별 집계
   const stats = useMemo(() => {
@@ -54,10 +55,8 @@ export const DemographicsSection: React.FC<Props> = ({
     <div className="space-y-6">
       {/* 🔹 1. 상단 요약 카드 그리드 */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
-        {/* 전체 인원 */}
         <SummaryCard label="전체 인원" value={data.totalMemberCount} />
 
-        {/* 미배정 인원 (클릭 가능) */}
         <div
           onClick={onUnassignedClick}
           className={`${
@@ -76,7 +75,6 @@ export const DemographicsSection: React.FC<Props> = ({
           />
         </div>
 
-        {/* 셀 배정 */}
         <SummaryCard
           label="셀 배정"
           value={data.cellMemberCount}
@@ -86,7 +84,6 @@ export const DemographicsSection: React.FC<Props> = ({
           borderColor="border-green-100"
         />
 
-        {/* 임원단 */}
         <SummaryCard
           label="임원단"
           value={data.executiveCount ?? 0}
@@ -96,7 +93,6 @@ export const DemographicsSection: React.FC<Props> = ({
           borderColor="border-purple-100"
         />
 
-        {/* 셀장 */}
         <SummaryCard
           label="셀장"
           value={data.cellLeaderCount ?? 0}
@@ -146,7 +142,6 @@ export const DemographicsSection: React.FC<Props> = ({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={data.distribution}
-                // 💡 상단 마진을 30으로 늘려 '(명)' 라벨 공간 확보
                 margin={{ top: 30, right: 10, left: 0, bottom: 5 }}
                 barSize={12}
               >
@@ -168,7 +163,6 @@ export const DemographicsSection: React.FC<Props> = ({
                   tick={{ fontSize: 12, fill: "#9ca3af" }}
                   axisLine={false}
                   tickLine={false}
-                  // 💡 [변경됨] Y축 상단에 단위 표시 추가
                   label={{
                     value: "(명)",
                     position: "top",
@@ -176,6 +170,8 @@ export const DemographicsSection: React.FC<Props> = ({
                     style: { fill: "#9ca3af", fontSize: "12px" },
                   }}
                 />
+
+                {/* 💡 [수정됨] 툴팁 포매터 수정 */}
                 <Tooltip
                   cursor={{ fill: "rgba(243, 244, 246, 0.6)" }}
                   contentStyle={{
@@ -183,9 +179,11 @@ export const DemographicsSection: React.FC<Props> = ({
                     border: "none",
                     boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
                   }}
-                  // 💡 [변경됨] 툴팁 수치 뒤에도 '명' 붙이기
-                  formatter={(value: number) => [`${value}명`, undefined]}
+                  // 변경 전: formatter={(value: number) => [`${value}명`, undefined]}
+                  // 변경 후: value만 리턴하면, Recharts가 자동으로 [Bar의 Name] : [Value] 형식으로 보여줍니다.
+                  formatter={(value: number) => `${value}명`}
                 />
+
                 <Legend verticalAlign="top" height={36} />
                 <Bar
                   dataKey="maleCount"
@@ -210,8 +208,7 @@ export const DemographicsSection: React.FC<Props> = ({
   );
 };
 
-// --- Sub Components ---
-
+// ... (SummaryCard, DetailAgeCard 등 하단 컴포넌트는 기존과 동일) ...
 const SummaryCard = ({
   label,
   value,

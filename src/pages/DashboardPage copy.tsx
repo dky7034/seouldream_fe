@@ -165,7 +165,6 @@ const formatDateGroupLabel = (
 };
 
 // --- Sub Components ---
-
 const DashboardFilterToolbar: React.FC<{
   summaryMode: SummaryMode;
   onSummaryModeChange: (m: SummaryMode) => void;
@@ -220,7 +219,8 @@ const DashboardFilterToolbar: React.FC<{
           그래프 단위:
         </span>
         <div className="flex bg-white rounded-md shadow-sm border border-gray-200 p-1">
-          {(["DAY", "WEEK", "MONTH"] as const).map((opt) => (
+          {/* ✅ 변경됨: 'WEEK' 제거하고 'DAY', 'MONTH'만 남김 */}
+          {(["DAY", "MONTH"] as const).map((opt) => (
             <button
               key={opt}
               onClick={() => onGroupByChange(opt)}
@@ -230,7 +230,8 @@ const DashboardFilterToolbar: React.FC<{
                   : "text-gray-500 hover:bg-gray-50"
               }`}
             >
-              {opt === "DAY" ? "일" : opt === "WEEK" ? "주" : "월"}
+              {/* 라벨도 '일' 대신 조금 더 명확하게 '주별(일자)'로 하거나 그대로 '일'로 둬도 됩니다. 여기선 심플하게 유지 */}
+              {opt === "DAY" ? "일" : "월"}
             </button>
           ))}
         </div>
