@@ -16,7 +16,6 @@ import { memberService } from "../services/memberService";
 import { formatDisplayName } from "../utils/memberUtils";
 import AttendanceMatrix from "../components/AttendanceMatrix";
 import NewsCenterCard from "../components/dashboard/NewsCenterCard";
-import { FaUserClock } from "react-icons/fa"; // 아이콘이 없다면 fa에서 적절한 것 import
 
 import type {
   CellLeaderDashboardDto,
