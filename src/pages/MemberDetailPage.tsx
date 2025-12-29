@@ -27,7 +27,6 @@ import { FaCalendarAlt, FaClock } from "react-icons/fa";
 // [Helpers] 날짜 및 나이 계산
 // -------------------------------------------------------------------------
 
-/** Date 객체를 YYYY-MM-DD 문자열로 변환 */
 const toISODate = (d: Date) => {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");
@@ -35,7 +34,6 @@ const toISODate = (d: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-/** 특정 날짜(date)가 학기(semester)의 '월 범위' 안에 들어가는지 체크 */
 const isDateInSemesterMonthRange = (date: Date, semester: SemesterDto) => {
   const targetYm = date.getFullYear() * 12 + date.getMonth();
   const s = new Date(semester.startDate);
@@ -45,7 +43,6 @@ const isDateInSemesterMonthRange = (date: Date, semester: SemesterDto) => {
   return targetYm >= sYm && targetYm <= eYm;
 };
 
-// ✅ 날짜 포맷팅 (KST 적용)
 const safeFormatDate = (dateStr: string | null | undefined) => {
   if (!dateStr) return "";
   const targetStr =
@@ -55,6 +52,12 @@ const safeFormatDate = (dateStr: string | null | undefined) => {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+};
+
+// ✅ [추가] 값이 없으면 '정보 없음'을 반환하는 헬퍼
+const displayValue = (val: string | number | null | undefined) => {
+  if (val === null || val === undefined || val === "") return "정보 없음";
+  return val;
 };
 
 // -------------------------------------------------------------------------
@@ -100,7 +103,7 @@ const InfoDl: React.FC<{ items: { dt: string; dd: React.ReactNode }[] }> = ({
   </dl>
 );
 
-// --- 기본 정보 카드 ---
+// --- [수정 1] 기본 정보 카드: 빈 값 처리 ---
 const BasicInfoCard: React.FC<{
   member: MemberDto;
   isCurrentUser: boolean;
@@ -111,7 +114,15 @@ const BasicInfoCard: React.FC<{
       ? `(만 ${member.age}세)`
       : "";
 
-  const displayBirthDate = safeFormatDate(member.birthDate);
+  const displayBirthDate = member.birthDate
+    ? safeFormatDate(member.birthDate)
+    : "";
+
+  // 생년월일과 나이 조합 표시, 없으면 '정보 없음'
+  const birthDateValue =
+    displayBirthDate || ageDisplay
+      ? `${displayBirthDate} ${ageDisplay}`.trim()
+      : "정보 없음";
 
   return (
     <InfoCard
@@ -129,12 +140,12 @@ const BasicInfoCard: React.FC<{
     >
       <InfoDl
         items={[
-          { dt: "이름", dd: member.name },
-          { dt: "아이디", dd: member.username },
-          { dt: "이메일", dd: member.email },
-          { dt: "연락처", dd: member.phone },
-          { dt: "생년월일", dd: `${displayBirthDate} ${ageDisplay}` },
-          { dt: "주소", dd: member.address || "정보 없음" },
+          { dt: "이름", dd: displayValue(member.name) },
+          { dt: "아이디", dd: displayValue(member.username) },
+          { dt: "이메일", dd: displayValue(member.email) },
+          { dt: "연락처", dd: displayValue(member.phone) },
+          { dt: "생년월일", dd: birthDateValue },
+          { dt: "주소", dd: displayValue(member.address) },
         ]}
       />
     </InfoCard>
@@ -243,7 +254,7 @@ const PrayersCard: React.FC<{ prayers: PrayerDto[] }> = ({ prayers }) => (
 );
 
 // ─────────────────────────────────────────────────────────────
-// [핵심] 출석 요약 카드
+// [핵심 수정 2] 출석 요약 카드: 미체크 로직 개선
 // ─────────────────────────────────────────────────────────────
 const AttendanceSummaryCard: React.FC<{
   summary: MemberAttendanceSummaryDto | null;
@@ -269,8 +280,6 @@ const AttendanceSummaryCard: React.FC<{
   memberId,
   memberName,
   cellAssignmentDate,
-  memberJoinDate,
-  memberJoinYear,
   attendances,
   semesters,
   activeSemester,
@@ -300,16 +309,18 @@ const AttendanceSummaryCard: React.FC<{
     return months;
   }, [activeSemester]);
 
-  // ✅ [수정] 미체크(빈칸) 계산 로직 - timezone safe 적용
+  // ✅ [수정된 로직] 미체크(빈칸) 계산
   const uncheckedCount = useMemo(() => {
     if (!startDate || !endDate) return 0;
+
+    // 1. 셀 배정일이 없으면(미배정 상태) 출석 의무가 없으므로 미체크 0 반환
+    if (!cellAssignmentDate) return 0;
 
     const filterStart = new Date(startDate);
     const filterEnd = new Date(endDate);
     filterStart.setHours(0, 0, 0, 0);
     filterEnd.setHours(23, 59, 59, 999);
 
-    // 날짜 문자열을 안전하게 로컬 시간 Date 객체로 변환하는 헬퍼 함수
     const getSafeDateObj = (dateStr: string) => {
       const safeStr = dateStr.includes("T") ? dateStr : `${dateStr}T00:00:00`;
       const d = new Date(safeStr);
@@ -317,39 +328,30 @@ const AttendanceSummaryCard: React.FC<{
       return d;
     };
 
-    let baseDate: Date;
+    // 2. 기준일 설정: 셀 배정일이 존재하므로 이를 기준으로 사용
+    const baseDate = getSafeDateObj(cellAssignmentDate);
 
-    // 배정일/가입일 처리 강화
-    if (cellAssignmentDate) {
-      baseDate = getSafeDateObj(cellAssignmentDate);
-    } else if (memberJoinDate) {
-      baseDate = getSafeDateObj(memberJoinDate);
-    } else if (memberJoinYear) {
-      baseDate = new Date(memberJoinYear, 0, 1);
-      baseDate.setHours(0, 0, 0, 0);
-    } else {
-      baseDate = new Date("2000-01-01T00:00:00");
-      baseDate.setHours(0, 0, 0, 0);
-    }
-
+    // 조회 시작일과 배정일 중 늦은 날짜를 실제 카운트 시작일로 설정
     const effectiveStart = filterStart < baseDate ? baseDate : filterStart;
+
+    // 유효 시작일이 조회 종료일보다 늦으면 카운트할 필요 없음
     if (effectiveStart > filterEnd) return 0;
 
     const targetSundays = new Set<string>();
     const current = new Date(effectiveStart);
 
-    // 시작일이 일요일이 아니면 다음 일요일로
+    // 시작일이 일요일이 아니면 다음 일요일로 이동
     if (current.getDay() !== 0) {
       current.setDate(current.getDate() + (7 - current.getDay()));
     }
 
-    // 기간 내 일요일 수집
+    // 기간 내 모든 일요일 수집
     while (current <= filterEnd) {
       targetSundays.add(toISODate(current));
       current.setDate(current.getDate() + 7);
     }
 
-    // 출석 기록 수집
+    // 실제 기록된 출석 날짜 수집
     const recordedDates = new Set<string>();
     attendances.forEach((att) => {
       if ((att.status === "PRESENT" || att.status === "ABSENT") && att.date) {
@@ -357,7 +359,7 @@ const AttendanceSummaryCard: React.FC<{
       }
     });
 
-    // 미체크 카운트
+    // 미체크 카운트 계산
     let missingCount = 0;
     targetSundays.forEach((sunday) => {
       if (!recordedDates.has(sunday)) {
@@ -366,14 +368,7 @@ const AttendanceSummaryCard: React.FC<{
     });
 
     return missingCount;
-  }, [
-    startDate,
-    endDate,
-    cellAssignmentDate,
-    memberJoinDate,
-    memberJoinYear,
-    attendances,
-  ]);
+  }, [startDate, endDate, cellAssignmentDate, attendances]);
 
   const formatDate = (dateStr: string) => dateStr.replace(/-/g, ".");
 
@@ -529,9 +524,9 @@ const AttendanceSummaryCard: React.FC<{
   );
 };
 
-// ... (이후 AdminActionsCard, TeamManagementModal, TempPasswordModal 등 기존과 동일) ...
-// Main Page 등 나머지는 변경 없음.
+// ... (이후 AdminActionsCard, TeamManagementModal, TempPasswordModal, MemberDetailPage 등 나머지 코드는 기존과 동일) ...
 
+// Main Page 등 나머지는 변경 없음.
 const AdminActionsCard: React.FC<{
   onResetPassword: () => void;
   isResetting: boolean;
