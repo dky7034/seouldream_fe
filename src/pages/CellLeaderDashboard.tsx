@@ -16,6 +16,7 @@ import { memberService } from "../services/memberService";
 import { formatDisplayName } from "../utils/memberUtils";
 import AttendanceMatrix from "../components/AttendanceMatrix";
 import NewsCenterCard from "../components/dashboard/NewsCenterCard";
+import { FaUserClock } from "react-icons/fa"; // 아이콘이 없다면 fa에서 적절한 것 import
 
 import type {
   CellLeaderDashboardDto,
@@ -921,6 +922,28 @@ const CellLeaderDashboard: React.FC = () => {
 
   // Render
   if (!user) return <div className="p-4">로그인 정보가 없습니다.</div>;
+
+  if (user && !user.cellId) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] p-8">
+        <div className="bg-gray-100 p-6 rounded-full mb-6">
+          <FaUsers className="text-4xl text-gray-400" />
+        </div>
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-3">
+          셀 배정 대기 중
+        </h2>
+        <p className="text-gray-500 text-center mb-6 leading-relaxed">
+          관리자(임원단)로부터 셀 리더 권한은 부여받았으나,
+          <br />
+          아직 담당 셀이 지정되지 않았습니다.
+          <br />
+          <span className="font-semibold text-indigo-600">
+            관리자에게 셀 배정을 요청해주세요.
+          </span>
+        </p>
+      </div>
+    );
+  }
 
   if (loading && !dashboardSummary) {
     return (
