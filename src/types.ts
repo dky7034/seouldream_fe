@@ -149,7 +149,7 @@ export interface CellDto {
   members: MemberDto[];
   createdAt: string;
   updatedAt: string;
-  attendanceRate?: number; // ✅ [추가] 백엔드에서 계산해서 내려주는 출석률
+  attendanceRate?: number; // 백엔드에서 계산해서 내려주는 출석률
 }
 
 export interface CellReportDto {
@@ -257,6 +257,8 @@ export interface OverallAttendanceStatDto {
   weeklyAverage: number;
   zeroAttendanceCount: number;
   attendanceTrend: number;
+  // 통계 서비스 로직 통일로 인해 totalPresent, totalPossible이 포함될 수 있음 (백엔드 확인 필요)
+  // 여기서는 안전하게 any 매핑이나 추가 필드를 고려하지만, 일단 기존 유지
 }
 
 export interface TotalSummaryDto {
@@ -265,6 +267,7 @@ export interface TotalSummaryDto {
   totalMembersInPeriod: number;
   totalRecordedDates: number;
   attendanceRate: number;
+  totalPossible?: number; // ✅ [추가] 백엔드 로직 통일로 추가된 필드 (전체 대상 수)
 }
 
 export interface MemberTotalSummaryDto {
@@ -362,12 +365,11 @@ export interface PrayerUserInfo {
   name: string;
 }
 
-// ✅ [수정] PrayerDto: meetingDate 필드 추가
 export interface PrayerDto {
   id: number;
   member: PrayerMemberInfo;
   content: string;
-  meetingDate: string; // ✅ YYYY-MM-DD (필수)
+  meetingDate: string; // YYYY-MM-DD (필수)
   weekOfMonth?: number;
   visibility: PrayerVisibility;
   isDeleted: boolean;
@@ -393,20 +395,18 @@ export interface PrayerCellSummaryDto {
   latestCreatedAt: string;
 }
 
-// ✅ [수정] CreatePrayerRequest: meetingDate 추가
 export interface CreatePrayerRequest {
   memberId: number;
   content: string;
-  meetingDate: string; // ✅ YYYY-MM-DD (필수)
+  meetingDate: string; // YYYY-MM-DD (필수)
   weekOfMonth?: number;
   visibility: PrayerVisibility;
   createdById: number;
 }
 
-// ✅ [수정] UpdatePrayerRequest: meetingDate 추가
 export interface UpdatePrayerRequest {
   content?: string;
-  meetingDate?: string; // ✅ YYYY-MM-DD (선택)
+  meetingDate?: string; // YYYY-MM-DD (선택)
   weekOfMonth?: number;
   createdAt?: string;
   visibility?: PrayerVisibility;
@@ -809,7 +809,6 @@ export interface GetAttendancesParams {
   half?: number;
 }
 
-// ✅ [추가] 출석 경고 조회용 파라미터 타입 (새로 추가해주세요!)
 export interface GetAttendanceAlertsParams {
   consecutiveAbsences: number; // 필수
   semesterId?: number; // 선택
@@ -870,7 +869,7 @@ export interface UnassignedMemberDto {
   id: number;
   name: string;
   birthYear?: string;
-  birthDate?: string; // ✅ 추가됨
+  birthDate?: string;
   age?: number;
   phone: string;
   registeredDate: string;

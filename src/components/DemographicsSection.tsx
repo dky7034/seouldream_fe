@@ -24,9 +24,11 @@ export const DemographicsSection: React.FC<Props> = ({
   // 1. 차트 너비 계산
   const minChartWidth = Math.max(data.distribution.length * 40, 800);
 
-  // 2. 미배정 인원 계산 (전체 - 셀 배정 - 임원단)
-  const unassignedCount =
-    data.totalMemberCount - data.cellMemberCount - (data.executiveCount ?? 0);
+  // ✅ [수정] 2. 미배정 인원 계산 (음수 방지 안전장치 추가)
+  const unassignedCount = Math.max(
+    0,
+    data.totalMemberCount - data.cellMemberCount - (data.executiveCount ?? 0)
+  );
 
   // 3. 연령대별 집계
   const stats = useMemo(() => {

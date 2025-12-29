@@ -1,3 +1,4 @@
+// src/pages/CellDetailPage.tsx
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { cellService } from "../services/cellService";
@@ -47,7 +48,12 @@ const AddMemberToCellModal: React.FC<{
           unassigned: true,
           size: 1000,
         });
-        setCandidateMembers(page.content);
+
+        // ✅ 임원 제외 필터링
+        const filteredContent = page.content.filter(
+          (m) => m.role !== "EXECUTIVE"
+        );
+        setCandidateMembers(filteredContent);
       } catch (error) {
         console.error("Failed to fetch unassigned members:", error);
       } finally {
@@ -199,7 +205,7 @@ const AddMemberToCellModal: React.FC<{
 // ───────────────── [컴포넌트] CellReportHistoryItem ─────────────────
 const CellReportHistoryItem: React.FC<{
   cellId: number;
-  date: string; // YYYY-MM-DD
+  date: string;
   isWritten: boolean;
 }> = ({ cellId, date, isWritten }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -522,27 +528,22 @@ const CellAttendanceMatrixCard: React.FC<{
     return months;
   }, [activeSemester]);
 
-  // ✅ [수정] 통계 재계산 로직 (미체크 수 + 실제 출석률)
-  // 프론트엔드에서 계산한 totalPossibleChecks(분모)를 기준으로
-  // 미체크와 출석률을 모두 일관되게 계산합니다.
+  // ✅ [수정] 통계 재계산 로직: 출석률은 백엔드 값을, 미체크는 프론트 계산 값을 사용
   const stats = useMemo(() => {
     if (!startDate || !endDate || sortedMembers.length === 0) {
       return { unchecked: 0, rate: 0 };
     }
 
+    // 1) 미체크(Unchecked) 계산 (프론트엔드 로직 유지)
     const filterStart = new Date(startDate);
     const filterEnd = new Date(endDate);
-
-    // 시간 부분 초기화 (날짜 비교 정확도 향상)
     filterStart.setHours(0, 0, 0, 0);
     filterEnd.setHours(23, 59, 59, 999);
 
-    let totalPossibleChecks = 0; // 분모: 전체 출석해야 하는 횟수
+    let totalPossibleChecks = 0;
 
     sortedMembers.forEach((member) => {
       let joinDate: Date;
-
-      // 🔥 우선순위: 배정일 > 생성일 > 가입연도 > 2000년
       if (member.cellAssignmentDate) {
         joinDate = new Date(member.cellAssignmentDate);
       } else if (member.createdAt) {
@@ -552,19 +553,14 @@ const CellAttendanceMatrixCard: React.FC<{
       } else {
         joinDate = new Date("2000-01-01");
       }
-
       joinDate.setHours(0, 0, 0, 0);
 
-      // 조회 시작일과 (배정일 or 등록일) 중 "더 늦은 날짜"를 유효 시작일로 설정
       const effectiveStart = filterStart < joinDate ? joinDate : filterStart;
-
-      // 유효 시작일이 조회 종료일보다 늦다면, 이 멤버는 카운트 대상 아님
       if (effectiveStart > filterEnd) return;
 
       const current = new Date(effectiveStart);
       current.setHours(0, 0, 0, 0);
 
-      // 기간 내 일요일(주일) 개수 계산
       while (current <= filterEnd) {
         if (current.getDay() === 0) {
           totalPossibleChecks++;
@@ -573,19 +569,13 @@ const CellAttendanceMatrixCard: React.FC<{
       }
     });
 
-    // 서버에서 받은 '실제 출석 수' (Present)
     const totalPresent = periodSummary?.totalPresent || 0;
-    // 서버에서 받은 '실제 결석 수' (Absent)
     const totalRecorded = totalPresent + (periodSummary?.totalAbsent || 0);
 
-    // 1) 미체크 수 계산 (총 횟수 - 기록된 횟수)
     const unchecked = Math.max(0, totalPossibleChecks - totalRecorded);
 
-    // 2) 출석률 계산 (분자: 실제 출석 수 / 분모: 전체 출석해야 하는 횟수)
-    const rate =
-      totalPossibleChecks === 0
-        ? 0
-        : (totalPresent / totalPossibleChecks) * 100;
+    // 2) 출석률(Rate)은 백엔드 값을 신뢰하여 사용
+    const rate = periodSummary?.attendanceRate ?? 0;
 
     return { unchecked, rate };
   }, [startDate, endDate, sortedMembers, periodSummary]);
@@ -593,7 +583,14 @@ const CellAttendanceMatrixCard: React.FC<{
   const formatDate = (dateStr: string) => dateStr.replace(/-/g, ".");
 
   const matrixMembers = useMemo(
-    () => sortedMembers.map((m) => ({ memberId: m.id, memberName: m.name })),
+    () =>
+      sortedMembers.map((m) => ({
+        memberId: m.id,
+        memberName: m.name,
+        cellAssignmentDate: m.cellAssignmentDate,
+        createdAt: m.createdAt,
+        joinYear: m.joinYear,
+      })),
     [sortedMembers]
   );
 
@@ -606,11 +603,10 @@ const CellAttendanceMatrixCard: React.FC<{
       </div>
 
       <div className="p-4 sm:p-6 space-y-6">
-        {/* 컨트롤 패널 */}
         <div className="bg-gray-50 p-3 sm:p-4 rounded-xl border border-gray-100 flex flex-col gap-4">
           <div className="flex flex-col gap-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              {/* 좌측 영역: 학기 선택 Dropdown OR 연도 표시 Badge */}
+              {/* 좌측 영역: 학기 선택 Dropdown */}
               {unitType !== "year" ? (
                 <div className="relative w-full sm:w-auto">
                   <div className="flex items-center bg-white px-3 py-2 rounded-md border border-gray-300 shadow-sm w-full sm:w-auto">
@@ -708,7 +704,7 @@ const CellAttendanceMatrixCard: React.FC<{
           </div>
         </div>
 
-        {/* ✅ [수정] 2칸 통계 카드 (프론트엔드 계산 값 사용) */}
+        {/* 2칸 통계 카드 */}
         {periodSummary ? (
           <div className="grid grid-cols-2 gap-3 sm:gap-4 text-center border-t border-b py-4">
             <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
@@ -778,7 +774,7 @@ const CellAttendanceMatrixCard: React.FC<{
   );
 };
 
-// ───────────────── 메인 페이지 ─────────────────
+// ... (이후 메인 페이지 로직 동일) ...
 const CellDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();

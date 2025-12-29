@@ -661,7 +661,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
           <>
             {/* Mobile View */}
             <div className="md:hidden space-y-3 mb-4">
-              {report.map((item: any) => {
+              {report.map((item) => {
                 const leaderMember = allMembersForNameCheck.find(
                   (m) => m.id === item.leaderId
                 );

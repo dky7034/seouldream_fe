@@ -38,26 +38,25 @@ import type {
   DashboardDemographicsDto,
 } from "../types";
 
-// ✅ [추가] 섹션 헤더 컴포넌트 (설명 문구 포함)
+// --- 섹션 헤더 컴포넌트 ---
 const SectionHeader: React.FC<{
   icon: React.ReactNode;
   title: string;
   description?: string;
-  colorClass: string; // 예: "text-indigo-600 bg-indigo-100"
+  colorClass: string;
 }> = ({ icon, title, description, colorClass }) => (
   <div className="mb-6">
     <div className="flex items-center gap-2 mb-1">
       <div className={`p-2 rounded-lg ${colorClass}`}>{icon}</div>
       <h2 className="text-xl font-bold text-gray-800">{title}</h2>
     </div>
-    {/* 설명 문구가 있을 때만 렌더링 */}
     {description && (
       <p className="text-sm text-gray-500 ml-11">{description}</p>
     )}
   </div>
 );
 
-// ✅ 만 나이 계산 헬퍼 함수
+// --- 만 나이 계산 헬퍼 함수 ---
 const calculateAge = (member: UnassignedMemberDto): number | null => {
   if (member.age !== undefined && member.age !== null && member.age !== 0) {
     return member.age;
@@ -78,10 +77,9 @@ const calculateAge = (member: UnassignedMemberDto): number | null => {
   return null;
 };
 
-// ✅ [수정 1] CustomTooltip 안전하게 변경 (TypeError 해결)
+// --- CustomTooltip ---
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
-    // 인덱스로 접근하지 않고 dataKey로 안전하게 찾음
     const countData = payload.find((p: any) => p.dataKey === "count");
     const growthData = payload.find((p: any) => p.dataKey === "growthRate");
 
@@ -89,7 +87,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       <div className="bg-white p-4 border border-gray-100 shadow-xl rounded-xl min-w-[150px]">
         <p className="text-sm font-bold text-gray-700 mb-2">{label}</p>
         <div className="space-y-1">
-          {/* 막대 데이터 (등록 인원) */}
           {countData && (
             <div className="flex items-center justify-between text-sm">
               <span className="flex items-center text-gray-500">
@@ -101,7 +98,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
               </span>
             </div>
           )}
-          {/* 라인 데이터 (증감률) */}
           {growthData && (
             <div className="flex items-center justify-between text-sm">
               <span className="flex items-center text-gray-500">
@@ -111,13 +107,14 @@ const CustomTooltip = ({ active, payload, label }: any) => {
               <span
                 className={`font-bold ${
                   growthData.value > 0
-                    ? "text-red-500" // 성장
+                    ? "text-red-500"
                     : growthData.value < 0
-                    ? "text-blue-500" // 감소
+                    ? "text-blue-500"
                     : "text-gray-500"
                 }`}
               >
-                {growthData.value}%
+                {/* ✅ [수정] 소수점 제거하여 정수로 표시 */}
+                {Number(growthData.value).toFixed(0)}%
               </span>
             </div>
           )}
@@ -128,7 +125,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-// ✅ [수정 2] 차트 컨테이너 높이 명시 (width/height 에러 해결)
+// --- NewcomerGrowthChart ---
 const NewcomerGrowthChart = React.memo(
   ({ data }: { data: NewcomerStatDto[] }) => {
     if (!data || data.length === 0) {
@@ -145,7 +142,6 @@ const NewcomerGrowthChart = React.memo(
         <h3 className="text-sm font-semibold text-gray-500 mb-2 px-2">
           월별 등록 추이 분석
         </h3>
-        {/* flex-1로 남은 공간을 모두 차지하게 하거나, 고정 높이를 줍니다. */}
         <div className="flex-1 w-full min-h-0">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
@@ -226,7 +222,7 @@ const NewcomerGrowthChart = React.memo(
   }
 );
 
-// ✅ [수정 3] 파이 차트 컨테이너 높이 명시
+// --- AgeGroupPieChart ---
 const AgeGroupPieChart = React.memo(
   ({ data }: { data: SemesterSummaryDto["ageGroupSummary"] }) => {
     const total = data.twenties + data.thirties;
@@ -246,7 +242,6 @@ const AgeGroupPieChart = React.memo(
 
     return (
       <div className="h-[200px] w-full flex items-center justify-center">
-        {/* 높이를 100%로 설정하되 부모가 h-[200px]이므로 안전함 */}
         <div className="w-full h-full">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -273,6 +268,7 @@ const AgeGroupPieChart = React.memo(
   }
 );
 
+// --- GenderRatioChart ---
 const GenderRatioChart = React.memo(
   ({ data }: { data: DashboardDemographicsDto }) => {
     const { male, female } = useMemo(() => {
@@ -350,7 +346,7 @@ const StatisticsPage: React.FC = () => {
     []
   );
 
-  // 1. 학기 목록 불러오기 및 기본 학기 설정
+  // 1. 학기 목록 로딩
   useEffect(() => {
     semesterService.getAllSemesters().then((list) => {
       const activeSemesters = list.filter((s) => s.isActive);
@@ -415,7 +411,12 @@ const StatisticsPage: React.FC = () => {
         if (dashboardData.demographics) {
           setDetailDemographics(dashboardData.demographics);
         }
-        setUnassignedList(unassigned);
+
+        // ✅ [수정] 임원(EXECUTIVE) 제외 필터링 적용
+        const filteredUnassigned = (unassigned as any[]).filter(
+          (m) => m.role !== "EXECUTIVE"
+        );
+        setUnassignedList(filteredUnassigned);
       } catch (error) {
         if (!ignore) console.error("통계 데이터 로드 실패:", error);
       } finally {
@@ -500,13 +501,11 @@ const StatisticsPage: React.FC = () => {
         {/* 메인 컨텐츠 영역 */}
         <div
           className={`space-y-10 transition-opacity duration-200 ${
-            // space-y-8 -> space-y-10 으로 간격 조금 늘림
             isRefetching ? "opacity-50 pointer-events-none" : "opacity-100"
           }`}
         >
           {/* 섹션 1: 변화 리포트 */}
           <section>
-            {/* ✅ [수정] SectionHeader 사용 및 설명 추가 */}
             <SectionHeader
               icon={<FaChartLine size={20} />}
               title="변화 리포트"
@@ -544,7 +543,8 @@ const StatisticsPage: React.FC = () => {
                           ) : (
                             <FaMinus className="mr-2 text-gray-300" />
                           )}
-                          {Math.abs(lastNewcomerStat.growthRate)}%
+                          {/* ✅ [수정] 증감률 소수점 제거 */}
+                          {Math.abs(lastNewcomerStat.growthRate).toFixed(0)}%
                           {lastNewcomerStat.growthRate > 0
                             ? " 증가"
                             : lastNewcomerStat.growthRate < 0
@@ -567,7 +567,6 @@ const StatisticsPage: React.FC = () => {
 
           {/* 섹션 2: 구성원 통계 분석 */}
           <section>
-            {/* ✅ [수정] SectionHeader 사용 및 설명 추가 */}
             <SectionHeader
               icon={<FaUserFriends size={20} />}
               title="구성원 통계 분석"
@@ -646,7 +645,6 @@ const StatisticsPage: React.FC = () => {
 
           {/* 섹션 3: 셀 미배정 인원 관리 */}
           <section id="unassigned-section">
-            {/* ✅ [수정] SectionHeader 사용 및 설명 추가 */}
             <SectionHeader
               icon={<FaUserSlash size={20} />}
               title="셀 미배정 인원 관리"

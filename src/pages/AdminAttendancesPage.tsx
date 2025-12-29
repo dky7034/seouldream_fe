@@ -68,7 +68,7 @@ const translateAttendanceStatus = (status: string) => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// Sub Component 1: AttendanceStats (상단 종합 통계 카드 - 유지)
+// Sub Component 1: AttendanceStats (상단 종합 통계 카드)
 // ─────────────────────────────────────────────────────────────
 
 const AttendanceStats = memo(
@@ -214,7 +214,7 @@ const AttendanceMatrixView = memo(
     unitType: UnitType;
     isLoading: boolean;
   }) => {
-    // ✅ 미체크 카운트 로직 (Set 활용 + 가입일 무시하여 빈칸 기준)
+    // ✅ [수정] 미체크 카운트 로직 강화 (가입일/배정일 고려)
     const uncheckedCount = useMemo(() => {
       if (!startDate || !endDate || members.length === 0) return 0;
 
@@ -257,7 +257,20 @@ const AttendanceMatrixView = memo(
 
       let missingCount = 0;
       members.forEach((member) => {
+        // 멤버별 유효 시작일 계산 (배정일 > 가입일 > 가입연도)
+        let joinDateStr = "2000-01-01";
+        if (member.cellAssignmentDate) joinDateStr = member.cellAssignmentDate;
+        else if (member.createdAt) joinDateStr = member.createdAt;
+        else if (member.joinYear) joinDateStr = `${member.joinYear}-01-01`;
+
+        // 문자열 비교를 위해 YYYY-MM-DD 포맷 통일 (Date 객체 변환 후 다시 toDateKey)
+        // (단순 문자열 비교도 가능하나, T00:00:00 등 포맷 안전성을 위해 변환 권장)
+        const safeJoinDateStr = toDateKey(new Date(joinDateStr));
+
         targetSundayKeys.forEach((sundayKey) => {
+          // 유효 시작일 이전 날짜는 카운트에서 제외
+          if (sundayKey < safeJoinDateStr) return;
+
           const key = `${member.id}-${sundayKey}`;
           if (!attendanceMap.has(key)) {
             missingCount++;
@@ -270,13 +283,24 @@ const AttendanceMatrixView = memo(
 
     const summary = useMemo(() => {
       const present = attendances.filter((a) => a.status === "PRESENT").length;
-      const absent = attendances.filter((a) => a.status === "ABSENT").length;
-      const totalRecorded = present + absent;
-      const rate = totalRecorded > 0 ? (present / totalRecorded) * 100 : 0;
+
+      // [수정 전] 기록된 것(출석+결석)만 분모로 잡음 -> 89% 나옴
+      // const absent = attendances.filter((a) => a.status === "ABSENT").length;
+      // const totalRecorded = present + absent;
+      // const rate = totalRecorded > 0 ? (present / totalRecorded) * 100 : 0;
+
+      // ✅ [수정 후] 미체크(uncheckedCount)까지 분모에 포함 -> 1~2% 나옴 (엄격한 기준)
+      const recordedTotal =
+        present + attendances.filter((a) => a.status === "ABSENT").length;
+      const realTotalPossible = recordedTotal + uncheckedCount;
+
+      const rate =
+        realTotalPossible > 0 ? (present / realTotalPossible) * 100 : 0;
 
       return { rate, unchecked: uncheckedCount };
     }, [attendances, uncheckedCount]);
 
+    // ✅ [수정] matrixMembers 생성 시 날짜 정보 전달 (회색 점 표시용)
     const matrixMembers = useMemo(
       () =>
         members
@@ -284,6 +308,9 @@ const AttendanceMatrixView = memo(
           .map((m) => ({
             memberId: m.id,
             memberName: formatDisplayName(m, members),
+            cellAssignmentDate: m.cellAssignmentDate,
+            createdAt: m.createdAt,
+            joinYear: m.joinYear,
           })),
       [members]
     );
@@ -295,11 +322,11 @@ const AttendanceMatrixView = memo(
 
     return (
       <div className="space-y-6 animate-fadeIn">
-        {/* ✅ [수정] 2칸 통계 카드 (출석률, 미체크) */}
+        {/* 통계 카드 (출석률, 미체크) */}
         <div className="grid grid-cols-2 gap-4 text-center">
           <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
             <p className="text-sm font-medium text-indigo-600 break-keep">
-              출석률 (기록 기준)
+              출석률
             </p>
             <p className="mt-2 text-3xl font-bold text-indigo-700">
               {summary.rate.toFixed(0)}

@@ -52,10 +52,9 @@ import { DemographicsSection } from "../components/DemographicsSection";
 type SummaryMode = "SEMESTER" | "YEAR";
 type IncompleteFilter = "WEEK" | "MONTH" | "SEMESTER";
 
-// ✅ 날짜 포맷팅 함수 (타임존 문제 해결 및 일관성 유지)
+// ✅ 날짜 포맷팅 함수
 const safeFormatDate = (dateStr: string | null | undefined) => {
   if (!dateStr) return "-";
-  // T는 있는데 Z가 없으면 Z를 붙여줌 (UTC 인식 유도 -> 브라우저가 KST 변환)
   const targetStr =
     dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
 
@@ -160,7 +159,6 @@ const formatDateGroupLabel = (
     const [y, w] = raw.split("-W");
     return `${y}년 ${w}주차`;
   }
-  // DAY인 경우 safeFormatDate 사용
   return safeFormatDate(raw);
 };
 
@@ -278,27 +276,20 @@ const TopSummaryChips: React.FC<{ data: DashboardDto }> = ({ data }) => {
 
   return (
     <div className="flex flex-wrap gap-2 sm:gap-3">
-      {/* 공지사항 */}
       <div className="inline-flex items-center px-3 py-2 rounded-full bg-yellow-50 text-yellow-700 text-xs sm:text-sm border border-yellow-100">
         <FaBullhorn className="mr-2" />
         이번 주 공지 {data.weeklyNoticeCount ?? 0}개
       </div>
-
-      {/* 기도제목 */}
       <div className="inline-flex items-center px-3 py-2 rounded-full bg-blue-50 text-blue-700 text-xs sm:text-sm border border-blue-100">
         <FaPrayingHands className="mr-2" />
         이번 주 기도제목 {data.weeklyPrayerCount ?? 0}개
       </div>
-
-      {/* 새가족 */}
       {data.newcomerCount > 0 && (
         <div className="inline-flex items-center px-3 py-2 rounded-full bg-emerald-50 text-emerald-700 text-xs sm:text-sm font-medium border border-emerald-100">
           <FaUserPlus className="mr-2" />
           이번 주 새가족 {data.newcomerCount}명
         </div>
       )}
-
-      {/* 출석 인원 증감 */}
       <div
         className={`inline-flex items-center px-3 py-2 rounded-full text-xs sm:text-sm font-medium border ${attendanceChangeColor(
           data.attendanceChange
@@ -308,8 +299,6 @@ const TopSummaryChips: React.FC<{ data: DashboardDto }> = ({ data }) => {
         지난주 대비 출석 인원 {data.attendanceChange > 0 ? "+" : ""}
         {data.attendanceChange}명
       </div>
-
-      {/* 미배정 인원 */}
       {data.unassignedMemberCount > 0 && (
         <div className="inline-flex items-center px-3 py-2 rounded-full bg-orange-50 text-orange-700 text-xs sm:text-sm font-medium border border-orange-100">
           <FaUserTag className="mr-2" />셀 미배정 인원{" "}
@@ -320,31 +309,67 @@ const TopSummaryChips: React.FC<{ data: DashboardDto }> = ({ data }) => {
   );
 };
 
+// ✅ [수정] 출석 인원 상세 표기 및 툴팁 추가
 const OverallAttendanceSummaryCard: React.FC<{
   summary: OverallAttendanceSummaryDto | OverallAttendanceStatDto | null;
   label?: string;
 }> = ({ summary, label = "기간 총 출석률" }) => {
   if (!summary) return <div className="text-center p-4">데이터 없음</div>;
+
   let rate: number | undefined;
+  let present: number | undefined;
+  let possible: number | undefined;
+
+  // DTO 구조에 따른 데이터 추출
   if ("totalSummary" in summary && summary.totalSummary) {
     rate = summary.totalSummary.attendanceRate;
+    present = summary.totalSummary.totalPresent;
+    possible = summary.totalSummary.totalPossible;
   } else if ("attendanceRate" in summary) {
+    // OverallAttendanceStatDto (통계 서비스 사용 시)
     rate = summary.attendanceRate;
+    present = (summary as any).totalPresent;
+    possible = (summary as any).totalPossible ?? summary.totalRecords;
   }
+
+  // 출석률이 너무 낮으면 색상 변경 등 시각적 강조 가능
+  const rateColor = (rate || 0) < 10 ? "text-red-500" : "text-indigo-600";
+
   return (
     <div className="grid grid-cols-1 gap-4 text-center">
-      <div className="p-4 sm:p-5 bg-indigo-50 rounded-lg">
-        <p className="text-xs sm:text-sm font-medium text-indigo-500">
-          {label}
+      <div className="p-4 sm:p-5 bg-indigo-50 rounded-lg relative group">
+        <div className="flex justify-center items-center gap-1 mb-1">
+          <p className="text-xs sm:text-sm font-medium text-indigo-500">
+            {label}
+          </p>
+          {/* 툴팁 */}
+          <div className="relative group/tooltip cursor-help">
+            <span className="text-xs text-indigo-400">ⓘ</span>
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-800 text-white text-[10px] rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity pointer-events-none z-10 shadow-lg">
+              전체 재적 인원 대비 출석률입니다.
+              <br />
+              (보고서 미제출도 모수에 포함)
+            </div>
+          </div>
+        </div>
+
+        {/* 🔴 [수정 완료] toFixed(1) -> toFixed(0) 으로 변경하여 정수 표현 */}
+        <p className={`mt-1 text-2xl sm:text-3xl font-semibold ${rateColor}`}>
+          {typeof rate === "number" ? `${rate.toFixed(0)}%` : "-"}
         </p>
-        <p className="mt-1 text-2xl sm:text-3xl font-semibold text-indigo-600">
-          {typeof rate === "number" ? `${rate.toFixed(1)}%` : "-"}
-        </p>
+
+        {/* 상세 수치 (출석/대상) */}
+        {typeof present === "number" && typeof possible === "number" && (
+          <p className="text-xs text-gray-500 mt-1">
+            ({present}명 출석 / 총 {possible}명 대상)
+          </p>
+        )}
       </div>
     </div>
   );
 };
 
+// ✅ [수정] 소수점 제거 (.toFixed(0))
 const AttendanceTrend: React.FC<{
   data?: AggregatedTrendDto[] | null;
   selectedGroupBy: AttendanceSummaryGroupBy;
@@ -385,7 +410,7 @@ const AttendanceTrend: React.FC<{
                 {formatDateGroupLabel(selectedGroupBy, item.dateGroup)}
               </span>
               <span>
-                {item.attendanceRate.toFixed(1)}% ({item.presentRecords}/
+                {item.attendanceRate.toFixed(0)}% ({item.presentRecords}/
                 {item.totalRecords})
               </span>
             </div>
@@ -586,7 +611,6 @@ const DashboardPage: React.FC = () => {
     };
   }, [isExecutive]);
 
-  // 핸들러
   const handleSummaryModeChange = (mode: SummaryMode) => {
     setSummaryMode(mode);
     setLoadingMain(true);
@@ -607,7 +631,6 @@ const DashboardPage: React.FC = () => {
     setIncompleteFilter(filter);
   };
 
-  // ✅ 메인 Fetch Data
   const fetchData = useCallback(async () => {
     if (!user) return;
     if (isExecutive && semesters.length === 0) return;
@@ -671,7 +694,7 @@ const DashboardPage: React.FC = () => {
           : Promise.resolve([]),
       ]);
 
-      // ✅ [수정 1] 미배정 인원에서 임원단(EXECUTIVE) 제외
+      // ✅ [필터링] 미배정 인원에서 임원단(EXECUTIVE) 제외
       const filteredUnassigned = (unassignedData as any[]).filter(
         (m) => m.role !== "EXECUTIVE"
       );
@@ -680,7 +703,7 @@ const DashboardPage: React.FC = () => {
       setTotalPrayers(prayersPage.totalElements);
       setUnassignedList(filteredUnassigned);
 
-      // ✅ [수정] Dashboard 데이터 업데이트 시 필터링된 미배정 인원 수 반영
+      // Dashboard 데이터 업데이트
       setDashboardData({
         ...mainData,
         overallAttendanceSummary:
@@ -709,7 +732,6 @@ const DashboardPage: React.FC = () => {
     isExecutive,
   ]);
 
-  // ✅ 초기 및 주요 필터 변경 시 메인 데이터 로딩
   useEffect(() => {
     let alive = true;
     Promise.resolve().then(() => {
@@ -721,7 +743,6 @@ const DashboardPage: React.FC = () => {
     };
   }, [fetchData]);
 
-  // ✅ 누락 리포트 로딩
   useEffect(() => {
     if (!isExecutive) return;
 
@@ -774,7 +795,6 @@ const DashboardPage: React.FC = () => {
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
-        {/* 헤더 섹션 */}
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800">
             대시보드
@@ -797,7 +817,6 @@ const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 메인 레이아웃 */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="xl:col-span-2 space-y-6">
             {isExecutive && (
@@ -880,7 +899,7 @@ const DashboardPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* ✅ [수정 2] 미배정 인원 상세 리스트 (위치 이동: 통계 위로) */}
+                {/* ✅ [위치 이동] 미배정 인원 상세 리스트 (통계 위로) */}
                 <div id="unassigned-section" className="mt-8 border-t pt-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
@@ -1082,7 +1101,7 @@ const DashboardPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* 공동체 구성 통계 (미배정 인원 아래로 이동) */}
+                {/* 공동체 구성 통계 */}
                 {loadingCharts
                   ? null
                   : dashboardData?.demographics && (

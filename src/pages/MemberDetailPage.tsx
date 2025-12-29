@@ -54,7 +54,6 @@ const safeFormatDate = (dateStr: string | null | undefined) => {
   return `${year}-${month}-${day}`;
 };
 
-// ✅ [추가] 값이 없으면 '정보 없음'을 반환하는 헬퍼
 const displayValue = (val: string | number | null | undefined) => {
   if (val === null || val === undefined || val === "") return "정보 없음";
   return val;
@@ -103,7 +102,6 @@ const InfoDl: React.FC<{ items: { dt: string; dd: React.ReactNode }[] }> = ({
   </dl>
 );
 
-// --- [수정 1] 기본 정보 카드: 빈 값 처리 ---
 const BasicInfoCard: React.FC<{
   member: MemberDto;
   isCurrentUser: boolean;
@@ -118,7 +116,6 @@ const BasicInfoCard: React.FC<{
     ? safeFormatDate(member.birthDate)
     : "";
 
-  // 생년월일과 나이 조합 표시, 없으면 '정보 없음'
   const birthDateValue =
     displayBirthDate || ageDisplay
       ? `${displayBirthDate} ${ageDisplay}`.trim()
@@ -152,15 +149,12 @@ const BasicInfoCard: React.FC<{
   );
 };
 
-// --- 교회 정보 카드 ---
-// --- 교회 정보 카드 ---
 const ChurchInfoCard: React.FC<{ member: MemberDto }> = ({ member }) => (
   <InfoCard title="교회 정보">
     <InfoDl
       items={[
         {
           dt: "셀",
-          // ✅ [수정] 셀 정보가 있으면 링크로 렌더링, 없으면 "없음" 표시
           dd: member.cell ? (
             <Link
               to={`/admin/cells/${member.cell.id}`}
@@ -199,7 +193,6 @@ const ChurchInfoCard: React.FC<{ member: MemberDto }> = ({ member }) => (
   </InfoCard>
 );
 
-// --- 팀 카드 ---
 const TeamsCard: React.FC<{
   memberTeams: TeamDto[];
   onManageClick: () => void;
@@ -238,7 +231,6 @@ const TeamsCard: React.FC<{
   </InfoCard>
 );
 
-// --- 기도제목 카드 ---
 const PrayersCard: React.FC<{ prayers: PrayerDto[] }> = ({ prayers }) => (
   <InfoCard title={`기도제목 (${prayers.length})`}>
     <div className="max-h-96 overflow-y-auto">
@@ -268,7 +260,7 @@ const PrayersCard: React.FC<{ prayers: PrayerDto[] }> = ({ prayers }) => (
 );
 
 // ─────────────────────────────────────────────────────────────
-// [핵심 수정 2] 출석 요약 카드: 미체크 로직 개선
+// [핵심 수정 2] 출석 요약 카드: 미체크 로직 개선 & 매트릭스 날짜 전달
 // ─────────────────────────────────────────────────────────────
 const AttendanceSummaryCard: React.FC<{
   summary: MemberAttendanceSummaryDto | null;
@@ -294,6 +286,8 @@ const AttendanceSummaryCard: React.FC<{
   memberId,
   memberName,
   cellAssignmentDate,
+  memberJoinDate,
+  memberJoinYear,
   attendances,
   semesters,
   activeSemester,
@@ -525,7 +519,16 @@ const AttendanceSummaryCard: React.FC<{
             endDate={endDate}
             year={new Date(startDate).getFullYear()}
             month={new Date(startDate).getMonth() + 1}
-            members={[{ memberId, memberName }]}
+            // ✅ [핵심 수정] 날짜 정보를 포함하여 전달
+            members={[
+              {
+                memberId,
+                memberName,
+                cellAssignmentDate,
+                createdAt: memberJoinDate,
+                joinYear: memberJoinYear,
+              },
+            ]}
             attendances={attendances}
             loading={false}
             limitStartDate={activeSemester?.startDate}
@@ -538,9 +541,8 @@ const AttendanceSummaryCard: React.FC<{
   );
 };
 
-// ... (이후 AdminActionsCard, TeamManagementModal, TempPasswordModal, MemberDetailPage 등 나머지 코드는 기존과 동일) ...
+// ... (나머지 컴포넌트 및 메인 페이지는 기존과 동일)
 
-// Main Page 등 나머지는 변경 없음.
 const AdminActionsCard: React.FC<{
   onResetPassword: () => void;
   isResetting: boolean;
