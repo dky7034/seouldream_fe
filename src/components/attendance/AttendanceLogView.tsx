@@ -14,7 +14,14 @@ import type {
 } from "../../types";
 import SimpleSearchableSelect from "../SimpleSearchableSelect";
 import AttendanceMatrix from "../AttendanceMatrix";
-import { FaTh, FaChartBar } from "react-icons/fa";
+import {
+  TableCellsIcon,
+  FunnelIcon,
+  ExclamationTriangleIcon,
+  CheckCircleIcon,
+  CalendarDaysIcon,
+  PresentationChartLineIcon,
+} from "@heroicons/react/24/solid";
 
 interface AttendanceLogViewProps {
   user: User;
@@ -28,17 +35,13 @@ type UnitType = "month" | "semester";
  * Helpers (Timezone Safe Version)
  * ----------------------------- */
 
-// ✅ [수정] 날짜 포맷팅 함수 (KST 적용)
 const safeFormatDate = (
   dateStr: string | null | undefined,
   separator = "-"
 ) => {
   if (!dateStr) return "";
-
-  // T는 있는데 Z가 없으면 Z를 붙여줌 (UTC 인식 유도 -> 브라우저가 KST 변환)
   const targetStr =
     dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
-
   const date = new Date(targetStr);
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -49,10 +52,8 @@ const safeFormatDate = (
 const getAttendanceMemberId = (att: any): number | null => {
   if (att?.memberId !== undefined && att?.memberId !== null)
     return Number(att.memberId);
-
   const m = att?.member;
   if (!m) return null;
-
   if (typeof m === "number" || typeof m === "string") return Number(m);
   if (typeof m === "object") {
     if (m.id !== undefined && m.id !== null) return Number(m.id);
@@ -94,11 +95,9 @@ const AttendanceMatrixView: React.FC<{
   allMembers,
   userRole,
 }) => {
-  // ✅ [복구] 미체크 계산 로직 (누락된 주차 확인용)
   const uncheckedCount = useMemo(() => {
     if (!startDate || !endDate || members.length === 0) return 0;
 
-    // 1. 조회 기간 설정
     const startStr = safeFormatDate(startDate, "-");
     const endStr = safeFormatDate(endDate, "-");
     const start = new Date(startStr);
@@ -108,7 +107,6 @@ const AttendanceMatrixView: React.FC<{
 
     if (start > end) return 0;
 
-    // 2. 기간 내 모든 일요일(Target Sundays) 수집
     const targetSundays: string[] = [];
     const cur = new Date(start);
     while (cur <= end) {
@@ -118,49 +116,34 @@ const AttendanceMatrixView: React.FC<{
       cur.setDate(cur.getDate() + 1);
     }
 
-    // 3. 출석 기록을 Set으로 변환하여 검색 속도 향상
     const attendanceSet = new Set<string>();
     for (const a of attendances) {
       const mId = getAttendanceMemberId(a);
       const dateKey = safeFormatDate(a.date, "-");
-
       if (mId === null || !dateKey) continue;
       if (!["PRESENT", "ABSENT"].includes(a.status)) continue;
-
       attendanceSet.add(`${mId}-${dateKey}`);
     }
 
     let incompleteWeeks = 0;
-
-    // 4. 각 일요일별로 검사
     for (const sundayStr of targetSundays) {
       const sundayDate = new Date(sundayStr);
       sundayDate.setHours(0, 0, 0, 0);
 
-      // ✅ [핵심 수정] 해당 주일(일요일) 날짜 기준으로, 셀에 이미 배정된 멤버만 필터링
       const activeMembers = members.filter((m) => {
-        // 배정일이 없으면(기존 멤버 or 데이터 누락) 체크 대상에 포함
         if (!m.cellAssignmentDate) return true;
-
         const assignDate = new Date(m.cellAssignmentDate);
         assignDate.setHours(0, 0, 0, 0);
-
-        // 배정일 <= 해당 주일 이면 체크 대상
         return assignDate <= sundayDate;
       });
 
-      // 해당 주차에 체크해야 할 멤버가 한 명도 없다면(ex: 모두 아직 배정 전) 패스
       if (activeMembers.length === 0) continue;
-
-      // 체크 대상 멤버 중 기록이 없는 사람이 있는지 확인
       const isWeekIncomplete = activeMembers.some((m) => {
         const key = `${m.id}-${sundayStr}`;
         return !attendanceSet.has(key);
       });
-
       if (isWeekIncomplete) incompleteWeeks++;
     }
-
     return incompleteWeeks;
   }, [startDate, endDate, members, attendances]);
 
@@ -181,42 +164,52 @@ const AttendanceMatrixView: React.FC<{
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* ✅ [수정] 통계 카드: 출석/결석 제거하고 '누락(주)'만 단독 표시 */}
+      {/* Alert Card */}
       {uncheckedCount > 0 ? (
-        <div className="p-3 sm:p-4 bg-red-50 rounded-xl border border-red-200 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-bold text-red-700">
-              ⚠️ 출석 체크가 누락된 주가 있습니다.
-            </p>
-            <p className="text-xs text-red-500 mt-1">
-              해당 기간 내 총 <strong>{uncheckedCount}개</strong>의 주일에 대해
-              출석 기록이 존재하지 않습니다.
-            </p>
+        <div className="p-4 bg-red-50 rounded-2xl border border-red-200 flex items-center justify-between shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="bg-red-100 p-2 rounded-full">
+              <ExclamationTriangleIcon className="h-6 w-6 text-red-600" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-red-800">
+                출석 체크가 누락된 주가 있습니다.
+              </p>
+              <p className="text-xs text-red-600 mt-0.5">
+                총{" "}
+                <strong className="font-extrabold">{uncheckedCount}개</strong>의
+                주일에 기록이 없습니다.
+              </p>
+            </div>
           </div>
-          <p className="text-3xl font-bold text-red-700 ml-4">
+          <div className="hidden sm:block text-3xl font-extrabold text-red-700/50">
             {uncheckedCount}
-          </p>
+          </div>
         </div>
       ) : (
-        <div className="p-3 sm:p-4 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-between opacity-80">
+        <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 flex items-center gap-3 shadow-sm opacity-80">
+          <CheckCircleIcon className="h-6 w-6 text-gray-400" />
           <div>
             <p className="text-sm font-bold text-gray-600">
-              ✅ 모든 주차 입력 완료
+              모든 주차 입력 완료
             </p>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 mt-0.5">
               조회 기간 내 누락된 주차가 없습니다.
             </p>
           </div>
-          <p className="text-3xl font-bold text-gray-400 ml-4">0</p>
         </div>
       )}
 
-      {/* 매트릭스 */}
-      <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-3 sm:p-4">
-        <h4 className="text-sm font-bold text-gray-700 mb-4 ml-1 flex items-center break-keep">
-          <FaTh className="mr-2 text-indigo-500" />
-          {matrixMode === "semester" ? "기간 전체 현황" : "월간 상세 현황"}
-        </h4>
+      {/* Matrix Card */}
+      <div className="bg-white shadow-sm rounded-2xl border border-gray-100 p-4 sm:p-6">
+        <div className="flex items-center gap-2 mb-4 border-b border-gray-50 pb-2">
+          <TableCellsIcon className="h-5 w-5 text-indigo-500" />
+          <h4 className="text-base font-bold text-gray-900">
+            {matrixMode === "semester"
+              ? "기간 전체 현황표"
+              : "월간 상세 현황표"}
+          </h4>
+        </div>
 
         <AttendanceMatrix
           mode={matrixMode}
@@ -278,10 +271,8 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
     (date: Date, semester: SemesterDto) => {
       const start = new Date(semester.startDate);
       const end = new Date(semester.endDate);
-
       const inRange = date >= start && date <= end;
       if (inRange) return true;
-
       return (
         (date.getFullYear() === end.getFullYear() &&
           date.getMonth() === end.getMonth()) ||
@@ -292,19 +283,18 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
     []
   );
 
-  const selectedSemester = useMemo(() => {
-    return semesters.find((s) => s.id === filters.semesterId) || null;
-  }, [semesters, filters.semesterId]);
+  const selectedSemester = useMemo(
+    () => semesters.find((s) => s.id === filters.semesterId) || null,
+    [semesters, filters.semesterId]
+  );
 
   const semesterMonths = useMemo(() => {
     if (!selectedSemester) return [];
     const start = new Date(selectedSemester.startDate);
     const end = new Date(selectedSemester.endDate);
-
     const list: { year: number; month: number; label: string }[] = [];
     const cur = new Date(start.getFullYear(), start.getMonth(), 1);
     const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
-
     while (cur <= endMonth) {
       list.push({
         year: cur.getFullYear(),
@@ -330,7 +320,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
       });
       setMembers(membersPage.content ?? []);
     } catch {
-      setError("셀 멤버 목록을 불러오는 데 실패했습니다.");
+      setError("셀 멤버 목록 로드 실패");
     }
   }, [user.cellId]);
 
@@ -344,9 +334,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
   }, []);
 
   useEffect(() => {
-    if (semesters.length === 0) return;
-    if (isInitialized) return;
-
+    if (semesters.length === 0 || isInitialized) return;
     const today = new Date();
     const currentSem = semesters.find((s) =>
       isDateInSemesterOrSameMonth(today, s)
@@ -367,18 +355,15 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
       }));
       setUnitType("semester");
     }
-
     setIsInitialized(true);
   }, [semesters, isInitialized, isDateInSemesterOrSameMonth]);
 
   const fetchAttendances = useCallback(async () => {
     if (!user.cellId || !isInitialized) return;
-
     setLoading(true);
     setError(null);
 
     const queryFilterMode: FilterMode = isCellLeader ? "unit" : filterMode;
-
     let params: GetAttendancesParams = {
       cellId: user.cellId,
       page: 0,
@@ -421,7 +406,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
       const data = await attendanceService.getAttendances(cleanedParams);
       setAttendanceList(data?.content ?? []);
     } catch {
-      setError("출석 데이터를 불러오는 데 실패했습니다.");
+      setError("출석 데이터 로드 실패");
     } finally {
       setLoading(false);
     }
@@ -438,11 +423,9 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
   useEffect(() => {
     fetchCellMembers();
   }, [fetchCellMembers]);
-
   useEffect(() => {
     fetchSemesters();
   }, [fetchSemesters]);
-
   useEffect(() => {
     fetchAttendances();
   }, [fetchAttendances]);
@@ -456,17 +439,14 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
 
   const handleUnitTypeClick = (type: UnitType) => {
     setUnitType(type);
-
     const today = new Date();
     const todayYear = today.getFullYear();
     const todayMonth = today.getMonth() + 1;
-
     if (type === "month") {
       if (semesterMonths.length > 0) {
         const isCurrentMonthInSemester = semesterMonths.some(
           (m) => m.year === todayYear && m.month === todayMonth
         );
-
         if (isCurrentMonthInSemester) {
           setFilters((prev) => ({
             ...prev,
@@ -475,7 +455,6 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
           }));
           return;
         }
-
         const isInRange = semesterMonths.some(
           (m) => m.year === filters.year && m.month === filters.month
         );
@@ -509,7 +488,6 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
   const handleSemesterChange = (newSemesterId: number) => {
     const sem = semesters.find((s) => s.id === newSemesterId);
     if (!sem) return;
-
     const start = new Date(sem.startDate);
     setFilters((prev) => ({
       ...prev,
@@ -519,18 +497,17 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
     }));
   };
 
-  // ❌ [삭제] handleMatrixMonthChange 제거됨 (사용 안함)
-
-  const filteredMembers = useMemo(() => {
-    return filters.memberId
-      ? members.filter((m) => m.id === filters.memberId)
-      : members;
-  }, [members, filters.memberId]);
+  const filteredMembers = useMemo(
+    () =>
+      filters.memberId
+        ? members.filter((m) => m.id === filters.memberId)
+        : members,
+    [members, filters.memberId]
+  );
 
   const viewProps = useMemo(() => {
     if (filterMode === "range")
       return { sDate: filters.startDate, eDate: filters.endDate };
-
     if (unitType === "semester") {
       const sem = semesters.find((s) => s.id === filters.semesterId);
       return {
@@ -538,22 +515,17 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
         eDate: safeFormatDate(sem?.endDate, "-"),
       };
     }
-
     const y = filters.year;
     const m = filters.month;
-
     let startObj = new Date(y, m - 1, 1);
     let endObj = new Date(y, m, 0);
-
     if (selectedSemester) {
       const semStart = new Date(selectedSemester.startDate);
       const semEnd = new Date(selectedSemester.endDate);
       if (semStart > startObj) startObj = semStart;
       if (semEnd < endObj) endObj = semEnd;
     }
-
     if (startObj > endObj) return { sDate: "", eDate: "" };
-
     return {
       sDate: safeFormatDate(startObj.toISOString(), "-"),
       eDate: safeFormatDate(endObj.toISOString(), "-"),
@@ -575,42 +547,39 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
   return (
     <div className="space-y-6">
       {error && (
-        <div className="p-3 text-sm font-medium text-red-700 bg-red-100 border border-red-400 rounded-md">
-          {error}
+        <div className="p-4 text-sm font-bold text-red-700 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2">
+          <ExclamationTriangleIcon className="h-5 w-5" /> {error}
         </div>
       )}
 
       {/* Control Panel */}
-      <div className="p-3 sm:p-4 bg-gray-50 rounded-lg space-y-4 border border-gray-200">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-50 bg-gray-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <FaChartBar className="text-indigo-500" />
-            <h3 className="text-lg font-semibold text-gray-800 break-keep">
-              출석 기록 조회
-            </h3>
+            <FunnelIcon className="h-5 w-5 text-indigo-500" />
+            <h3 className="text-lg font-bold text-gray-900">기록 조회 필터</h3>
           </div>
 
           {!isCellLeader && (
-            <div className="bg-white p-1 rounded-lg border border-gray-200 flex text-sm w-full sm:w-auto">
+            <div className="bg-gray-100 p-1 rounded-xl flex text-sm font-bold w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setFilterMode("unit")}
-                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ${
+                className={`flex-1 sm:flex-none px-4 py-2 rounded-lg transition-all ${
                   filterMode === "unit"
-                    ? "bg-blue-100 text-blue-700 font-medium"
-                    : "text-gray-500 hover:bg-gray-50"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-gray-400 hover:text-gray-600"
                 }`}
               >
                 학기/월
               </button>
-              <div className="w-px bg-gray-200 my-1 mx-1" />
               <button
                 type="button"
                 onClick={() => setFilterMode("range")}
-                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ${
+                className={`flex-1 sm:flex-none px-4 py-2 rounded-lg transition-all ${
                   filterMode === "range"
-                    ? "bg-blue-100 text-blue-700 font-medium"
-                    : "text-gray-500 hover:bg-gray-50"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-gray-400 hover:text-gray-600"
                 }`}
               >
                 직접 입력
@@ -619,158 +588,148 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
           )}
         </div>
 
-        <hr className="border-gray-200" />
-
-        {filterMode === "range" && !isCellLeader ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                시작일
-              </label>
-              <input
-                type="date"
-                value={filters.startDate}
-                onChange={(e) =>
-                  handleFilterChange("startDate", e.target.value)
-                }
-                className="block w-full border-gray-300 rounded-md shadow-sm h-[40px] px-3 focus:ring-blue-500 focus:border-blue-500 bg-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                종료일
-              </label>
-              <input
-                type="date"
-                value={filters.endDate}
-                onChange={(e) => handleFilterChange("endDate", e.target.value)}
-                className="block w-full border-gray-300 rounded-md shadow-sm h-[40px] px-3 focus:ring-blue-500 focus:border-blue-500 bg-white"
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* 학기 선택 및 단위 선택 */}
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                {/* 라벨과 기간 정보를 헤더처럼 배치 */}
-                <div className="flex justify-between items-end mb-1">
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    학기 선택
-                  </label>
-
-                  {/* 데스크탑: 우측 상단에 기간 표시 */}
-                  {selectedSemester && (
-                    <span className="hidden sm:block text-xs text-indigo-600 font-medium">
-                      {selectedSemester.startDate} ~ {selectedSemester.endDate}
-                    </span>
-                  )}
-                </div>
-
-                <select
-                  value={filters.semesterId}
-                  onChange={(e) => handleSemesterChange(Number(e.target.value))}
-                  className="block w-full border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
-                >
-                  {semesters.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}{" "}
-                      {/* 괄호와 날짜를 제거하여 이름만 깔끔하게 표시 */}
-                    </option>
-                  ))}
-                </select>
-
-                {/* 모바일: 드롭다운 바로 아래에 기간 표시 */}
-                {selectedSemester && (
-                  <p className="sm:hidden mt-1.5 text-xs text-gray-500 flex items-center">
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 mr-1.5"></span>
-                    {selectedSemester.startDate} ~ {selectedSemester.endDate}
-                  </p>
-                )}
-              </div>
-
-              <div className="sm:min-w-[180px]">
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                  조회 단위
+        <div className="p-5">
+          {filterMode === "range" && !isCellLeader ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase">
+                  시작일
                 </label>
-                <div className="flex bg-white rounded-md border border-gray-300 overflow-hidden w-full">
-                  <button
-                    type="button"
-                    onClick={() => handleUnitTypeClick("month")}
-                    className={`flex-1 py-2 text-sm transition-colors whitespace-nowrap ${
-                      unitType === "month"
-                        ? "bg-blue-600 text-white font-medium"
-                        : "text-gray-600 hover:bg-gray-50"
-                    }`}
-                  >
-                    월별 상세
-                  </button>
-                  <div className="w-px bg-gray-300" />
-                  <button
-                    type="button"
-                    onClick={() => handleUnitTypeClick("semester")}
-                    className={`flex-1 py-2 text-sm transition-colors whitespace-nowrap ${
-                      unitType === "semester"
-                        ? "bg-blue-600 text-white font-medium"
-                        : "text-gray-600 hover:bg-gray-50"
-                    }`}
-                  >
-                    학기 전체
-                  </button>
-                </div>
+                <input
+                  type="date"
+                  value={filters.startDate}
+                  onChange={(e) =>
+                    handleFilterChange("startDate", e.target.value)
+                  }
+                  className="block w-full border-gray-200 rounded-xl text-sm focus:border-indigo-500 focus:ring-indigo-500 bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase">
+                  종료일
+                </label>
+                <input
+                  type="date"
+                  value={filters.endDate}
+                  onChange={(e) =>
+                    handleFilterChange("endDate", e.target.value)
+                  }
+                  className="block w-full border-gray-200 rounded-xl text-sm focus:border-indigo-500 focus:ring-indigo-500 bg-gray-50"
+                />
               </div>
             </div>
-
-            {/* 월 선택 (가로 스크롤 적용) */}
-            {unitType === "month" && (
-              <div className="bg-white p-3 rounded-md border border-gray-200">
-                <div className="text-xs text-gray-400 mb-2 break-keep">
-                  * 선택된 학기({selectedSemester?.name})에 포함된 월만
-                  표시됩니다.
-                </div>
-                <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x">
-                  {semesterMonths.length > 0 ? (
-                    semesterMonths.map((m) => {
-                      const isActive =
-                        filters.year === m.year && filters.month === m.month;
-                      return (
-                        <button
-                          key={`${m.year}-${m.month}`}
-                          type="button"
-                          onClick={() =>
-                            handleMonthButtonClick(m.year, m.month)
-                          }
-                          className={`flex-shrink-0 snap-start px-4 py-2 text-sm rounded-md transition-all shadow-sm border ${
-                            isActive
-                              ? "bg-blue-600 text-white font-bold border-blue-600 ring-2 ring-blue-300"
-                              : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-blue-400"
-                          }`}
-                        >
-                          {m.year !== filters.year && (
-                            <span className="text-xs opacity-75 mr-1">
-                              {m.year}년
-                            </span>
-                          )}
-                          {m.label}
-                        </button>
-                      );
-                    })
-                  ) : (
-                    <span className="text-sm text-gray-500 py-1">
-                      표시할 월이 없습니다.
-                    </span>
+          ) : (
+            <div className="space-y-5">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                  <div className="flex justify-between items-end mb-1.5">
+                    <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1">
+                      <CalendarDaysIcon className="h-4 w-4" /> 학기 선택
+                    </label>
+                    {selectedSemester && (
+                      <span className="hidden sm:block text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                        {selectedSemester.startDate} ~{" "}
+                        {selectedSemester.endDate}
+                      </span>
+                    )}
+                  </div>
+                  <select
+                    value={filters.semesterId}
+                    onChange={(e) =>
+                      handleSemesterChange(Number(e.target.value))
+                    }
+                    className="block w-full pl-3 pr-10 py-2.5 text-sm border-gray-200 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-xl bg-gray-50 font-medium"
+                  >
+                    {semesters.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedSemester && (
+                    <p className="sm:hidden mt-2 text-xs text-indigo-600 flex items-center">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 mr-1.5"></span>
+                      {selectedSemester.startDate} ~ {selectedSemester.endDate}
+                    </p>
                   )}
                 </div>
-              </div>
-            )}
-          </div>
-        )}
 
-        <div className="pt-2 border-t border-gray-200 mt-2">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:min-w-[200px]">
+                  <label className="text-xs font-bold text-gray-500 mb-1.5 uppercase flex items-center gap-1">
+                    <PresentationChartLineIcon className="h-4 w-4" /> 조회 단위
+                  </label>
+                  <div className="flex bg-gray-100 p-1 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => handleUnitTypeClick("month")}
+                      className={`flex-1 py-1.5 text-sm font-bold rounded-lg transition-all ${
+                        unitType === "month"
+                          ? "bg-white text-indigo-600 shadow-sm"
+                          : "text-gray-400 hover:text-gray-600"
+                      }`}
+                    >
+                      월별 상세
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUnitTypeClick("semester")}
+                      className={`flex-1 py-1.5 text-sm font-bold rounded-lg transition-all ${
+                        unitType === "semester"
+                          ? "bg-white text-indigo-600 shadow-sm"
+                          : "text-gray-400 hover:text-gray-600"
+                      }`}
+                    >
+                      학기 전체
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {unitType === "month" && (
+                <div className="animate-fadeIn pt-2">
+                  <div className="text-xs font-bold text-gray-400 mb-2 px-1">
+                    상세 월 선택
+                  </div>
+                  <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x">
+                    {semesterMonths.length > 0 ? (
+                      semesterMonths.map((m) => {
+                        const isActive =
+                          filters.year === m.year && filters.month === m.month;
+                        return (
+                          <button
+                            key={`${m.year}-${m.month}`}
+                            type="button"
+                            onClick={() =>
+                              handleMonthButtonClick(m.year, m.month)
+                            }
+                            className={`flex-shrink-0 snap-start px-4 py-2 text-sm font-bold rounded-full transition-all border ${
+                              isActive
+                                ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-200"
+                                : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300"
+                            }`}
+                          >
+                            <span className="text-[10px] mr-1 opacity-80 font-normal">
+                              {m.year !== filters.year && `${m.year}년 `}
+                            </span>
+                            {m.label}
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <span className="text-sm text-gray-400 py-1 pl-1">
+                        표시할 월이 없습니다.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="border-t border-gray-100 mt-5 pt-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                특정 셀원 검색
+              <div className="text-xs font-bold text-gray-500 uppercase mb-1.5">
+                셀원 검색
               </div>
               <SimpleSearchableSelect
                 options={memberOptions}
@@ -781,15 +740,14 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
                 placeholder="전체 보기"
               />
             </div>
-
             <div>
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+              <div className="text-xs font-bold text-gray-500 uppercase mb-1.5">
                 상태 필터
               </div>
               <select
                 value={filters.status}
                 onChange={(e) => handleFilterChange("status", e.target.value)}
-                className="block w-full border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white"
+                className="block w-full border-gray-200 rounded-xl shadow-sm py-2 px-3 text-sm focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 font-medium"
               >
                 <option value="all">모든 상태</option>
                 <option value="PRESENT">출석만 표시</option>
@@ -814,7 +772,6 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
         limitEndDate={selectedSemester?.endDate}
         filterMode={filterMode}
         allMembers={allMembers}
-        // ✅ [추가] 여기서 user.role 정보를 하위 컴포넌트로 전달
         userRole={user.role}
       />
     </div>

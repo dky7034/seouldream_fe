@@ -22,6 +22,21 @@ import MultiSelect from "../components/MultiSelect";
 import ConfirmModal from "../components/ConfirmModal";
 import AttendanceMatrix from "../components/AttendanceMatrix";
 import { FaCalendarAlt, FaClock } from "react-icons/fa";
+import {
+  UserCircleIcon,
+  PhoneIcon,
+  EnvelopeIcon,
+  HomeIcon,
+  CakeIcon,
+  IdentificationIcon,
+  UserGroupIcon,
+  KeyIcon,
+  ShieldExclamationIcon,
+  CheckCircleIcon,
+  BuildingLibraryIcon,
+  XMarkIcon,
+  ChatBubbleBottomCenterTextIcon,
+} from "@heroicons/react/24/solid";
 
 // -------------------------------------------------------------------------
 // [Helpers] 날짜 및 나이 계산
@@ -55,7 +70,8 @@ const safeFormatDate = (dateStr: string | null | undefined) => {
 };
 
 const displayValue = (val: string | number | null | undefined) => {
-  if (val === null || val === undefined || val === "") return "정보 없음";
+  if (val === null || val === undefined || val === "")
+    return <span className="text-gray-300">정보 없음</span>;
   return val;
 };
 
@@ -63,43 +79,20 @@ const displayValue = (val: string | number | null | undefined) => {
 // [Components] UI 카드 컴포넌트들
 // -------------------------------------------------------------------------
 
-const InfoCard: React.FC<{
-  title: string;
-  children: React.ReactNode;
-  actions?: React.ReactNode;
-  className?: string;
-}> = ({ title, children, actions, className }) => (
-  <div className={`bg-white shadow overflow-hidden sm:rounded-lg ${className}`}>
-    <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
-      <h3 className="text-lg leading-6 font-medium text-gray-900 break-keep">
-        {title}
-      </h3>
-      {actions}
+const InfoRow: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  value: React.ReactNode;
+}> = ({ icon, label, value }) => (
+  <div className="flex items-start py-3 border-b border-gray-50 last:border-0">
+    <div className="flex-shrink-0 mt-0.5 text-gray-400 w-5 h-5 mr-3">
+      {icon}
     </div>
-    <div className="border-t border-gray-200">{children}</div>
+    <div className="flex-1">
+      <p className="text-xs font-medium text-gray-500 mb-0.5">{label}</p>
+      <div className="text-sm text-gray-900 font-medium break-all">{value}</div>
+    </div>
   </div>
-);
-
-const InfoDl: React.FC<{ items: { dt: string; dd: React.ReactNode }[] }> = ({
-  items,
-}) => (
-  <dl className="divide-y divide-gray-200">
-    {items.map((item, index) => (
-      <div
-        key={index}
-        className={`px-4 py-3 sm:px-6 flex flex-col sm:grid sm:grid-cols-3 sm:gap-4 ${
-          index % 2 === 0 ? "bg-gray-50" : "bg-white"
-        }`}
-      >
-        <dt className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-0">
-          {item.dt}
-        </dt>
-        <dd className="text-sm text-gray-900 sm:col-span-2 break-keep">
-          {item.dd}
-        </dd>
-      </div>
-    ))}
-  </dl>
 );
 
 const BasicInfoCard: React.FC<{
@@ -111,86 +104,129 @@ const BasicInfoCard: React.FC<{
     member.age !== undefined && member.age !== null
       ? `(만 ${member.age}세)`
       : "";
-
   const displayBirthDate = member.birthDate
     ? safeFormatDate(member.birthDate)
     : "";
-
   const birthDateValue =
     displayBirthDate || ageDisplay
       ? `${displayBirthDate} ${ageDisplay}`.trim()
       : "정보 없음";
 
   return (
-    <InfoCard
-      title="기본 정보"
-      actions={
-        isCurrentUser && (
+    <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-2xl overflow-hidden">
+      <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+          <IdentificationIcon className="h-5 w-5 text-indigo-500" />
+          기본 정보
+        </h3>
+        {isCurrentUser && (
           <button
             onClick={onEditProfile}
-            className="px-3 py-1 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 whitespace-nowrap"
+            className="text-xs font-bold text-indigo-600 bg-white border border-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors shadow-sm"
           >
             수정
           </button>
-        )
-      }
-    >
-      <InfoDl
-        items={[
-          { dt: "이름", dd: displayValue(member.name) },
-          { dt: "아이디", dd: displayValue(member.username) },
-          { dt: "이메일", dd: displayValue(member.email) },
-          { dt: "연락처", dd: displayValue(member.phone) },
-          { dt: "생년월일", dd: birthDateValue },
-          { dt: "주소", dd: displayValue(member.address) },
-        ]}
-      />
-    </InfoCard>
+        )}
+      </div>
+      <div className="p-6 grid grid-cols-1 gap-1">
+        <InfoRow
+          icon={<UserCircleIcon />}
+          label="이름"
+          value={displayValue(member.name)}
+        />
+        <InfoRow
+          icon={<KeyIcon />}
+          label="아이디"
+          value={displayValue(member.username)}
+        />
+        <InfoRow
+          icon={<EnvelopeIcon />}
+          label="이메일"
+          value={displayValue(member.email)}
+        />
+        <InfoRow
+          icon={<PhoneIcon />}
+          label="연락처"
+          value={displayValue(member.phone)}
+        />
+        <InfoRow icon={<CakeIcon />} label="생년월일" value={birthDateValue} />
+        <InfoRow
+          icon={<HomeIcon />}
+          label="주소"
+          value={displayValue(member.address)}
+        />
+      </div>
+    </div>
   );
 };
 
 const ChurchInfoCard: React.FC<{ member: MemberDto }> = ({ member }) => (
-  <InfoCard title="교회 정보">
-    <InfoDl
-      items={[
-        {
-          dt: "셀",
-          dd: member.cell ? (
+  <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-2xl overflow-hidden">
+    <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50">
+      <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+        <BuildingLibraryIcon className="h-5 w-5 text-indigo-500" />
+        교회 정보
+      </h3>
+    </div>
+    <div className="p-6 grid grid-cols-1 gap-1">
+      <InfoRow
+        icon={<UserGroupIcon />}
+        label="소속 셀"
+        value={
+          member.cell ? (
             <Link
               to={`/admin/cells/${member.cell.id}`}
-              className="text-indigo-600 hover:text-indigo-800 hover:underline font-medium"
+              className="text-indigo-600 font-bold hover:underline"
             >
               {member.cell.name}
             </Link>
           ) : (
-            "없음"
-          ),
-        },
-        {
-          dt: "셀 배정일",
-          dd: member.cellAssignmentDate
+            <span className="text-gray-400">미배정</span>
+          )
+        }
+      />
+      <InfoRow
+        icon={<CheckCircleIcon />}
+        label="셀 배정일"
+        value={
+          member.cellAssignmentDate
             ? safeFormatDate(member.cellAssignmentDate)
-            : "미배정",
-        },
-        { dt: "역할", dd: translateRole(member.role) },
-        { dt: "등록연도", dd: member.joinYear },
-        {
-          dt: "상태",
-          dd: (
-            <span
-              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                member.active
-                  ? "bg-green-100 text-green-800"
-                  : "bg-gray-200 text-gray-800"
-              }`}
-            >
-              {member.active ? "활동" : "비활동"}
-            </span>
-          ),
-        },
-      ]}
-    />
-  </InfoCard>
+            : "-"
+        }
+      />
+      <InfoRow
+        icon={<IdentificationIcon />}
+        label="직분/역할"
+        value={translateRole(member.role)}
+      />
+      <InfoRow
+        icon={<FaCalendarAlt />}
+        label="등록연도"
+        value={member.joinYear ? `${member.joinYear}년` : "-"}
+      />
+      <InfoRow
+        icon={
+          <div
+            className={`w-2.5 h-2.5 rounded-full mt-1.5 ${
+              member.active ? "bg-green-500" : "bg-gray-400"
+            }`}
+          />
+        }
+        label="상태"
+        value={
+          <span
+            className={`inline-flex px-2 py-0.5 rounded-md text-xs font-bold ${
+              member.active
+                ? "bg-green-100 text-green-700"
+                : "bg-gray-100 text-gray-600"
+            }`}
+          >
+            {member.active ? "활동 중" : "비활동"}
+          </span>
+        }
+      />
+    </div>
+  </div>
 );
 
 const TeamsCard: React.FC<{
@@ -198,54 +234,68 @@ const TeamsCard: React.FC<{
   onManageClick: () => void;
   canManage: boolean;
 }> = ({ memberTeams, onManageClick, canManage }) => (
-  <InfoCard
-    title="소속 팀"
-    actions={
-      canManage && (
+  <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-2xl overflow-hidden">
+    <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+      <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+        <UserGroupIcon className="h-5 w-5 text-indigo-500" />
+        소속 팀
+      </h3>
+      {canManage && (
         <button
           onClick={onManageClick}
-          className="text-sm text-indigo-600 hover:text-indigo-800 whitespace-nowrap"
+          className="text-xs font-bold text-gray-600 bg-white border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
         >
-          + 관리
+          관리
         </button>
-      )
-    }
-  >
-    <div className="px-4 py-5">
+      )}
+    </div>
+    <div className="p-6">
       {memberTeams.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           {memberTeams.map((t) => (
             <Link
               key={t.id}
               to={`/admin/teams/${t.id}`}
-              className="px-2.5 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full hover:bg-blue-200 transition-colors"
+              className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-100 text-sm font-bold rounded-lg hover:bg-blue-100 transition-colors"
             >
               {t.name}
             </Link>
           ))}
         </div>
       ) : (
-        <p className="text-sm text-gray-500">소속된 팀이 없습니다.</p>
+        <p className="text-sm text-gray-400 text-center py-4">
+          소속된 사역 팀이 없습니다.
+        </p>
       )}
     </div>
-  </InfoCard>
+  </div>
 );
 
 const PrayersCard: React.FC<{ prayers: PrayerDto[] }> = ({ prayers }) => (
-  <InfoCard title={`기도제목 (${prayers.length})`}>
-    <div className="max-h-96 overflow-y-auto">
+  <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-2xl overflow-hidden">
+    <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50">
+      <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+        <ChatBubbleBottomCenterTextIcon className="h-5 w-5 text-indigo-500" />
+        기도제목{" "}
+        <span className="text-gray-400 text-sm font-normal ml-1">
+          ({prayers.length})
+        </span>
+      </h3>
+    </div>
+    <div className="max-h-80 overflow-y-auto p-2">
       {prayers.length > 0 ? (
-        <ul className="divide-y divide-gray-200">
+        <ul className="space-y-1">
           {prayers.map((p) => (
-            <li
-              key={p.id}
-              className="px-4 py-4 hover:bg-gray-50 transition-colors"
-            >
-              <Link to={`/admin/prayers/${p.id}`} className="block">
-                <p className="text-sm text-gray-800 hover:text-indigo-600 font-medium transition-colors break-keep">
+            <li key={p.id}>
+              <Link
+                to={`/admin/prayers/${p.id}`}
+                className="block p-4 hover:bg-gray-50 rounded-xl transition-colors group"
+              >
+                <p className="text-sm text-gray-800 font-medium group-hover:text-indigo-600 break-keep line-clamp-2">
                   {p.content}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1">
+                  <FaClock className="text-[10px]" />{" "}
                   {safeFormatDate(p.createdAt)}
                 </p>
               </Link>
@@ -253,14 +303,16 @@ const PrayersCard: React.FC<{ prayers: PrayerDto[] }> = ({ prayers }) => (
           ))}
         </ul>
       ) : (
-        <p className="px-4 py-4 text-sm text-gray-500">기도제목이 없습니다.</p>
+        <p className="py-8 text-center text-sm text-gray-400">
+          등록된 기도제목이 없습니다.
+        </p>
       )}
     </div>
-  </InfoCard>
+  </div>
 );
 
 // ─────────────────────────────────────────────────────────────
-// [핵심 수정 2] 출석 요약 카드: 미체크 로직 개선 & 매트릭스 날짜 전달
+// [AttendanceSummaryCard]
 // ─────────────────────────────────────────────────────────────
 const AttendanceSummaryCard: React.FC<{
   summary: MemberAttendanceSummaryDto | null;
@@ -317,11 +369,9 @@ const AttendanceSummaryCard: React.FC<{
     return months;
   }, [activeSemester]);
 
-  // ✅ [수정된 로직] 미체크(빈칸) 계산
+  // ✅ [로직 유지] 미체크 계산
   const uncheckedCount = useMemo(() => {
     if (!startDate || !endDate) return 0;
-
-    // 1. 셀 배정일이 없으면(미배정 상태) 출석 의무가 없으므로 미체크 0 반환
     if (!cellAssignmentDate) return 0;
 
     const filterStart = new Date(startDate);
@@ -336,30 +386,23 @@ const AttendanceSummaryCard: React.FC<{
       return d;
     };
 
-    // 2. 기준일 설정: 셀 배정일이 존재하므로 이를 기준으로 사용
     const baseDate = getSafeDateObj(cellAssignmentDate);
-
-    // 조회 시작일과 배정일 중 늦은 날짜를 실제 카운트 시작일로 설정
     const effectiveStart = filterStart < baseDate ? baseDate : filterStart;
 
-    // 유효 시작일이 조회 종료일보다 늦으면 카운트할 필요 없음
     if (effectiveStart > filterEnd) return 0;
 
     const targetSundays = new Set<string>();
     const current = new Date(effectiveStart);
 
-    // 시작일이 일요일이 아니면 다음 일요일로 이동
     if (current.getDay() !== 0) {
       current.setDate(current.getDate() + (7 - current.getDay()));
     }
 
-    // 기간 내 모든 일요일 수집
     while (current <= filterEnd) {
       targetSundays.add(toISODate(current));
       current.setDate(current.getDate() + 7);
     }
 
-    // 실제 기록된 출석 날짜 수집
     const recordedDates = new Set<string>();
     attendances.forEach((att) => {
       if ((att.status === "PRESENT" || att.status === "ABSENT") && att.date) {
@@ -367,7 +410,6 @@ const AttendanceSummaryCard: React.FC<{
       }
     });
 
-    // 미체크 카운트 계산
     let missingCount = 0;
     targetSundays.forEach((sunday) => {
       if (!recordedDates.has(sunday)) {
@@ -381,120 +423,110 @@ const AttendanceSummaryCard: React.FC<{
   const formatDate = (dateStr: string) => dateStr.replace(/-/g, ".");
 
   return (
-    <InfoCard title="출석 요약 & 현황">
+    <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-2xl overflow-hidden">
+      <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center">
+        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+          <CheckCircleIcon className="h-5 w-5 text-indigo-500" />
+          출석 현황
+        </h3>
+      </div>
       <div className="p-4 sm:p-6 space-y-6">
-        <div className="bg-gray-50 p-3 sm:p-4 rounded-xl border border-gray-100 flex flex-col gap-4">
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="relative w-full sm:w-auto">
-                <div className="flex items-center bg-white px-3 py-2 rounded-md border border-gray-300 shadow-sm w-full sm:w-auto">
-                  <FaCalendarAlt className="text-indigo-500 mr-2 text-sm flex-shrink-0" />
-                  <select
-                    value={activeSemester?.id || ""}
-                    onChange={(e) => onSemesterChange(Number(e.target.value))}
-                    className="bg-transparent text-gray-700 font-semibold text-sm focus:outline-none cursor-pointer w-full sm:min-w-[140px]"
-                  >
-                    {semesters.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex bg-gray-200 p-1 rounded-lg w-full sm:w-auto">
-                <button
-                  onClick={() => onUnitTypeChange("month")}
-                  className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-medium rounded-md transition-all whitespace-nowrap ${
-                    unitType === "month"
-                      ? "bg-white text-indigo-700 shadow ring-1 ring-black/5"
-                      : "text-gray-500 hover:bg-gray-300"
-                  }`}
+        {/* Controls */}
+        <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="relative w-full sm:w-auto">
+              <div className="flex items-center bg-white px-3 py-2.5 rounded-lg border border-gray-200 shadow-sm w-full sm:w-auto hover:border-indigo-300 transition-colors">
+                <FaCalendarAlt className="text-indigo-500 mr-2 text-sm flex-shrink-0" />
+                <select
+                  value={activeSemester?.id || ""}
+                  onChange={(e) => onSemesterChange(Number(e.target.value))}
+                  className="bg-transparent text-gray-700 font-bold text-sm focus:outline-none cursor-pointer w-full sm:min-w-[140px]"
                 >
-                  월별 보기
-                </button>
-                <button
-                  onClick={() => onUnitTypeChange("semester")}
-                  className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-medium rounded-md transition-all whitespace-nowrap ${
-                    unitType === "semester"
-                      ? "bg-white text-indigo-700 shadow ring-1 ring-black/5"
-                      : "text-gray-500 hover:bg-gray-300"
-                  }`}
-                >
-                  학기 전체
-                </button>
+                  {semesters.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            {unitType === "month" && activeSemester && (
-              <div className="animate-fadeIn mt-1">
-                <span className="text-xs font-bold text-gray-500 block mb-2 px-1">
-                  {activeSemester.name} 상세 월 선택:
-                </span>
-                <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x">
-                  {semesterMonths.map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => onMonthSelect(m)}
-                      className={`flex-shrink-0 px-3 py-1.5 text-xs rounded-full border transition-all snap-start ${
-                        selectedMonth === m
-                          ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-300"
-                          : "bg-white text-gray-600 border-gray-200 hover:bg-gray-100"
-                      }`}
-                    >
-                      {m}월
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            <div className="flex bg-gray-200 p-1 rounded-lg w-full sm:w-auto">
+              {(["month", "semester"] as const).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => onUnitTypeChange(type)}
+                  className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-bold rounded-md transition-all whitespace-nowrap ${
+                    unitType === type
+                      ? "bg-white text-indigo-600 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  {type === "month" ? "월별" : "학기 전체"}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-1 sm:gap-2 text-xs text-gray-500 border-t border-gray-200 pt-3 mt-1">
-            <div className="flex items-center">
-              <FaClock className="mr-1.5 text-gray-400" />
-              <span className="font-medium whitespace-nowrap">조회 기간:</span>
+          {unitType === "month" && activeSemester && (
+            <div className="animate-fadeIn">
+              <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x">
+                {semesterMonths.map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => onMonthSelect(m)}
+                    className={`flex-shrink-0 px-4 py-2 text-xs font-bold rounded-full border transition-all snap-start ${
+                      selectedMonth === m
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-200"
+                        : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                    }`}
+                  >
+                    {m}월
+                  </button>
+                ))}
+              </div>
             </div>
-            <span className="font-mono bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700">
+          )}
+
+          <div className="flex justify-end items-center gap-2 text-xs text-gray-500 border-t border-gray-200 pt-3">
+            <FaClock className="text-gray-400" />
+            <span className="font-mono">
               {formatDate(startDate)} ~ {formatDate(endDate)}
             </span>
           </div>
         </div>
 
+        {/* Stats Grid */}
         {totalSummary ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-center border-t border-b py-4">
-            {isExecutive ? (
-              <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100 flex flex-col items-center justify-center">
-                <p className="text-sm font-medium text-indigo-600 whitespace-nowrap">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {isExecutive && (
+              <div className="p-5 bg-gradient-to-br from-indigo-50 to-white rounded-2xl border border-indigo-100 shadow-sm text-center">
+                <p className="text-xs font-bold text-indigo-600 uppercase tracking-wide">
                   출석률
                 </p>
-                <p className="mt-2 text-3xl font-bold text-indigo-700">
+                <p className="mt-1 text-4xl font-extrabold text-indigo-700">
                   {totalSummary.attendanceRate.toFixed(0)}
-                  <span className="text-lg ml-0.5">%</span>
+                  <span className="text-xl ml-1 text-indigo-400">%</span>
                 </p>
               </div>
-            ) : (
-              <></>
             )}
-
             <div
-              className={`p-4 rounded-xl border flex flex-col items-center justify-center ${
+              className={`p-5 rounded-2xl border shadow-sm text-center bg-gradient-to-br ${
                 uncheckedCount > 0
-                  ? "bg-red-50 border-red-100"
-                  : "bg-gray-50 border-gray-200"
+                  ? "from-red-50 to-white border-red-100"
+                  : "from-gray-50 to-white border-gray-200"
               } ${!isExecutive ? "sm:col-span-2" : ""}`}
             >
               <p
-                className={`text-sm font-medium whitespace-nowrap ${
+                className={`text-xs font-bold uppercase tracking-wide ${
                   uncheckedCount > 0 ? "text-red-600" : "text-gray-500"
                 }`}
               >
                 미체크
               </p>
               <p
-                className={`mt-2 text-3xl font-bold ${
-                  uncheckedCount > 0 ? "text-red-700" : "text-gray-600"
+                className={`mt-1 text-4xl font-extrabold ${
+                  uncheckedCount > 0 ? "text-red-600" : "text-gray-400"
                 }`}
               >
                 {uncheckedCount}
@@ -502,16 +534,16 @@ const AttendanceSummaryCard: React.FC<{
             </div>
           </div>
         ) : (
-          <p className="text-sm text-gray-500 py-4 text-center">
-            선택된 기간에 대한 데이터가 없습니다.
+          <p className="text-sm text-gray-400 text-center py-4 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+            데이터가 없습니다.
           </p>
         )}
 
+        {/* Matrix */}
         <div className="pt-2">
-          <h4 className="text-sm font-medium text-gray-700 mb-3 ml-1 break-keep">
-            {unitType === "semester"
-              ? `[${activeSemester?.name}] 전체 현황`
-              : `${selectedMonth}월 상세 현황 (학기 교집합)`}
+          <h4 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <div className="w-1 h-4 bg-indigo-500 rounded-full"></div>
+            상세 출석표
           </h4>
           <AttendanceMatrix
             mode={unitType === "month" ? "month" : "semester"}
@@ -519,7 +551,6 @@ const AttendanceSummaryCard: React.FC<{
             endDate={endDate}
             year={new Date(startDate).getFullYear()}
             month={new Date(startDate).getMonth() + 1}
-            // ✅ [핵심 수정] 날짜 정보를 포함하여 전달
             members={[
               {
                 memberId,
@@ -537,30 +568,29 @@ const AttendanceSummaryCard: React.FC<{
           />
         </div>
       </div>
-    </InfoCard>
+    </div>
   );
 };
-
-// ... (나머지 컴포넌트 및 메인 페이지는 기존과 동일)
 
 const AdminActionsCard: React.FC<{
   onResetPassword: () => void;
   isResetting: boolean;
 }> = ({ onResetPassword, isResetting }) => (
-  <InfoCard title="관리자 도구" className="border-l-4 border-red-500">
-    <div className="p-6">
-      <p className="text-sm text-gray-600 mb-4 break-keep">
-        주의: 아래 버튼은 사용자 계정에 직접적인 영향을 미칩니다.
-      </p>
-      <button
-        onClick={onResetPassword}
-        disabled={isResetting}
-        className="w-full bg-red-600 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-red-700 disabled:bg-red-300"
-      >
-        {isResetting ? "초기화 중..." : "비밀번호 강제 초기화"}
-      </button>
-    </div>
-  </InfoCard>
+  <div className="bg-red-50 border border-red-100 rounded-2xl p-6 shadow-sm">
+    <h3 className="text-lg font-bold text-red-800 mb-2 flex items-center gap-2">
+      <ShieldExclamationIcon className="h-5 w-5" /> 관리자 도구
+    </h3>
+    <p className="text-sm text-red-600 mb-4 break-keep">
+      사용자의 비밀번호를 강제로 초기화합니다.
+    </p>
+    <button
+      onClick={onResetPassword}
+      disabled={isResetting}
+      className="w-full bg-white border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm font-bold hover:bg-red-600 hover:text-white disabled:opacity-50 transition-all shadow-sm"
+    >
+      {isResetting ? "초기화 중..." : "비밀번호 강제 초기화"}
+    </button>
+  </div>
 );
 
 const TeamManagementModal: React.FC<{
@@ -588,29 +618,42 @@ const TeamManagementModal: React.FC<{
   const teamOptions = allTeams.map((t) => ({ value: t.id, label: t.name }));
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg">
-        <h2 className="text-xl font-bold mb-4 break-keep">
-          {memberName}님의 팀 관리
-        </h2>
-        <div className="mb-6 max-h-60 overflow-y-auto">
+    <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[80vh]">
+        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+          <h2 className="text-lg font-bold text-gray-900 break-keep">
+            팀 관리{" "}
+            <span className="text-gray-500 font-normal text-sm">
+              ({memberName})
+            </span>
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <XMarkIcon className="h-6 w-6" />
+          </button>
+        </div>
+
+        <div className="p-6 overflow-y-auto">
           <MultiSelect
             options={teamOptions}
             selectedValues={selectedTeamIds}
             onChange={setSelectedTeamIds}
           />
         </div>
-        <div className="flex justify-end space-x-4">
+
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 rounded-b-2xl">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300"
+            className="px-4 py-2 rounded-xl text-gray-700 bg-white border border-gray-300 font-medium hover:bg-gray-50"
             disabled={isSaving}
           >
             취소
           </button>
           <button
             onClick={handleSave}
-            className="px-4 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+            className="px-6 py-2 rounded-xl text-white bg-indigo-600 font-bold hover:bg-indigo-700 shadow-sm"
             disabled={isSaving}
           >
             {isSaving ? "저장 중..." : "저장"}
@@ -628,34 +671,37 @@ const TempPasswordModal: React.FC<{
 }> = ({ isOpen, onClose, password }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
-        <h2 className="text-xl font-bold mb-4 text-gray-800 break-keep">
+    <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+      <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-md text-center">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 mb-4">
+          <CheckCircleIcon className="h-6 w-6 text-green-600" />
+        </div>
+        <h2 className="text-xl font-bold mb-2 text-gray-900">
           임시 비밀번호 생성 완료
         </h2>
-        <p className="text-sm text-gray-600 mb-4 break-keep">
-          사용자에게 아래 임시 비밀번호를 전달하고, 로그인 후 즉시 비밀번호를
-          변경하도록 안내해주세요.
+        <p className="text-sm text-gray-600 mb-6 break-keep leading-relaxed">
+          사용자에게 아래 비밀번호를 전달해주세요.
+          <br />
+          로그인 후 즉시 변경하도록 안내가 필요합니다.
         </p>
-        <div className="p-3 bg-gray-100 rounded-md text-center">
-          <p className="text-lg font-mono font-bold text-indigo-600 break-all">
+        <div className="p-4 bg-gray-100 rounded-xl mb-6 border border-gray-200">
+          <p className="text-2xl font-mono font-bold text-indigo-600 tracking-wider break-all select-all">
             {password}
           </p>
         </div>
-        <div className="mt-6 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-          >
-            닫기
-          </button>
-        </div>
+        <button
+          onClick={onClose}
+          className="w-full px-4 py-3 rounded-xl text-white font-bold bg-indigo-600 hover:bg-indigo-700 shadow-md transition-all"
+        >
+          확인
+        </button>
       </div>
     </div>
   );
 };
 
 const MemberDetailPage: React.FC = () => {
+  // ... (기존 로직 유지)
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -939,115 +985,126 @@ const MemberDetailPage: React.FC = () => {
   if (loading && !member)
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
-        <p className="text-gray-600">로딩 중입니다...</p>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
       </div>
     );
-  if (error) return <div className="p-4 text-red-600 text-center">{error}</div>;
+  if (error)
+    return <div className="p-10 text-center text-red-500">{error}</div>;
   if (!member)
     return (
-      <div className="p-4 text-red-600 text-center">
+      <div className="p-10 text-center text-gray-500">
         멤버 정보를 찾을 수 없습니다.
       </div>
     );
+
   const isExecutive = user?.role === "EXECUTIVE";
 
   return (
-    <div className="container mx-auto px-4 py-8 pb-10">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 break-keep">
-          {member.name} 상세 정보
-        </h1>
-        <div className="flex gap-2 w-full sm:w-auto">
-          {isExecutive && (
+    <div className="bg-gray-50 min-h-screen pb-20">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+              {member.name}{" "}
+              <span className="text-lg font-normal text-gray-400">
+                상세 정보
+              </span>
+            </h1>
+          </div>
+          <div className="flex gap-2 w-full sm:w-auto">
+            {isExecutive && (
+              <button
+                onClick={() => navigate(`/admin/users/${id}/edit`)}
+                className="flex-1 sm:flex-none bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-50 transition-colors shadow-sm"
+              >
+                수정
+              </button>
+            )}
             <button
-              onClick={() => navigate(`/admin/users/${id}/edit`)}
-              className="flex-1 sm:flex-none bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 text-center whitespace-nowrap"
+              onClick={() => navigate(-1)}
+              className="flex-1 sm:flex-none bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"
             >
-              수정
+              뒤로 가기
             </button>
-          )}
-          <button
-            onClick={() => navigate(-1)}
-            className="flex-1 sm:flex-none bg-gray-200 text-gray-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-300 text-center whitespace-nowrap"
-          >
-            뒤로 가기
-          </button>
-        </div>
-      </div>
-
-      {resetPasswordError && (
-        <div className="mb-4 p-3 text-sm font-medium text-red-700 bg-red-100 border border-red-400 rounded-md">
-          {resetPasswordError}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <BasicInfoCard
-            member={member}
-            isCurrentUser={user?.memberId === member.id && isExecutive}
-            onEditProfile={() => navigate("/my-profile")}
-          />
-          <AttendanceSummaryCard
-            summary={attendanceSummary}
-            memberId={member.id}
-            memberName={member.name}
-            cellAssignmentDate={member.cellAssignmentDate}
-            memberJoinDate={member.createdAt}
-            memberJoinYear={member.joinYear}
-            attendances={attendanceList}
-            semesters={semesters}
-            activeSemester={activeSemester}
-            onSemesterChange={handleSemesterChange}
-            unitType={unitType}
-            onUnitTypeChange={handleUnitTypeChange}
-            selectedMonth={selectedMonth}
-            onMonthSelect={setSelectedMonth}
-            onMatrixMonthChange={handleMatrixMonthChange}
-            startDate={periodRange.startDate}
-            endDate={periodRange.endDate}
-            userRole={user?.role}
-          />
+          </div>
         </div>
 
-        <div className="space-y-6">
-          <ChurchInfoCard member={member} />
-          <TeamsCard
-            memberTeams={memberTeams}
-            onManageClick={() => setIsTeamModalOpen(true)}
-            canManage={isExecutive}
-          />
-          {isExecutive && (
-            <AdminActionsCard
-              onResetPassword={() => setShowConfirmResetModal(true)}
-              isResetting={isResettingPassword}
+        {resetPasswordError && (
+          <div className="mb-6 p-4 text-sm font-bold text-red-700 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2">
+            <ShieldExclamationIcon className="h-5 w-5" />
+            {resetPasswordError}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <BasicInfoCard
+              member={member}
+              isCurrentUser={user?.memberId === member.id && !!isExecutive}
+              onEditProfile={() => navigate("/my-profile")}
             />
-          )}
-          <PrayersCard prayers={prayers} />
-        </div>
-      </div>
+            <AttendanceSummaryCard
+              summary={attendanceSummary}
+              memberId={member.id}
+              memberName={member.name}
+              cellAssignmentDate={member.cellAssignmentDate}
+              memberJoinDate={member.createdAt}
+              memberJoinYear={member.joinYear}
+              attendances={attendanceList}
+              semesters={semesters}
+              activeSemester={activeSemester}
+              onSemesterChange={handleSemesterChange}
+              unitType={unitType}
+              onUnitTypeChange={handleUnitTypeChange}
+              selectedMonth={selectedMonth}
+              onMonthSelect={setSelectedMonth}
+              onMatrixMonthChange={handleMatrixMonthChange}
+              startDate={periodRange.startDate}
+              endDate={periodRange.endDate}
+              userRole={user?.role}
+            />
+          </div>
 
-      <TeamManagementModal
-        key={isTeamModalOpen ? "modal-open" : "modal-closed"}
-        isOpen={isTeamModalOpen}
-        onClose={() => setIsTeamModalOpen(false)}
-        onSave={handleTeamSave}
-        memberName={member.name}
-        allTeams={allTeams}
-        memberTeams={memberTeams}
-      />
-      <ConfirmModal
-        isOpen={showConfirmResetModal}
-        onClose={() => setShowConfirmResetModal(false)}
-        onConfirm={handleResetPassword}
-        title="비밀번호 초기화 확인"
-        message={`정말로 ${member.name}님의 비밀번호를 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
-      />
-      <TempPasswordModal
-        isOpen={showTempPasswordModal}
-        onClose={() => setShowTempPasswordModal(false)}
-        password={temporaryPassword}
-      />
+          <div className="space-y-6">
+            <ChurchInfoCard member={member} />
+            <TeamsCard
+              memberTeams={memberTeams}
+              onManageClick={() => setIsTeamModalOpen(true)}
+              canManage={!!isExecutive}
+            />
+            <PrayersCard prayers={prayers} />
+            {isExecutive && (
+              <AdminActionsCard
+                onResetPassword={() => setShowConfirmResetModal(true)}
+                isResetting={isResettingPassword}
+              />
+            )}
+          </div>
+        </div>
+
+        <TeamManagementModal
+          key={isTeamModalOpen ? "modal-open" : "modal-closed"}
+          isOpen={isTeamModalOpen}
+          onClose={() => setIsTeamModalOpen(false)}
+          onSave={handleTeamSave}
+          memberName={member.name}
+          allTeams={allTeams}
+          memberTeams={memberTeams}
+        />
+        <ConfirmModal
+          isOpen={showConfirmResetModal}
+          onClose={() => setShowConfirmResetModal(false)}
+          onConfirm={handleResetPassword}
+          title="비밀번호 초기화 확인"
+          message={`정말로 ${member.name}님의 비밀번호를 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
+        />
+        <TempPasswordModal
+          isOpen={showTempPasswordModal}
+          onClose={() => setShowTempPasswordModal(false)}
+          password={temporaryPassword}
+        />
+      </div>
     </div>
   );
 };

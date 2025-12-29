@@ -94,13 +94,13 @@ const AttendanceMatrixView: React.FC<{
   allMembers,
   userRole,
 }) => {
-  // ✅ [수정] 미체크 계산 로직 (셀 배정일 고려)
+  // ✅ [복구] 미체크 계산 로직 (누락된 주차 확인용)
   const uncheckedCount = useMemo(() => {
     if (!startDate || !endDate || members.length === 0) return 0;
 
+    // 1. 조회 기간 설정
     const startStr = safeFormatDate(startDate, "-");
     const endStr = safeFormatDate(endDate, "-");
-
     const start = new Date(startStr);
     const end = new Date(endStr);
     start.setHours(0, 0, 0, 0);
@@ -108,7 +108,7 @@ const AttendanceMatrixView: React.FC<{
 
     if (start > end) return 0;
 
-    // 1. 기간 내 일요일(Sunday) 목록 수집
+    // 2. 기간 내 모든 일요일(Target Sundays) 수집
     const targetSundays: string[] = [];
     const cur = new Date(start);
     while (cur <= end) {
@@ -118,44 +118,42 @@ const AttendanceMatrixView: React.FC<{
       cur.setDate(cur.getDate() + 1);
     }
 
-    if (targetSundays.length === 0) return 0;
-
-    // 2. 출석 기록 Set 생성 (MemberId-YYYY-MM-DD)
+    // 3. 출석 기록을 Set으로 변환하여 검색 속도 향상
     const attendanceSet = new Set<string>();
     for (const a of attendances) {
       const mId = getAttendanceMemberId(a);
       const dateKey = safeFormatDate(a.date, "-");
 
       if (mId === null || !dateKey) continue;
-      // 출석(PRESENT) 혹은 결석(ABSENT) 상태인 경우에만 '체크됨'으로 간주
-      if (a.status === "PRESENT" || a.status === "ABSENT") {
-        attendanceSet.add(`${mId}-${dateKey}`);
-      }
+      if (!["PRESENT", "ABSENT"].includes(a.status)) continue;
+
+      attendanceSet.add(`${mId}-${dateKey}`);
     }
 
     let incompleteWeeks = 0;
 
-    // 3. 각 일요일별로 검사
+    // 4. 각 일요일별로 검사
     for (const sundayStr of targetSundays) {
       const sundayDate = new Date(sundayStr);
       sundayDate.setHours(0, 0, 0, 0);
 
-      // ✅ [핵심 변경] 해당 주일(Sunday) 시점에 '활동 중이어야 하는' 멤버만 필터링
-      const activeMembersForWeek = members.filter((m: any) => {
-        // 셀 배정일이 있으면 그 날짜, 없으면 가입 연도 1월 1일 기준
-        const rawDate = m.cellAssignmentDate || `${m.joinYear}-01-01`;
-        const assignmentDate = new Date(rawDate);
-        assignmentDate.setHours(0, 0, 0, 0);
+      // ✅ [핵심 수정] 해당 주일(일요일) 날짜 기준으로, 셀에 이미 배정된 멤버만 필터링
+      const activeMembers = members.filter((m) => {
+        // 배정일이 없으면(기존 멤버 or 데이터 누락) 체크 대상에 포함
+        if (!m.cellAssignmentDate) return true;
+
+        const assignDate = new Date(m.cellAssignmentDate);
+        assignDate.setHours(0, 0, 0, 0);
 
         // 배정일 <= 해당 주일 이면 체크 대상
-        return assignmentDate <= sundayDate;
+        return assignDate <= sundayDate;
       });
 
-      // 해당 주에 체크해야 할 인원이 아무도 없다면(모두 배정 전이라면) 누락 아님
-      if (activeMembersForWeek.length === 0) continue;
+      // 해당 주차에 체크해야 할 멤버가 한 명도 없다면(ex: 모두 아직 배정 전) 패스
+      if (activeMembers.length === 0) continue;
 
-      // 필터링된 멤버 중 한 명이라도 기록이 없으면 누락 주차로 카운트
-      const isWeekIncomplete = activeMembersForWeek.some((m) => {
+      // 체크 대상 멤버 중 기록이 없는 사람이 있는지 확인
+      const isWeekIncomplete = activeMembers.some((m) => {
         const key = `${m.id}-${sundayStr}`;
         return !attendanceSet.has(key);
       });
@@ -183,7 +181,7 @@ const AttendanceMatrixView: React.FC<{
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* 통계 카드 */}
+      {/* ✅ [수정] 통계 카드: 출석/결석 제거하고 '누락(주)'만 단독 표시 */}
       {uncheckedCount > 0 ? (
         <div className="p-3 sm:p-4 bg-red-50 rounded-xl border border-red-200 flex items-center justify-between">
           <div>

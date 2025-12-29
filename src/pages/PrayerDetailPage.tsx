@@ -1,4 +1,3 @@
-// src/pages/PrayerDetailPage.tsx
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { prayerService } from "../services/prayerService";
@@ -7,6 +6,7 @@ import { formatDisplayName } from "../utils/memberUtils";
 import type { PrayerDto } from "../types";
 import { useAuth } from "../hooks/useAuth";
 import { checkUserRole } from "../utils/roleUtils";
+import { UserCircleIcon, CalendarDaysIcon } from "@heroicons/react/24/solid"; // 아이콘 추가
 import ReactMarkdown from "react-markdown";
 
 const PrayerDetailPage: React.FC = () => {
@@ -17,8 +17,6 @@ const PrayerDetailPage: React.FC = () => {
   const [prayer, setPrayer] = useState<PrayerDto | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-
-  // 동명이인 판별용 Map (id -> formattedName)
   const [memberMap, setMemberMap] = useState<Map<number, string>>(new Map());
 
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] =
@@ -190,95 +188,91 @@ const PrayerDetailPage: React.FC = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen pb-10">
-      <div className="container mx-auto px-4 py-6 sm:py-8 max-w-4xl">
+      <div className="container mx-auto px-4 py-6 sm:px-6 sm:py-10 max-w-4xl">
         {/* 상세 카드 */}
-        <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-xl overflow-hidden">
-          {/* ✅ 모바일 패딩 px-4로 최적화 (데스크탑은 px-8 유지) */}
-          <div className="px-4 py-6 sm:px-8 sm:py-8">
+        <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-2xl overflow-hidden">
+          <div className="px-5 py-6 sm:px-10 sm:py-10">
             {/* Header Section */}
-            <div className="border-b border-gray-100 pb-5 mb-6">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-                {/* Title */}
-                <h1 className="flex-1 text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 leading-snug break-words break-keep">
-                  <span className="text-gray-900">
-                    {getFormattedName(prayer.member?.id, prayer.member?.name)}
-                  </span>
-                  <span className="text-gray-800">님의 기도제목</span>
-                </h1>
+            <div className="border-b border-gray-100 pb-6 mb-6">
+              {/* Title: break-keep 적용 */}
+              <h1 className="text-xl sm:text-3xl font-bold text-gray-900 leading-snug break-keep mb-4">
+                <span className="text-indigo-600">
+                  {getFormattedName(prayer.member?.id, prayer.member?.name)}
+                </span>
+                <span className="text-gray-900">님의 기도제목</span>
+              </h1>
+
+              {/* Meta & Buttons Wrapper */}
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                {/* Metadata with Icons */}
+                <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs sm:text-sm text-gray-500">
+                  <div className="flex items-center gap-1.5">
+                    <UserCircleIcon className="h-4 w-4 text-gray-400" />
+                    <span className="font-medium text-gray-700">작성자:</span>
+                    <span>
+                      {getFormattedName(
+                        prayer.createdBy?.id,
+                        prayer.createdBy?.name
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="hidden sm:block w-px h-3 bg-gray-300"></div>
+
+                  <div className="flex items-center gap-1.5">
+                    <CalendarDaysIcon className="h-4 w-4 text-gray-400" />
+                    <span>{createdLabel}</span>
+                  </div>
+
+                  {hasEdited && (
+                    <>
+                      <div className="hidden sm:block w-px h-3 bg-gray-300"></div>
+                      <div className="flex items-center gap-1.5 text-gray-400">
+                        <span>(수정됨: {updatedLabel})</span>
+                      </div>
+                    </>
+                  )}
+                </div>
 
                 {/* Buttons */}
                 {canModify && (
-                  <div className="flex gap-2 self-end sm:self-auto flex-shrink-0">
+                  <div className="flex gap-2 shrink-0">
                     <button
                       onClick={handleEdit}
-                      className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 text-xs sm:text-sm font-medium transition-colors"
+                      className="bg-white border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 hover:border-gray-300 text-xs sm:text-sm font-medium transition-colors"
                     >
                       수정
                     </button>
                     <button
                       onClick={handleDeleteClick}
-                      className="bg-red-50 text-red-600 px-3 py-1.5 rounded-md hover:bg-red-100 text-xs sm:text-sm font-medium transition-colors"
+                      className="bg-red-50 border border-transparent text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-100 text-xs sm:text-sm font-medium transition-colors"
                     >
                       삭제
                     </button>
                   </div>
                 )}
               </div>
-
-              {/* Metadata */}
-              {/* ✅ flex-wrap으로 모바일에서 자연스럽게 줄바꿈되도록 수정 */}
-              <div className="mt-4 flex flex-wrap items-center gap-y-1 gap-x-3 text-xs sm:text-sm text-gray-500">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-medium text-gray-700">작성자</span>
-                  <span>
-                    {getFormattedName(
-                      prayer.createdBy?.id,
-                      prayer.createdBy?.name
-                    )}
-                  </span>
-                </div>
-
-                <span className="text-gray-300">|</span>
-
-                <div className="flex items-center gap-1.5">
-                  <span className="font-medium text-gray-700">작성일</span>
-                  <span>{createdLabel}</span>
-                </div>
-
-                {hasEdited && (
-                  <>
-                    <span className="text-gray-300">|</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-medium text-gray-700">수정일</span>
-                      <span>{updatedLabel}</span>
-                    </div>
-                  </>
-                )}
-              </div>
             </div>
 
             {/* Content Section */}
-            <div className="prose prose-sm sm:prose max-w-none text-gray-800 break-words leading-relaxed">
+            <div className="prose prose-sm sm:prose max-w-none text-gray-800 break-words leading-relaxed overflow-hidden">
               <ReactMarkdown
                 components={{
-                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
                   img: ({ node, ...props }) => (
                     <img
                       {...props}
-                      className="rounded-lg max-w-full h-auto shadow-sm my-4"
+                      className="rounded-xl w-full h-auto shadow-sm my-4"
                       alt={props.alt || "content-image"}
                     />
                   ),
-                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
                   a: ({ node, ...props }) => (
                     <a
                       {...props}
-                      className="text-indigo-600 hover:text-indigo-800 underline break-all"
+                      className="text-indigo-600 hover:text-indigo-800 underline break-all font-medium"
                       target="_blank"
                       rel="noopener noreferrer"
                     />
                   ),
-                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
                   p: ({ node, ...props }) => (
                     <p {...props} className="mb-4 whitespace-pre-line" />
                   ),
@@ -290,49 +284,46 @@ const PrayerDetailPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 하단 돌아가기 버튼 (원래대로 유지) */}
-        <div className="mt-6 text-center">
+        {/* Bottom Button */}
+        <div className="mt-6 text-center sm:text-left">
           <button
             onClick={() => navigate(-1)}
-            className="bg-white text-gray-700 px-5 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium shadow-sm transition-all"
+            className="w-full sm:w-auto bg-white text-gray-700 px-6 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 text-sm font-bold shadow-sm transition-all"
           >
             목록으로 돌아가기
           </button>
         </div>
       </div>
 
-      {/* 삭제 확인 모달 */}
+      {/* Delete Confirmation Modal */}
       {showDeleteConfirmModal && (
-        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-          <div className="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full transform transition-all">
+        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-sm transform transition-all">
             <h2 className="text-lg font-bold mb-3 text-gray-900">
               기도제목 삭제
             </h2>
-            <p className="text-sm text-gray-600 mb-5 leading-relaxed break-keep">
+            <p className="text-sm text-gray-600 mb-6 leading-relaxed break-keep">
               정말로 이 기도제목을 삭제하시겠습니까?
-              <br />
-              <span className="text-xs text-red-500 mt-1 block">
-                * 삭제 후에는 복구할 수 없습니다.
-              </span>
+              <br className="hidden sm:block" /> 복구할 수 없는 작업입니다.
             </p>
 
             {deleteError && (
-              <div className="p-3 text-xs font-medium text-red-700 bg-red-50 rounded-lg mb-4">
+              <div className="p-3 text-xs font-medium text-red-700 bg-red-50 rounded-lg mb-4 break-keep">
                 {deleteError}
               </div>
             )}
 
-            <div className="flex justify-end gap-2">
+            <div className="flex gap-3">
               <button
                 onClick={handleCloseDeleteConfirmModal}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
                 disabled={deleting}
               >
                 취소
               </button>
               <button
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 shadow-md transition-colors"
                 disabled={deleting}
               >
                 {deleting ? "삭제 중..." : "삭제하기"}

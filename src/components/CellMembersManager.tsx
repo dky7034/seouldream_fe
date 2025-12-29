@@ -5,6 +5,12 @@ import { memberService } from "../services/memberService";
 import type { MemberDto, User } from "../types";
 import { translateRole } from "../utils/roleUtils";
 import { formatDisplayName } from "../utils/memberUtils";
+import {
+  UserCircleIcon,
+  CakeIcon,
+  CalendarDaysIcon,
+  ClockIcon,
+} from "@heroicons/react/24/solid";
 
 type SortConfig = {
   key: keyof MemberDto;
@@ -71,17 +77,13 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
 
   const sortedMembers = useMemo(() => {
     if (!sortConfig.key) return members;
-
     const sorted = [...members].sort((a, b) => {
       const aVal = a[sortConfig.key];
       const bVal = b[sortConfig.key];
-
       if (aVal == null && bVal == null) return 0;
       if (aVal == null) return 1;
       if (bVal == null) return -1;
-
       let compare = 0;
-
       if (typeof aVal === "string" && typeof bVal === "string") {
         compare = aVal.localeCompare(bVal);
       } else if (typeof aVal === "number" && typeof bVal === "number") {
@@ -89,10 +91,8 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
       } else {
         compare = String(aVal).localeCompare(String(bVal));
       }
-
       return sortConfig.direction === "ascending" ? compare : -compare;
     });
-
     return sorted;
   }, [members, sortConfig]);
 
@@ -106,12 +106,9 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
 
   const renderSortIndicator = (key: keyof MemberDto) => {
     const isActive = sortConfig.key === key;
-    const baseClass = "ml-1 text-xs";
-
-    if (!isActive) {
+    const baseClass = "ml-1 text-xs inline-block align-middle";
+    if (!isActive)
       return <span className={`${baseClass} text-gray-300`}>↕</span>;
-    }
-
     return (
       <span className={`${baseClass} text-indigo-500`}>
         {sortConfig.direction === "ascending" ? "▲" : "▼"}
@@ -122,35 +119,43 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
   return (
     <div className="space-y-6">
       {/* 헤더 영역 */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <div className="bg-white px-5 py-4 border-b border-gray-100 sm:rounded-t-2xl sm:border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-800">셀원 목록</h2>
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <UserCircleIcon className="h-6 w-6 text-indigo-500" />
+            셀원 목록
+            <span className="bg-indigo-100 text-indigo-700 text-xs py-0.5 px-2.5 rounded-full font-bold">
+              {members.length}
+            </span>
+          </h2>
           <p className="mt-1 text-sm text-gray-500">
-            현재 셀에 속한 멤버 정보를 확인할 수 있습니다.
+            현재 셀에 배정된 모든 멤버 정보를 관리합니다.
           </p>
         </div>
       </div>
 
       {error && (
-        <p className="text-center mt-4 text-sm text-red-600">{error}</p>
+        <div className="p-4 bg-red-50 text-red-600 text-sm rounded-xl text-center border border-red-100">
+          {error}
+        </div>
       )}
 
       {loading && !error && (
-        <p className="text-center mt-4 text-sm text-gray-500">로딩 중...</p>
+        <div className="flex justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        </div>
       )}
 
       {!loading && !error && (
         <>
           {/* ✅ 모바일: 카드형 리스트 */}
-          <div className="sm:hidden space-y-3">
+          <div className="sm:hidden space-y-3 px-1">
             {sortedMembers.map((member) => {
               const isMe = user.memberId === member.id;
               const found = allMembers.find((am) => am.id === member.id);
               const displayName = found
                 ? formatDisplayName(found, allMembers)
                 : member.name;
-
-              // ✅ [수정] 백엔드 만 나이 사용
               const displayBirthDate = safeFormatDate(member.birthDate);
               const ageDisplay =
                 member.age !== undefined && member.age !== null
@@ -161,46 +166,72 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                 <div
                   key={member.id}
                   onClick={() => navigate(`/admin/users/${member.id}`)}
-                  className={`w-full text-left bg-white rounded-lg shadow-sm px-4 py-3 border ${
-                    !member.active ? "opacity-70 bg-gray-50" : ""
+                  className={`relative w-full text-left bg-white rounded-2xl shadow-sm p-4 border border-gray-100 active:scale-[0.98] transition-all ${
+                    !member.active ? "opacity-75 bg-gray-50" : ""
                   }`}
                 >
                   {/* 상단: 이름 + 역할 뱃지 */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="font-semibold text-gray-900 text-sm">
-                      {displayName}
-                      {isMe && (
-                        <span className="ml-2 text-[11px] text-indigo-600 font-medium">
-                          나
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`h-10 w-10 rounded-full flex items-center justify-center text-lg font-bold ${
+                          isMe
+                            ? "bg-indigo-100 text-indigo-600"
+                            : "bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        {displayName.charAt(0)}
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-900 text-base flex items-center gap-1.5">
+                          {displayName}
+                          {isMe && (
+                            <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">
+                              나
+                            </span>
+                          )}
+                        </div>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                            member.role === "EXECUTIVE"
+                              ? "bg-red-50 text-red-700"
+                              : member.role === "CELL_LEADER"
+                              ? "bg-yellow-50 text-yellow-700"
+                              : "bg-green-50 text-green-700"
+                          }`}
+                        >
+                          {translateRole(member.role)}
                         </span>
-                      )}
+                      </div>
                     </div>
-                    <span
-                      className={`px-2 inline-flex text-[11px] leading-5 font-semibold rounded-full ${
-                        member.role === "EXECUTIVE"
-                          ? "bg-red-100 text-red-800"
-                          : member.role === "CELL_LEADER"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-green-100 text-green-800"
-                      }`}
-                    >
-                      {translateRole(member.role)}
-                    </span>
+                    {/* 상태 뱃지 */}
+                    {!member.active && (
+                      <span className="px-2 py-1 rounded-md bg-gray-200 text-gray-500 text-[10px] font-bold">
+                        비활동
+                      </span>
+                    )}
                   </div>
 
-                  {/* 중간: 생년월일 / 나이 / 등록연도 */}
-                  <div className="mt-2 text-xs text-gray-600 space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">생년월일</span>
+                  {/* 하단: 정보 그리드 */}
+                  <div className="grid grid-cols-2 gap-y-2 text-xs text-gray-500 border-t border-gray-50 pt-3">
+                    <div className="flex items-center gap-1.5">
+                      <CakeIcon className="h-3.5 w-3.5 text-gray-400" />
                       <span>
-                        {displayBirthDate
-                          ? `${displayBirthDate} ${ageDisplay}`
-                          : "-"}
+                        {displayBirthDate || "-"} {ageDisplay}
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">등록연도</span>
-                      <span>{member.joinYear ?? "-"}</span>
+                    <div className="flex items-center gap-1.5">
+                      <CalendarDaysIcon className="h-3.5 w-3.5 text-gray-400" />
+                      <span>
+                        {member.joinYear ? `${member.joinYear}년 등록` : "-"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 col-span-2">
+                      <ClockIcon className="h-3.5 w-3.5 text-gray-400" />
+                      <span>
+                        배정일:{" "}
+                        {safeFormatDate(member.cellAssignmentDate) || "미배정"}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -208,53 +239,34 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
             })}
 
             {sortedMembers.length === 0 && (
-              <div className="px-4 py-6 text-center text-sm text-gray-500 bg-white rounded-lg shadow-sm">
+              <div className="py-12 text-center text-sm text-gray-400 bg-white rounded-2xl border border-dashed border-gray-200">
                 셀에 등록된 멤버가 없습니다.
               </div>
             )}
           </div>
 
           {/* ✅ 데스크톱: 테이블 뷰 */}
-          <div className="hidden sm:block bg-white shadow-md rounded-lg overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
-              <thead className="bg-gray-50">
+          <div className="hidden sm:block bg-white shadow-sm rounded-b-2xl border-x border-b border-gray-200 overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead className="bg-gray-50/50">
                 <tr>
-                  <th
-                    onClick={() => requestSort("name")}
-                    className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  >
-                    이름
-                    {renderSortIndicator("name")}
-                  </th>
-                  <th
-                    onClick={() => requestSort("role")}
-                    className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  >
-                    역할
-                    {renderSortIndicator("role")}
-                  </th>
-                  <th
-                    onClick={() => requestSort("birthDate")}
-                    className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  >
-                    생년월일
-                    {renderSortIndicator("birthDate")}
-                  </th>
-                  <th
-                    onClick={() => requestSort("joinYear")}
-                    className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  >
-                    등록연도
-                    {renderSortIndicator("joinYear")}
-                  </th>
-                  <th
-                    onClick={() => requestSort("cellAssignmentDate")}
-                    className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  >
-                    셀 배정일
-                    {renderSortIndicator("cellAssignmentDate")}
-                  </th>
-                  <th className="relative px-4 sm:px-6 py-3">
+                  {[
+                    { key: "name", label: "이름" },
+                    { key: "role", label: "역할" },
+                    { key: "birthDate", label: "생년월일" },
+                    { key: "joinYear", label: "등록연도" },
+                    { key: "cellAssignmentDate", label: "셀 배정일" },
+                  ].map((col) => (
+                    <th
+                      key={col.key}
+                      onClick={() => requestSort(col.key as keyof MemberDto)}
+                      className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      {col.label}{" "}
+                      {renderSortIndicator(col.key as keyof MemberDto)}
+                    </th>
+                  ))}
+                  <th className="relative px-6 py-3">
                     <span className="sr-only">Actions</span>
                   </th>
                 </tr>
@@ -265,8 +277,6 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                   const displayName = found
                     ? formatDisplayName(found, allMembers)
                     : member.name;
-
-                  // ✅ [수정] 백엔드 만 나이 사용
                   const displayBirthDate = safeFormatDate(member.birthDate);
                   const displayAssignedDate = safeFormatDate(
                     member.cellAssignmentDate
@@ -279,25 +289,26 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                   return (
                     <tr
                       key={member.id}
-                      className={
-                        !member.active ? "bg-gray-100 text-gray-500" : ""
-                      }
+                      className={`hover:bg-gray-50 transition-colors cursor-pointer group ${
+                        !member.active ? "bg-gray-50 text-gray-400" : ""
+                      }`}
+                      onClick={() => navigate(`/admin/users/${member.id}`)}
                     >
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => navigate(`/admin/users/${member.id}`)}
-                          className={`font-semibold ${
-                            !member.active
-                              ? "text-gray-500 cursor-default"
-                              : "text-indigo-600 hover:text-indigo-900"
-                          }`}
-                        >
-                          {displayName}
-                        </button>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                            {displayName}
+                          </div>
+                          {user.memberId === member.id && (
+                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600 border border-indigo-100">
+                              나
+                            </span>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span
-                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-bold rounded-full ${
                             member.role === "EXECUTIVE"
                               ? "bg-red-100 text-red-800"
                               : member.role === "CELL_LEADER"
@@ -308,17 +319,22 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                           {translateRole(member.role)}
                         </span>
                       </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
-                        {displayBirthDate} {ageDisplay}
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">
+                        {displayBirthDate}{" "}
+                        <span className="text-xs text-gray-400">
+                          {ageDisplay}
+                        </span>
                       </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">
                         {member.joinYear}
                       </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
-                        {displayAssignedDate || "미배정"}
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">
+                        {displayAssignedDate || "-"}
                       </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        {/* 수정 버튼 로직 제거됨 */}
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <span className="text-indigo-600 hover:text-indigo-900 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                          상세보기 &rarr;
+                        </span>
                       </td>
                     </tr>
                   );
@@ -327,7 +343,7 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                   <tr>
                     <td
                       colSpan={6}
-                      className="px-6 py-4 text-center text-sm text-gray-500"
+                      className="px-6 py-12 text-center text-sm text-gray-400"
                     >
                       셀에 등록된 멤버가 없습니다.
                     </td>

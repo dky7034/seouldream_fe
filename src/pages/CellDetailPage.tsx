@@ -1,4 +1,3 @@
-// src/pages/CellDetailPage.tsx
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { cellService } from "../services/cellService";
@@ -19,6 +18,16 @@ import {
   FaChevronUp,
   FaQuoteLeft,
 } from "react-icons/fa";
+import {
+  UserCircleIcon,
+  UserPlusIcon,
+  InformationCircleIcon,
+  DocumentArrowDownIcon,
+  UsersIcon,
+  CheckCircleIcon,
+  XMarkIcon,
+  MegaphoneIcon,
+} from "@heroicons/react/24/solid";
 
 // ───────────────── [컴포넌트] AddMemberToCellModal ─────────────────
 const AddMemberToCellModal: React.FC<{
@@ -48,8 +57,6 @@ const AddMemberToCellModal: React.FC<{
           unassigned: true,
           size: 1000,
         });
-
-        // ✅ 임원 제외 필터링
         const filteredContent = page.content.filter(
           (m) => m.role !== "EXECUTIVE"
         );
@@ -101,79 +108,49 @@ const AddMemberToCellModal: React.FC<{
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
-        <h2 className="text-xl font-bold mb-2 break-keep">셀에 멤버 추가</h2>
-        <p className="text-xs sm:text-sm text-gray-600 mb-4 break-keep">
-          현재 어떤 셀에도 속하지 않은 멤버만 목록에 표시됩니다.
-        </p>
+    <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <UserPlusIcon className="h-5 w-5 text-indigo-600" /> 셀 멤버 추가
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <XMarkIcon className="h-6 w-6" />
+          </button>
+        </div>
 
-        <div className="flex-1 overflow-y-auto mb-4 px-1">
+        {/* Search & Selected Pills */}
+        <div className="p-4 border-b border-gray-100 bg-white">
+          <p className="text-xs text-gray-500 mb-2 break-keep">
+            * 현재 소속이 없는 멤버만 검색됩니다.
+          </p>
           <input
             type="text"
             placeholder="이름으로 검색..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 mb-2"
+            className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3 transition-all"
           />
-          <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-md">
-            {isLoadingMembers ? (
-              <p className="p-3 text-xs sm:text-sm text-gray-500">
-                미소속 멤버를 불러오는 중입니다...
-              </p>
-            ) : filteredMembers.length === 0 ? (
-              <p className="p-3 text-xs sm:text-sm text-gray-500">
-                {candidateMembers.length === 0
-                  ? "현재 셀에 소속되지 않은 멤버가 없습니다."
-                  : "검색 결과가 없습니다."}
-              </p>
-            ) : (
-              <ul>
-                {filteredMembers.map((member) => (
-                  <li
-                    key={member.id}
-                    className={`flex items-center text-xs sm:text-sm hover:bg-indigo-50 ${
-                      selectedMemberIds.includes(member.id)
-                        ? "bg-indigo-100"
-                        : ""
-                    }`}
-                  >
-                    <label
-                      htmlFor={`add-member-checkbox-${member.id}`}
-                      className="flex items-center w-full px-3 py-2 cursor-pointer"
-                    >
-                      <input
-                        id={`add-member-checkbox-${member.id}`}
-                        type="checkbox"
-                        checked={selectedMemberIds.includes(member.id)}
-                        onChange={() => handleToggleMember(member.id)}
-                        className="mr-2 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                      />
-                      {formatNameWithBirthdate(member)}
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <p className="mt-2 text-xs text-gray-600">
-            선택된 멤버:{" "}
-            <span className="font-semibold">{selectedMemberIds.length}명</span>
-          </p>
+
+          {/* 선택된 멤버 뱃지 (가로 스크롤) */}
           {selectedMembers.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="flex overflow-x-auto gap-2 pb-1 no-scrollbar">
               {selectedMembers.map((m) => (
                 <span
                   key={m.id}
-                  className="inline-flex items-center px-2.5 py-1 rounded-full text-xs bg-indigo-50 text-indigo-700 border border-indigo-100"
+                  className="flex-shrink-0 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100"
                 >
                   {formatNameWithBirthdate(m)}
                   <button
                     type="button"
                     onClick={() => handleRemoveMember(m.id)}
-                    className="ml-1 text-indigo-400 hover:text-indigo-700"
+                    className="ml-1 text-indigo-400 hover:text-indigo-700 rounded-full hover:bg-indigo-200 p-0.5"
                   >
-                    ✕
+                    <XMarkIcon className="h-3 w-3" />
                   </button>
                 </span>
               ))}
@@ -181,20 +158,68 @@ const AddMemberToCellModal: React.FC<{
           )}
         </div>
 
-        <div className="flex justify-end space-x-3 mt-auto pt-2 border-t">
+        {/* List Area */}
+        <div className="flex-1 overflow-y-auto p-2">
+          {isLoadingMembers ? (
+            <div className="flex justify-center items-center h-32">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+            </div>
+          ) : filteredMembers.length === 0 ? (
+            <p className="p-8 text-center text-sm text-gray-500">
+              {candidateMembers.length === 0
+                ? "현재 추가 가능한(미소속) 멤버가 없습니다."
+                : "검색 결과가 없습니다."}
+            </p>
+          ) : (
+            <ul className="space-y-1">
+              {filteredMembers.map((member) => (
+                <li key={member.id}>
+                  <label
+                    htmlFor={`add-member-checkbox-${member.id}`}
+                    className={`flex items-center px-4 py-3 rounded-xl cursor-pointer transition-colors ${
+                      selectedMemberIds.includes(member.id)
+                        ? "bg-indigo-50 border border-indigo-100"
+                        : "hover:bg-gray-50 border border-transparent"
+                    }`}
+                  >
+                    <input
+                      id={`add-member-checkbox-${member.id}`}
+                      type="checkbox"
+                      checked={selectedMemberIds.includes(member.id)}
+                      onChange={() => handleToggleMember(member.id)}
+                      className="mr-3 h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    />
+                    <span
+                      className={`text-sm ${
+                        selectedMemberIds.includes(member.id)
+                          ? "font-bold text-indigo-900"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      {formatNameWithBirthdate(member)}
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 shrink-0">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-md text-sm text-gray-700 bg-gray-200 hover:bg-gray-300"
+            className="px-4 py-2 rounded-xl text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors"
             disabled={isSaving}
           >
             취소
           </button>
           <button
             onClick={handleSave}
-            className="px-4 py-2 rounded-md text-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60"
+            className="px-6 py-2 rounded-xl text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 shadow-sm transition-colors"
             disabled={selectedMemberIds.length === 0 || isSaving}
           >
-            {isSaving ? "추가 중..." : `${selectedMemberIds.length}명 추가`}
+            {isSaving ? "추가 중..." : `${selectedMemberIds.length}명 추가하기`}
           </button>
         </div>
       </div>
@@ -223,7 +248,6 @@ const CellReportHistoryItem: React.FC<{
       const report = await attendanceService
         .getCellReport(cellId, date)
         .catch(() => null);
-
       const attRes = await attendanceService.getAttendances({
         startDate: date,
         endDate: date,
@@ -257,18 +281,20 @@ const CellReportHistoryItem: React.FC<{
     reportData.attendances.length === 0;
 
   return (
-    <div className="border border-gray-200 rounded-lg bg-white overflow-hidden mb-3 shadow-sm">
+    <div className="border border-gray-200 rounded-xl bg-white overflow-hidden mb-3 shadow-sm transition-all hover:shadow-md">
       <button
         onClick={toggleOpen}
-        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-gray-50 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <span className="font-bold text-gray-700">{date} (일)</span>
+          <span className="font-bold text-gray-800 text-sm sm:text-base">
+            {date} (일)
+          </span>
           <span
-            className={`text-[10px] px-2 py-0.5 rounded-full border ${
+            className={`text-[10px] sm:text-xs px-2 py-0.5 rounded-full border font-medium ${
               !isWritten
-                ? "bg-gray-100 text-gray-400 border-gray-200"
-                : "bg-green-50 text-green-600 border-green-200"
+                ? "bg-gray-100 text-gray-500 border-gray-200"
+                : "bg-green-50 text-green-700 border-green-200"
             }`}
           >
             {!isWritten ? "미작성" : "작성됨"}
@@ -280,30 +306,30 @@ const CellReportHistoryItem: React.FC<{
       </button>
 
       {isOpen && (
-        <div className="p-4 border-t border-gray-200 bg-white animate-fadeIn">
+        <div className="px-5 py-5 border-t border-gray-100 bg-gray-50/30 animate-fadeIn">
           {loading ? (
-            <div className="text-center py-4 text-sm text-gray-500">
-              보고서 정보를 불러오는 중...
+            <div className="flex justify-center py-4">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-500"></div>
             </div>
           ) : isEmpty ? (
             <div className="text-center py-4 text-sm text-gray-400">
-              등록된 보고서 및 출석 데이터가 없습니다.
+              등록된 보고서 내용이 없습니다.
             </div>
           ) : (
             <div className="space-y-6">
               {(reportData!.cellShare || reportData!.specialNotes) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
-                    <h4 className="text-xs font-bold text-indigo-800 mb-2 flex items-center gap-1">
+                  <div className="bg-indigo-50/60 p-4 rounded-xl border border-indigo-100">
+                    <h4 className="text-xs font-bold text-indigo-800 mb-2 flex items-center gap-1.5">
                       <FaQuoteLeft className="opacity-50" /> 셀 은혜 나눔
                     </h4>
                     <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
                       {reportData!.cellShare || "내용 없음"}
                     </p>
                   </div>
-                  <div className="bg-red-50 p-4 rounded-lg border border-red-100">
-                    <h4 className="text-xs font-bold text-red-800 mb-2">
-                      ⚠ 셀 특이사항
+                  <div className="bg-red-50/60 p-4 rounded-xl border border-red-100">
+                    <h4 className="text-xs font-bold text-red-800 mb-2 flex items-center gap-1.5">
+                      <MegaphoneIcon className="h-3 w-3" /> 셀 특이사항
                     </h4>
                     <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
                       {reportData!.specialNotes || "내용 없음"}
@@ -314,41 +340,40 @@ const CellReportHistoryItem: React.FC<{
 
               {reportData!.attendances.length > 0 && (
                 <div>
-                  <h4 className="text-sm font-bold text-gray-800 mb-3 pl-1 border-l-4 border-indigo-500">
-                    &nbsp;멤버별 기도제목 및 특이사항
+                  <h4 className="text-sm font-bold text-gray-800 mb-3 pl-2 border-l-4 border-indigo-500 flex items-center">
+                    멤버별 출석 & 기도제목
                   </h4>
 
+                  {/* 모바일 뷰 */}
                   <div className="md:hidden space-y-3">
                     {reportData!.attendances.map((att) => (
                       <div
                         key={att.id}
-                        className="p-3 border border-gray-200 rounded-lg bg-gray-50 flex flex-col gap-2"
+                        className="p-4 border border-gray-200 rounded-xl bg-white shadow-sm"
                       >
-                        <div className="flex justify-between items-center border-b border-gray-200 pb-2">
-                          <span className="font-medium text-gray-900 text-sm">
+                        <div className="flex justify-between items-center mb-3 border-b border-gray-100 pb-2">
+                          <span className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                            <UserCircleIcon className="h-5 w-5 text-gray-300" />
                             {formatNameWithBirthdate(att.member)}
                           </span>
                           <span
-                            className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full ${
+                            className={`inline-flex px-2 py-0.5 text-[11px] font-bold rounded-full ${
                               att.status === "PRESENT"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-red-100 text-red-700"
                             }`}
                           >
                             {att.status === "PRESENT" ? "출석" : "결석"}
                           </span>
                         </div>
-                        <div className="text-sm text-gray-700 pt-1">
+                        <div className="text-sm text-gray-700">
                           {att.prayerContent ? (
-                            <div className="mb-1 whitespace-pre-wrap leading-relaxed">
-                              <span className="text-xs font-bold text-indigo-500 block mb-0.5">
-                                기도제목
-                              </span>
+                            <div className="bg-gray-50 p-3 rounded-lg text-xs leading-relaxed">
                               {att.prayerContent}
                             </div>
                           ) : (
-                            <span className="text-gray-400 text-xs">
-                              등록된 내용이 없습니다.
+                            <span className="text-gray-400 text-xs pl-1">
+                              기도제목 없음
                             </span>
                           )}
                         </div>
@@ -356,44 +381,41 @@ const CellReportHistoryItem: React.FC<{
                     ))}
                   </div>
 
-                  <div className="hidden md:block overflow-x-auto border border-gray-200 rounded-lg">
+                  {/* 데스크탑 뷰 */}
+                  <div className="hidden md:block overflow-hidden border border-gray-200 rounded-xl shadow-sm">
                     <table className="min-w-full divide-y divide-gray-200 text-sm">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase w-24 whitespace-nowrap">
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 w-32">
                             이름
                           </th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase w-20 whitespace-nowrap">
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 w-24">
                             출석
                           </th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                            기도제목 및 특이사항
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
+                            기도제목
                           </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 bg-white">
                         {reportData!.attendances.map((att) => (
                           <tr key={att.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 font-medium text-gray-900 align-top whitespace-nowrap">
+                            <td className="px-4 py-3 font-medium text-gray-900">
                               {formatNameWithBirthdate(att.member)}
                             </td>
-                            <td className="px-4 py-3 align-top">
+                            <td className="px-4 py-3">
                               <span
-                                className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full ${
+                                className={`inline-flex px-2 py-0.5 text-[11px] font-bold rounded-full ${
                                   att.status === "PRESENT"
-                                    ? "bg-green-100 text-green-800"
-                                    : "bg-red-100 text-red-800"
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-red-100 text-red-700"
                                 }`}
                               >
                                 {att.status === "PRESENT" ? "출석" : "결석"}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-gray-600 align-top whitespace-pre-wrap">
-                              {att.prayerContent ? (
-                                <div className="mb-1 text-gray-800">
-                                  {att.prayerContent}
-                                </div>
-                              ) : (
+                            <td className="px-4 py-3 text-gray-600 whitespace-pre-wrap">
+                              {att.prayerContent || (
                                 <span className="text-gray-300 text-xs">-</span>
                               )}
                             </td>
@@ -421,13 +443,8 @@ const CellReportHistoryContainer: React.FC<{
 }> = ({ cellId, startDate, endDate, attendances }) => {
   const writtenDates = useMemo(() => {
     const dates = new Set<string>();
-    if (attendances) {
-      attendances.forEach((att) => {
-        if (att.date) {
-          dates.add(att.date);
-        }
-      });
-    }
+    if (attendances)
+      attendances.forEach((att) => att.date && dates.add(att.date));
     return dates;
   }, [attendances]);
 
@@ -436,12 +453,9 @@ const CellReportHistoryContainer: React.FC<{
     const dates: string[] = [];
     const start = new Date(startDate);
     const end = new Date(endDate);
-
     const current = new Date(start);
     const day = current.getDay();
-    if (day !== 0) {
-      current.setDate(current.getDate() + (7 - day));
-    }
+    if (day !== 0) current.setDate(current.getDate() + (7 - day));
 
     while (current <= end) {
       const y = current.getFullYear();
@@ -456,30 +470,22 @@ const CellReportHistoryContainer: React.FC<{
   if (sundayDates.length === 0) return null;
 
   return (
-    <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-      <div className="px-4 py-4 sm:px-6 border-b border-gray-100">
-        <h3 className="text-base sm:text-lg leading-6 font-medium text-gray-900">
-          🗓️ 주간 보고서 기록
+    <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-2xl overflow-hidden mt-6">
+      <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50">
+        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+          <InformationCircleIcon className="h-5 w-5 text-indigo-500" />
+          주간 보고서 기록
         </h3>
-        <p className="mt-1 text-sm text-gray-500 break-keep">
-          선택된 조회 기간 내의 셀 보고서와 기도제목을 확인합니다.
-        </p>
       </div>
-      <div className="p-4 bg-gray-50 min-h-[200px]">
-        {sundayDates.length === 0 ? (
-          <p className="text-center text-gray-500 py-8">
-            조회할 수 있는 주일(일요일) 날짜가 없습니다.
-          </p>
-        ) : (
-          sundayDates.map((date) => (
-            <CellReportHistoryItem
-              key={date}
-              cellId={cellId}
-              date={date}
-              isWritten={writtenDates.has(date)}
-            />
-          ))
-        )}
+      <div className="p-4 sm:p-6 bg-white min-h-[200px]">
+        {sundayDates.map((date) => (
+          <CellReportHistoryItem
+            key={date}
+            cellId={cellId}
+            date={date}
+            isWritten={writtenDates.has(date)}
+          />
+        ))}
       </div>
     </div>
   );
@@ -528,60 +534,41 @@ const CellAttendanceMatrixCard: React.FC<{
     return months;
   }, [activeSemester]);
 
-  // ✅ [수정] 통계 재계산 로직: 출석률은 백엔드 값을, 미체크는 프론트 계산 값을 사용
   const stats = useMemo(() => {
     if (!startDate || !endDate || sortedMembers.length === 0) {
       return { unchecked: 0, rate: 0 };
     }
-
-    // 1) 미체크(Unchecked) 계산 (프론트엔드 로직 유지)
     const filterStart = new Date(startDate);
     const filterEnd = new Date(endDate);
     filterStart.setHours(0, 0, 0, 0);
     filterEnd.setHours(23, 59, 59, 999);
 
     let totalPossibleChecks = 0;
-
     sortedMembers.forEach((member) => {
-      let joinDate: Date;
-      if (member.cellAssignmentDate) {
-        joinDate = new Date(member.cellAssignmentDate);
-      } else if (member.createdAt) {
-        joinDate = new Date(member.createdAt);
-      } else if (member.joinYear) {
-        joinDate = new Date(member.joinYear, 0, 1);
-      } else {
-        joinDate = new Date("2000-01-01");
-      }
+      const joinDate = member.cellAssignmentDate
+        ? new Date(member.cellAssignmentDate)
+        : member.createdAt
+        ? new Date(member.createdAt)
+        : new Date("2000-01-01");
       joinDate.setHours(0, 0, 0, 0);
-
       const effectiveStart = filterStart < joinDate ? joinDate : filterStart;
       if (effectiveStart > filterEnd) return;
-
       const current = new Date(effectiveStart);
       current.setHours(0, 0, 0, 0);
-
       while (current <= filterEnd) {
-        if (current.getDay() === 0) {
-          totalPossibleChecks++;
-        }
+        if (current.getDay() === 0) totalPossibleChecks++;
         current.setDate(current.getDate() + 1);
       }
     });
 
     const totalPresent = periodSummary?.totalPresent || 0;
     const totalRecorded = totalPresent + (periodSummary?.totalAbsent || 0);
-
     const unchecked = Math.max(0, totalPossibleChecks - totalRecorded);
-
-    // 2) 출석률(Rate)은 백엔드 값을 신뢰하여 사용
     const rate = periodSummary?.attendanceRate ?? 0;
-
     return { unchecked, rate };
   }, [startDate, endDate, sortedMembers, periodSummary]);
 
   const formatDate = (dateStr: string) => dateStr.replace(/-/g, ".");
-
   const matrixMembers = useMemo(
     () =>
       sortedMembers.map((m) => ({
@@ -595,26 +582,28 @@ const CellAttendanceMatrixCard: React.FC<{
   );
 
   return (
-    <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-      <div className="px-4 py-4 sm:px-6 border-b border-gray-100">
-        <h3 className="text-base sm:text-lg leading-6 font-medium text-gray-900 break-keep">
-          출석 요약 & 현황
+    <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-2xl overflow-hidden">
+      <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+          <CheckCircleIcon className="h-5 w-5 text-indigo-500" />
+          출석 현황
         </h3>
       </div>
 
       <div className="p-4 sm:p-6 space-y-6">
-        <div className="bg-gray-50 p-3 sm:p-4 rounded-xl border border-gray-100 flex flex-col gap-4">
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              {/* 좌측 영역: 학기 선택 Dropdown */}
+        {/* Controls Container */}
+        <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex flex-col gap-4">
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+            {/* Left: Selectors */}
+            <div className="flex flex-col sm:flex-row gap-2 w-full xl:w-auto">
               {unitType !== "year" ? (
                 <div className="relative w-full sm:w-auto">
-                  <div className="flex items-center bg-white px-3 py-2 rounded-md border border-gray-300 shadow-sm w-full sm:w-auto">
+                  <div className="flex items-center bg-white px-3 py-2.5 rounded-lg border border-gray-200 shadow-sm w-full sm:w-auto hover:border-indigo-300 transition-colors">
                     <FaCalendarAlt className="text-indigo-500 mr-2 text-sm flex-shrink-0" />
                     <select
                       value={activeSemester?.id || ""}
                       onChange={(e) => onSemesterChange(Number(e.target.value))}
-                      className="bg-transparent text-gray-700 font-semibold text-sm focus:outline-none cursor-pointer w-full sm:min-w-[140px]"
+                      className="bg-transparent text-gray-700 font-semibold text-sm focus:outline-none cursor-pointer w-full sm:min-w-[160px]"
                     >
                       {semesters.map((s) => (
                         <option key={s.id} value={s.id}>
@@ -625,7 +614,7 @@ const CellAttendanceMatrixCard: React.FC<{
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center bg-white px-4 py-2 rounded-md border border-gray-300 shadow-sm w-full sm:w-auto justify-center sm:justify-start">
+                <div className="flex items-center bg-white px-4 py-2.5 rounded-lg border border-gray-200 shadow-sm w-full sm:w-auto justify-center sm:justify-start">
                   <FaCalendarAlt className="text-indigo-500 mr-2 text-sm" />
                   <span className="text-gray-900 font-bold text-sm">
                     {new Date(startDate).getFullYear()}년
@@ -633,107 +622,90 @@ const CellAttendanceMatrixCard: React.FC<{
                 </div>
               )}
 
-              {/* 연간/학기/월별 버튼 */}
+              {/* Toggle Buttons */}
               <div className="flex bg-gray-200 p-1 rounded-lg w-full sm:w-auto">
-                <button
-                  onClick={() => onUnitTypeChange("month")}
-                  className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-medium rounded-md transition-all whitespace-nowrap ${
-                    unitType === "month"
-                      ? "bg-white text-indigo-700 shadow ring-1 ring-black/5"
-                      : "text-gray-500 hover:bg-gray-300"
-                  }`}
-                >
-                  월별
-                </button>
-                <button
-                  onClick={() => onUnitTypeChange("semester")}
-                  className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-medium rounded-md transition-all whitespace-nowrap ${
-                    unitType === "semester"
-                      ? "bg-white text-indigo-700 shadow ring-1 ring-black/5"
-                      : "text-gray-500 hover:bg-gray-300"
-                  }`}
-                >
-                  학기
-                </button>
-                <button
-                  onClick={() => onUnitTypeChange("year")}
-                  className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-medium rounded-md transition-all whitespace-nowrap ${
-                    unitType === "year"
-                      ? "bg-white text-indigo-700 shadow ring-1 ring-black/5"
-                      : "text-gray-500 hover:bg-gray-300"
-                  }`}
-                >
-                  연간
-                </button>
+                {(["month", "semester", "year"] as const).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => onUnitTypeChange(type)}
+                    className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-bold rounded-md transition-all whitespace-nowrap ${
+                      unitType === type
+                        ? "bg-white text-indigo-600 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-300/50"
+                    }`}
+                  >
+                    {type === "month"
+                      ? "월별"
+                      : type === "semester"
+                      ? "학기"
+                      : "연간"}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* 월 선택 (월별 보기일 때만) */}
-            {unitType === "month" && activeSemester && (
-              <div className="animate-fadeIn mt-1">
-                <span className="text-xs font-bold text-gray-500 block mb-2 px-1">
-                  상세 월 선택
-                </span>
-                <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x">
-                  {semesterMonths.map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => onMonthSelect(m)}
-                      className={`flex-shrink-0 px-3 py-1.5 text-xs rounded-full border transition-all snap-start ${
-                        selectedMonth === m
-                          ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-300"
-                          : "bg-white text-gray-600 border-gray-200 hover:bg-gray-100"
-                      }`}
-                    >
-                      {m}월
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-gray-500 border-t border-gray-200 pt-3 mt-1">
-            <div className="flex items-center flex-shrink-0">
+            {/* Right: Date Range Display */}
+            <div className="flex items-center justify-end text-xs text-gray-500 bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm">
               <FaClock className="mr-1.5 text-gray-400" />
-              <span className="font-medium whitespace-nowrap">조회 기간:</span>
+              <span className="font-mono text-gray-700">
+                {formatDate(startDate)} ~ {formatDate(endDate)}
+              </span>
             </div>
-            <span className="font-mono bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700">
-              {formatDate(startDate)} ~ {formatDate(endDate)}
-            </span>
           </div>
+
+          {/* Detailed Month Selector */}
+          {unitType === "month" && activeSemester && (
+            <div className="animate-fadeIn">
+              <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x pt-1">
+                {semesterMonths.map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => onMonthSelect(m)}
+                    className={`flex-shrink-0 px-4 py-2 text-xs font-bold rounded-full border transition-all snap-start ${
+                      selectedMonth === m
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-200"
+                        : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                    }`}
+                  >
+                    {m}월
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* 2칸 통계 카드 */}
+        {/* Stats Cards */}
         {periodSummary ? (
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 text-center border-t border-b py-4">
-            <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
-              <p className="text-sm font-medium text-indigo-600 break-keep">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-5 bg-gradient-to-br from-indigo-50 to-white rounded-2xl border border-indigo-100 shadow-sm text-center">
+              <p className="text-xs sm:text-sm font-bold text-indigo-600 uppercase tracking-wide">
                 출석률
               </p>
-              <p className="mt-2 text-3xl font-bold text-indigo-700">
+              <p className="mt-1 text-3xl sm:text-4xl font-extrabold text-indigo-700">
                 {stats.rate.toFixed(0)}
-                <span className="text-lg ml-0.5">%</span>
+                <span className="text-lg sm:text-xl ml-1 text-indigo-400">
+                  %
+                </span>
               </p>
             </div>
-
             <div
-              className={`p-4 rounded-xl border ${
+              className={`p-5 rounded-2xl border shadow-sm text-center bg-gradient-to-br ${
                 stats.unchecked > 0
-                  ? "bg-red-50 border-red-100"
-                  : "bg-gray-50 border-gray-200"
+                  ? "from-red-50 to-white border-red-100"
+                  : "from-gray-50 to-white border-gray-200"
               }`}
             >
               <p
-                className={`text-sm font-medium break-keep ${
+                className={`text-xs sm:text-sm font-bold uppercase tracking-wide ${
                   stats.unchecked > 0 ? "text-red-600" : "text-gray-500"
                 }`}
               >
                 미체크
               </p>
               <p
-                className={`mt-2 text-3xl font-bold ${
-                  stats.unchecked > 0 ? "text-red-700" : "text-gray-600"
+                className={`mt-1 text-3xl sm:text-4xl font-extrabold ${
+                  stats.unchecked > 0 ? "text-red-600" : "text-gray-400"
                 }`}
               >
                 {stats.unchecked}
@@ -741,19 +713,16 @@ const CellAttendanceMatrixCard: React.FC<{
             </div>
           </div>
         ) : (
-          <p className="text-sm text-gray-500 py-4 text-center">
+          <div className="p-8 text-center text-sm text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
             선택된 기간에 대한 데이터가 없습니다.
-          </p>
+          </div>
         )}
 
-        {/* 매트릭스 */}
+        {/* Matrix Component Wrapper */}
         <div className="pt-2">
-          <h4 className="text-sm font-medium text-gray-700 mb-3 ml-1 break-keep">
-            {unitType === "year"
-              ? `[${new Date(startDate).getFullYear()}년] 전체 현황`
-              : unitType === "semester"
-              ? `[${activeSemester?.name}] 전체 현황`
-              : `${selectedMonth}월 상세 현황`}
+          <h4 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <div className="w-1 h-4 bg-indigo-500 rounded-full"></div>
+            상세 출석표
           </h4>
           <AttendanceMatrix
             mode={unitType}
@@ -774,8 +743,10 @@ const CellAttendanceMatrixCard: React.FC<{
   );
 };
 
-// ... (이후 메인 페이지 로직 동일) ...
+// ... (메인 페이지 로직은 동일하되 UI만 아래 리턴문으로 교체) ...
+
 const CellDetailPage: React.FC = () => {
+  // ... (기존 로직 동일: Hooks, useEffect, handlers ...)
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -815,6 +786,7 @@ const CellDetailPage: React.FC = () => {
     return targetYm >= sYm && targetYm <= eYm;
   };
 
+  // ... (useEffect 및 핸들러 로직들 - 위 코드와 동일하게 유지)
   useEffect(() => {
     const loadSemesters = async () => {
       try {
@@ -1034,54 +1006,24 @@ const CellDetailPage: React.FC = () => {
     return list;
   }, [cell]);
 
-  if (loading) {
+  if (loading)
     return (
-      <div className="bg-gray-50 min-h-screen flex items-center justify-center">
-        <p className="text-gray-600">로딩 중...</p>
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
       </div>
     );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-gray-50 min-h-screen flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-sm p-6 text-center">
-          <p className="text-red-600 mb-4">{error}</p>
-          <button
-            onClick={() => navigate(-1)}
-            className="inline-flex justify-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-          >
-            뒤로 가기
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!cell) {
-    return (
-      <div className="bg-gray-50 min-h-screen flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-sm p-6 text-center">
-          <p className="text-red-600 mb-4">셀 정보를 찾을 수 없습니다.</p>
-          <button
-            onClick={() => navigate(-1)}
-            className="inline-flex justify-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-          >
-            뒤로 가기
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (error)
+    return <div className="p-10 text-center text-red-500">{error}</div>;
+  if (!cell) return null;
 
   return (
-    <div className="bg-gray-50 min-h-screen pb-10">
+    <div className="bg-gray-50 min-h-screen pb-20">
       <ConfirmModal
         isOpen={isDeleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
         onConfirm={handleDelete}
         title="셀 삭제"
-        message={`'${cell.name}' 셀을 정말 삭제하시겠습니까? 셀에 속한 모든 셀원은 '*소속 셀 없음' 상태가 됩니다.`}
+        message={`'${cell.name}' 셀을 삭제하시겠습니까? 소속된 멤버는 '소속 셀 없음' 상태가 됩니다.`}
       />
       <AddMemberToCellModal
         isOpen={isAddMemberModalOpen}
@@ -1089,92 +1031,103 @@ const CellDetailPage: React.FC = () => {
         onSave={handleAddMemberToCell}
       />
 
-      <div className="container mx-auto max-w-6xl px-4 py-6 sm:py-8">
-        {/* 상단 헤더 */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div className="space-y-1">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 break-keep">
-              {cell.name} 상세 정보
+      <div className="container mx-auto max-w-6xl px-4 py-8">
+        {/* Top Header */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+              {cell.name}{" "}
+              <span className="text-lg font-normal text-gray-400">
+                상세 정보
+              </span>
             </h1>
-            <p className="text-sm text-gray-600 break-keep">
-              셀 기본 정보, 출석 요약, 셀원 목록, 셀 보고서를 확인할 수
-              있습니다.
+            <p className="mt-2 text-sm text-gray-600">
+              셀의 정보를 관리하고 출석 및 보고서 데이터를 확인합니다.
             </p>
           </div>
-          {user?.role === "EXECUTIVE" && (
-            <div className="flex gap-2 w-full sm:w-auto">
-              <button
-                onClick={() => navigate(`/admin/cells/${id}/edit`)}
-                className="flex-1 sm:flex-none px-4 py-2 text-sm font-medium text-white bg-yellow-600 rounded-md hover:bg-yellow-700 text-center"
-              >
-                수정
-              </button>
-              <button
-                onClick={() => setDeleteModalOpen(true)}
-                className="flex-1 sm:flex-none px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 text-center"
-              >
-                삭제
-              </button>
-            </div>
-          )}
+          <div className="flex gap-2">
+            {user?.role === "EXECUTIVE" && (
+              <>
+                <button
+                  onClick={() => navigate(`/admin/cells/${id}/edit`)}
+                  className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm font-medium transition-colors shadow-sm"
+                >
+                  수정
+                </button>
+                <button
+                  onClick={() => setDeleteModalOpen(true)}
+                  className="bg-white border border-red-200 text-red-600 px-4 py-2 rounded-lg hover:bg-red-50 text-sm font-medium transition-colors shadow-sm"
+                >
+                  삭제
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => navigate(-1)}
+              className="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 text-sm font-medium transition-colors shadow-sm"
+            >
+              목록으로
+            </button>
+          </div>
         </div>
 
-        {/* 메인 그리드 */}
+        {/* Main Grid */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* 왼쪽 영역 */}
+          {/* Left Column (Main Info & Charts) */}
           <div className="xl:col-span-2 space-y-6">
-            {/* 기본 정보 카드 */}
-            <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-              <div className="px-4 py-4 sm:px-6 border-b border-gray-100">
-                <h3 className="text-base sm:text-lg leading-6 font-medium text-gray-900">
-                  기본 정보
-                </h3>
-              </div>
-              <div className="divide-y divide-gray-100">
-                <div className="px-4 py-3 sm:px-6 flex flex-col sm:grid sm:grid-cols-3 gap-1 sm:gap-4 bg-gray-50">
-                  <dt className="text-xs sm:text-sm font-medium text-gray-500">
-                    셀 이름
+            {/* Info Card */}
+            <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-2xl p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <InformationCircleIcon className="h-5 w-5 text-indigo-500" />
+                기본 정보
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8">
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <dt className="text-xs font-medium text-gray-500 uppercase">
+                    셀 설명
                   </dt>
-                  <dd className="text-sm text-gray-900 sm:col-span-2">
-                    {cell.name}
+                  <dd className="mt-1 text-sm font-medium text-gray-900">
+                    {cell.description || "설명 없음"}
                   </dd>
                 </div>
-                <div className="px-4 py-3 sm:px-6 flex flex-col sm:grid sm:grid-cols-3 gap-1 sm:gap-4 bg-white">
-                  <dt className="text-xs sm:text-sm font-medium text-gray-500">
-                    설명
+                <div className="bg-gray-50 p-3 rounded-xl flex justify-between items-center">
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500 uppercase">
+                      활동 상태
+                    </dt>
+                    <dd className="mt-1 text-sm font-medium text-gray-900">
+                      {cell.active ? "활동 중" : "비활동"}
+                    </dd>
+                  </div>
+                  <div
+                    className={`w-3 h-3 rounded-full ${
+                      cell.active ? "bg-green-500" : "bg-gray-400"
+                    }`}
+                  ></div>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <dt className="text-xs font-medium text-gray-500 uppercase">
+                    인원 구성
                   </dt>
-                  <dd className="text-sm text-gray-900 sm:col-span-2 break-keep">
-                    {cell.description || "없음"}
+                  <dd className="mt-1 text-sm font-medium text-gray-900 flex gap-3">
+                    <span className="text-blue-600">남 {cell.maleCount}명</span>
+                    <span className="text-pink-600">
+                      여 {cell.femaleCount}명
+                    </span>
                   </dd>
                 </div>
-                <div className="px-4 py-3 sm:px-6 flex flex-col sm:grid sm:grid-cols-3 gap-1 sm:gap-4 bg-gray-50">
-                  <dt className="text-xs sm:text-sm font-medium text-gray-500">
-                    활동 여부
-                  </dt>
-                  <dd className="text-sm text-gray-900 sm:col-span-2">
-                    {cell.active ? "활동 중" : "비활동"}
-                  </dd>
-                </div>
-                <div className="px-4 py-3 sm:px-6 flex flex-col sm:grid sm:grid-cols-3 gap-1 sm:gap-4 bg-white">
-                  <dt className="text-xs sm:text-sm font-medium text-gray-500">
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <dt className="text-xs font-medium text-gray-500 uppercase">
                     편성 연도
                   </dt>
-                  <dd className="text-sm text-gray-900 sm:col-span-2">
+                  <dd className="mt-1 text-sm font-medium text-gray-900">
                     {new Date(cell.createdAt).getFullYear()}년
                   </dd>
                 </div>
-                <div className="px-4 py-3 sm:px-6 flex flex-col sm:grid sm:grid-cols-3 gap-1 sm:gap-4 bg-gray-50">
-                  <dt className="text-xs sm:text-sm font-medium text-gray-500">
-                    인원 구성
-                  </dt>
-                  <dd className="text-sm text-gray-900 sm:col-span-2">
-                    남 {cell.maleCount}명, 여 {cell.femaleCount}명
-                  </dd>
-                </div>
               </div>
             </div>
 
-            {/* 출석 매트릭스 카드 */}
+            {/* Attendance Matrix */}
             <CellAttendanceMatrixCard
               cellId={cell.id}
               sortedMembers={sortedMembers}
@@ -1191,7 +1144,7 @@ const CellDetailPage: React.FC = () => {
               endDate={periodRange.endDate}
             />
 
-            {/* 셀 보고서 기록 */}
+            {/* Reports */}
             {cell && periodRange.startDate && (
               <CellReportHistoryContainer
                 cellId={cell.id}
@@ -1202,99 +1155,97 @@ const CellDetailPage: React.FC = () => {
             )}
           </div>
 
-          {/* 오른쪽 영역 */}
+          {/* Right Column (Members & Exports) */}
           <div className="space-y-6">
-            {/* 셀원 목록 카드 */}
-            <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-              <div className="px-4 py-4 sm:px-6 flex items-center justify-between border-b border-gray-100">
-                <h3 className="text-base sm:text-lg leading-6 font-medium text-gray-900">
-                  셀원 목록 ({cell.members.length}명)
+            {/* Members Card */}
+            <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-2xl overflow-hidden">
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <UsersIcon className="h-5 w-5 text-indigo-500" />
+                  셀원 목록
+                  <span className="bg-indigo-100 text-indigo-700 text-xs py-0.5 px-2 rounded-full">
+                    {cell.members.length}
+                  </span>
                 </h3>
                 {user?.role === "EXECUTIVE" && (
                   <button
                     onClick={() => setAddMemberModalOpen(true)}
-                    className="px-3 py-1.5 text-xs sm:text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 px-3 py-1.5 rounded-lg shadow-sm transition-colors"
                   >
-                    + 셀원 추가
+                    + 추가
                   </button>
                 )}
               </div>
-              <div className="border-t border-gray-100 max-h-[500px] overflow-y-auto">
-                {sortedMembers.length > 0 ? (
-                  <ul className="divide-y divide-gray-200">
-                    {sortedMembers.map((member) => (
-                      <li
-                        key={member.id}
-                        className="px-4 py-3 flex items-center justify-between hover:bg-gray-50"
-                      >
-                        <div className="flex items-center flex-1 min-w-0">
-                          <button
-                            onClick={() =>
-                              navigate(`/admin/users/${member.id}`)
-                            }
-                            className="text-sm font-medium text-indigo-600 hover:text-indigo-900 truncate text-left"
-                          >
+              <ul className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
+                {sortedMembers.map((member) => (
+                  <li
+                    key={member.id}
+                    className="hover:bg-gray-50 transition-colors"
+                  >
+                    <button
+                      onClick={() => navigate(`/admin/users/${member.id}`)}
+                      className="w-full flex items-center p-4 text-left"
+                    >
+                      <UserCircleIcon className="h-10 w-10 text-gray-300 mr-3" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-gray-900">
                             {formatNameWithBirthdate(member)}
-                          </button>
-                          <span className="ml-2 text-xs text-gray-500 flex-shrink-0">
-                            (
-                            {member.gender
-                              ? member.gender.toUpperCase() === "MALE"
-                                ? "남"
-                                : "여"
-                              : ""}
-                            )
                           </span>
-                        </div>
-                        <div className="ml-3 flex-shrink-0 flex gap-1">
                           {member.id === cell.leader?.id && (
-                            <span className="text-[10px] font-bold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full border border-indigo-200">
+                            <span className="text-[10px] font-bold bg-indigo-600 text-white px-1.5 py-0.5 rounded">
                               셀장
                             </span>
                           )}
                           {member.id === cell.viceLeader?.id && (
-                            <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full border border-blue-200">
+                            <span className="text-[10px] font-bold bg-blue-500 text-white px-1.5 py-0.5 rounded">
                               예비
                             </span>
                           )}
                         </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="px-4 py-4 text-sm text-gray-500">
-                    이 셀에 등록된 셀원이 없습니다.
-                  </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {member.gender === "MALE" ? "남성" : "여성"}
+                        </p>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+                {sortedMembers.length === 0 && (
+                  <li className="p-8 text-center text-sm text-gray-400">
+                    등록된 셀원이 없습니다.
+                  </li>
                 )}
-              </div>
+              </ul>
             </div>
 
-            {/* 데이터 추출 카드 */}
-            <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-              <div className="px-4 py-4 sm:px-6 border-b border-gray-100">
-                <h3 className="text-base sm:text-lg leading-6 font-medium text-gray-900 break-keep">
-                  데이터 추출 (xlsx)
-                </h3>
-              </div>
-              <div className="p-4 sm:p-6 space-y-5">
-                <div>
-                  <button
-                    onClick={handleExportMembers}
-                    className="w-full px-4 py-2.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-                  >
-                    셀 멤버 명단 다운로드
-                  </button>
-                </div>
+            {/* Export Card */}
+            <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-2xl p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <DocumentArrowDownIcon className="h-5 w-5 text-green-600" />
+                엑셀 다운로드
+              </h3>
+              <div className="space-y-4">
+                <button
+                  onClick={handleExportMembers}
+                  className="w-full flex justify-center items-center py-2.5 px-4 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-sm"
+                >
+                  명단 다운로드 (.xlsx)
+                </button>
+
                 <div className="pt-4 border-t border-gray-100">
-                  <p className="text-sm font-medium text-gray-700 mb-2 break-keep">
-                    출석 현황 다운로드 기간 설정
-                  </p>
+                  <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">
+                    출석부 기간 설정
+                  </label>
                   <div className="flex flex-col gap-2">
                     <KoreanCalendarPicker
                       value={exportStartDate}
                       onChange={setExportStartDate}
                     />
-                    <div className="text-center text-gray-400 text-xs">▼</div>
+                    <div className="flex justify-center -my-2 z-10 relative">
+                      <span className="bg-white px-2 text-gray-300 text-xs">
+                        ▼
+                      </span>
+                    </div>
                     <KoreanCalendarPicker
                       value={exportEndDate}
                       onChange={setExportEndDate}
@@ -1302,24 +1253,14 @@ const CellDetailPage: React.FC = () => {
                   </div>
                   <button
                     onClick={handleExportAttendances}
-                    className="w-full mt-4 px-4 py-2.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+                    className="w-full mt-3 flex justify-center items-center py-2.5 px-4 border border-transparent rounded-xl text-sm font-bold text-white bg-green-600 hover:bg-green-700 transition-colors shadow-sm"
                   >
-                    출석 현황 다운로드
+                    출석부 다운로드 (.xlsx)
                   </button>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-
-        {/* 하단 뒤로가기 버튼 */}
-        <div className="mt-8 flex justify-end">
-          <button
-            onClick={() => navigate(-1)}
-            className="w-full sm:w-auto px-6 py-2.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-          >
-            목록으로 돌아가기
-          </button>
         </div>
       </div>
     </div>

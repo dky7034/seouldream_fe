@@ -28,7 +28,7 @@ const AdminNoticesPage: React.FC = () => {
 
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
+  // const currentYear = now.getFullYear(); // ❌ 초기값 로직에서 제거 (사용 안 함)
 
   const [noticePage, setNoticePage] = useState<Page<NoticeDto> | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -47,6 +47,22 @@ const AdminNoticesPage: React.FC = () => {
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const hasActiveSemesters = semesters.length > 0;
 
+  // ✅ [수정 2] 날짜 포맷팅 함수 개선 (타임존 문제 해결)
+  // 입력값에 'Z'가 없으면 강제로 붙여서 UTC로 인식하게 함 -> 브라우저가 KST로 자동 변환
+  const safeFormatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return "-";
+
+    // T는 있는데 Z가 없으면 Z를 붙여줌 (Spring Boot 기본 LocalDateTime 대응)
+    const targetStr =
+      dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
+
+    const date = new Date(targetStr);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}.${month}.${day}`;
+  };
+
   // ───────────────── URL 기반 초기값 설정 ─────────────────
   const [filters, setFilters] = useState(() => {
     const title = searchParams.get("title") ?? "";
@@ -61,18 +77,28 @@ const AdminNoticesPage: React.FC = () => {
     const startDate = searchParams.get("startDate") ?? "";
     const endDate = searchParams.get("endDate") ?? "";
 
-    const safeNumber = (val: string | null, defaultValue: number | "" = "") => {
-      if (!val) return defaultValue;
+    const safeNumber = (val: string | null) => {
+      if (!val) return "";
       const num = Number(val);
-      return isNaN(num) ? defaultValue : num;
+      return isNaN(num) ? "" : num;
     };
+
+    // ✅ [수정 1] 초기값을 무조건 "" (전체 연도)로 설정
+    // URL에 year 파라미터가 없으면 -> 전체 연도("")
+    // URL에 year 파라미터가 있으면 -> 해당 연도 숫자
+    let initialYear: number | "" = ""; // 기본값을 전체 연도로 변경!
+
+    if (yearParam && yearParam !== "all") {
+      const parsed = Number(yearParam);
+      if (!isNaN(parsed)) initialYear = parsed;
+    }
 
     return {
       title,
       pinned,
       startDate,
       endDate,
-      year: safeNumber(yearParam, currentYear),
+      year: initialYear,
       month: safeNumber(monthParam),
       semesterId: safeNumber(semesterIdParam),
     };
@@ -102,23 +128,15 @@ const AdminNoticesPage: React.FC = () => {
 
   const debouncedTitleFilter = useDebounce(filters.title, 500);
 
-  // ✅ [성능 최적화] 멤버 ID -> 포맷된 이름 매핑 (Map 사용)
-  // 기존: 렌더링마다 find()로 검색 (O(N*rows)) -> 개선: Map 조회 (O(1))
   const memberNameMap = useMemo(() => {
     const map = new Map<number, string>();
     if (allMembersForNameCheck.length === 0) return map;
-
-    // formatDisplayName 함수가 내부적으로 중복 검사를 하므로,
-    // 여기서 미리 모든 멤버에 대해 계산해둡니다.
     allMembersForNameCheck.forEach((m) => {
-      // 💡 여기서 formatDisplayName을 호출하여 결과를 저장
       map.set(m.id, formatDisplayName(m, allMembersForNameCheck));
     });
-
     return map;
   }, [allMembersForNameCheck]);
 
-  // ✅ [성능 최적화] Map 조회 헬퍼 함수
   const getFormattedName = useCallback(
     (id?: number, name?: string) => {
       if (!name) return "알 수 없음";
@@ -149,7 +167,7 @@ const AdminNoticesPage: React.FC = () => {
         }
       }
 
-      const yearText = filters.year ? `${filters.year}년` : "전체 연도";
+      const yearText = filters.year === "" ? "전체 연도" : `${filters.year}년`;
 
       if (unitType === "year") {
         return `조회 단위: 연간 (${yearText})`;
@@ -184,8 +202,12 @@ const AdminNoticesPage: React.FC = () => {
         if (nextFilters.startDate) params.startDate = nextFilters.startDate;
         if (nextFilters.endDate) params.endDate = nextFilters.endDate;
       } else {
-        if (typeof nextFilters.year === "number")
+        if (nextFilters.year === "") {
+          params.year = "all";
+        } else if (typeof nextFilters.year === "number") {
           params.year = String(nextFilters.year);
+        }
+
         if (typeof nextFilters.month === "number")
           params.month = String(nextFilters.month);
         if (typeof nextFilters.semesterId === "number")
@@ -244,7 +266,11 @@ const AdminNoticesPage: React.FC = () => {
       } else {
         params = {
           ...params,
-          year: normalizeNumberInput(filters.year),
+          // filters.year가 ""(빈문자열)이면 undefined를 할당하여 API 요청에서 제외
+          year:
+            filters.year === ""
+              ? undefined
+              : normalizeNumberInput(filters.year),
           month: normalizeNumberInput(filters.month),
         };
       }
@@ -318,7 +344,6 @@ const AdminNoticesPage: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      // 병렬로 실행하여 초기 로딩 속도 미세 개선
       Promise.all([fetchAvailableYears(), fetchSemesters()]);
     }
   }, [user, fetchAvailableYears, fetchSemesters]);
@@ -360,7 +385,8 @@ const AdminNoticesPage: React.FC = () => {
 
   const handleUnitTypeClick = (type: UnitType) => {
     const cy = new Date().getFullYear();
-    const baseYear = filters.year || cy;
+    // ✅ 단위 변경 시에도 기본값은 "전체 연도"("")로 설정
+    const baseYear = filters.year === "" ? "" : filters.year || "";
     let nextFilters = { ...filters };
 
     if (type === "year") {
@@ -371,9 +397,11 @@ const AdminNoticesPage: React.FC = () => {
         semesterId: "" as const,
       };
     } else if (type === "month") {
+      // 월간 선택 시에는 연도가 필수이므로, 없다면 현재 연도로 강제 설정
+      const targetYear = baseYear === "" ? cy : baseYear;
       nextFilters = {
         ...filters,
-        year: baseYear,
+        year: targetYear,
         month: (filters.month as number) || currentMonth,
         semesterId: "" as const,
       };
@@ -385,7 +413,7 @@ const AdminNoticesPage: React.FC = () => {
         semesterId: filters.semesterId || ("" as const),
       };
 
-      if (semesters.length > 0) {
+      if (semesters.length > 0 && !nextFilters.semesterId) {
         const now = new Date();
         const currentYearMonth = `${now.getFullYear()}-${String(
           now.getMonth() + 1
@@ -417,7 +445,7 @@ const AdminNoticesPage: React.FC = () => {
 
   const handleUnitValueClick = (value: number) => {
     const cy = new Date().getFullYear();
-    const baseYear = filters.year || cy;
+    const baseYear = filters.year === "" ? cy : filters.year || cy;
 
     const nextFilters = {
       ...filters,
@@ -672,6 +700,7 @@ const AdminNoticesPage: React.FC = () => {
                     연도
                   </label>
                   <select
+                    // ✅ value 처리: filters.year가 ""이면 ""로 매핑 (전체 연도)
                     value={filters.year === "" ? "" : filters.year}
                     onChange={(e) =>
                       handleFilterChange(
@@ -786,19 +815,7 @@ const AdminNoticesPage: React.FC = () => {
               </label>
               <div className="flex space-x-1 bg-gray-200 p-1 rounded-lg">
                 <button
-                  onClick={() => {
-                    const nextSort = "createdAt,desc";
-                    const nextPage = 0;
-                    setSortOrder(nextSort);
-                    setCurrentPage(nextPage);
-                    syncSearchParams(
-                      filters,
-                      filterType,
-                      unitType,
-                      nextSort,
-                      nextPage
-                    );
-                  }}
+                  onClick={() => requestSort("createdAt")}
                   className={`w-full px-4 py-1.5 text-xs sm:text-sm font-medium rounded-md ${
                     sortOrder === "createdAt,desc"
                       ? "bg-white text-indigo-700 shadow"
@@ -889,8 +906,10 @@ const AdminNoticesPage: React.FC = () => {
                             {notice.title}
                           </Link>
                           <p className="text-[11px] text-gray-500">
-                            작성일{" "}
-                            {new Date(notice.createdAt).toLocaleDateString()}
+                            작성일 {/* ✅ safeFormatDate 적용 */}
+                            <span className="font-medium text-gray-700">
+                              {safeFormatDate(notice.createdAt)}
+                            </span>
                           </p>
                           <p className="text-[11px] text-gray-500">
                             작성자{" "}
@@ -987,7 +1006,8 @@ const AdminNoticesPage: React.FC = () => {
                               )}
                             </td>
                             <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500">
-                              {new Date(notice.createdAt).toLocaleDateString()}
+                              {/* ✅ safeFormatDate 적용 */}
+                              {safeFormatDate(notice.createdAt)}
                             </td>
                             <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500">
                               {getFormattedName(
