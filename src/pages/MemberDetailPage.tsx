@@ -153,11 +153,25 @@ const BasicInfoCard: React.FC<{
 };
 
 // --- 교회 정보 카드 ---
+// --- 교회 정보 카드 ---
 const ChurchInfoCard: React.FC<{ member: MemberDto }> = ({ member }) => (
   <InfoCard title="교회 정보">
     <InfoDl
       items={[
-        { dt: "셀", dd: member.cell?.name || "없음" },
+        {
+          dt: "셀",
+          // ✅ [수정] 셀 정보가 있으면 링크로 렌더링, 없으면 "없음" 표시
+          dd: member.cell ? (
+            <Link
+              to={`/admin/cells/${member.cell.id}`}
+              className="text-indigo-600 hover:text-indigo-800 hover:underline font-medium"
+            >
+              {member.cell.name}
+            </Link>
+          ) : (
+            "없음"
+          ),
+        },
         {
           dt: "셀 배정일",
           dd: member.cellAssignmentDate

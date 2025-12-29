@@ -1,4 +1,3 @@
-// src/pages/CellDetailPage.tsx
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { cellService } from "../services/cellService";
@@ -523,29 +522,49 @@ const CellAttendanceMatrixCard: React.FC<{
     return months;
   }, [activeSemester]);
 
-  // ✅ [설명] 이 로직은 '빈칸(Empty Slots)'의 총 개수를 계산합니다.
-  const uncheckedCount = useMemo(() => {
-    if (!startDate || !endDate || sortedMembers.length === 0) return 0;
+  // ✅ [수정] 통계 재계산 로직 (미체크 수 + 실제 출석률)
+  // 프론트엔드에서 계산한 totalPossibleChecks(분모)를 기준으로
+  // 미체크와 출석률을 모두 일관되게 계산합니다.
+  const stats = useMemo(() => {
+    if (!startDate || !endDate || sortedMembers.length === 0) {
+      return { unchecked: 0, rate: 0 };
+    }
+
     const filterStart = new Date(startDate);
     const filterEnd = new Date(endDate);
-    let totalPossibleChecks = 0;
+
+    // 시간 부분 초기화 (날짜 비교 정확도 향상)
+    filterStart.setHours(0, 0, 0, 0);
+    filterEnd.setHours(23, 59, 59, 999);
+
+    let totalPossibleChecks = 0; // 분모: 전체 출석해야 하는 횟수
 
     sortedMembers.forEach((member) => {
       let joinDate: Date;
-      if (member.createdAt) {
+
+      // 🔥 우선순위: 배정일 > 생성일 > 가입연도 > 2000년
+      if (member.cellAssignmentDate) {
+        joinDate = new Date(member.cellAssignmentDate);
+      } else if (member.createdAt) {
         joinDate = new Date(member.createdAt);
       } else if (member.joinYear) {
         joinDate = new Date(member.joinYear, 0, 1);
       } else {
         joinDate = new Date("2000-01-01");
       }
+
       joinDate.setHours(0, 0, 0, 0);
+
+      // 조회 시작일과 (배정일 or 등록일) 중 "더 늦은 날짜"를 유효 시작일로 설정
       const effectiveStart = filterStart < joinDate ? joinDate : filterStart;
+
+      // 유효 시작일이 조회 종료일보다 늦다면, 이 멤버는 카운트 대상 아님
       if (effectiveStart > filterEnd) return;
 
       const current = new Date(effectiveStart);
       current.setHours(0, 0, 0, 0);
 
+      // 기간 내 일요일(주일) 개수 계산
       while (current <= filterEnd) {
         if (current.getDay() === 0) {
           totalPossibleChecks++;
@@ -554,10 +573,21 @@ const CellAttendanceMatrixCard: React.FC<{
       }
     });
 
-    const recordedChecks =
-      (periodSummary?.totalPresent || 0) + (periodSummary?.totalAbsent || 0);
+    // 서버에서 받은 '실제 출석 수' (Present)
+    const totalPresent = periodSummary?.totalPresent || 0;
+    // 서버에서 받은 '실제 결석 수' (Absent)
+    const totalRecorded = totalPresent + (periodSummary?.totalAbsent || 0);
 
-    return Math.max(0, totalPossibleChecks - recordedChecks);
+    // 1) 미체크 수 계산 (총 횟수 - 기록된 횟수)
+    const unchecked = Math.max(0, totalPossibleChecks - totalRecorded);
+
+    // 2) 출석률 계산 (분자: 실제 출석 수 / 분모: 전체 출석해야 하는 횟수)
+    const rate =
+      totalPossibleChecks === 0
+        ? 0
+        : (totalPresent / totalPossibleChecks) * 100;
+
+    return { unchecked, rate };
   }, [startDate, endDate, sortedMembers, periodSummary]);
 
   const formatDate = (dateStr: string) => dateStr.replace(/-/g, ".");
@@ -678,7 +708,7 @@ const CellAttendanceMatrixCard: React.FC<{
           </div>
         </div>
 
-        {/* ✅ [수정] 2칸 통계 카드 (출석률, 미체크) */}
+        {/* ✅ [수정] 2칸 통계 카드 (프론트엔드 계산 값 사용) */}
         {periodSummary ? (
           <div className="grid grid-cols-2 gap-3 sm:gap-4 text-center border-t border-b py-4">
             <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
@@ -686,31 +716,31 @@ const CellAttendanceMatrixCard: React.FC<{
                 출석률
               </p>
               <p className="mt-2 text-3xl font-bold text-indigo-700">
-                {periodSummary.attendanceRate.toFixed(0)}
+                {stats.rate.toFixed(0)}
                 <span className="text-lg ml-0.5">%</span>
               </p>
             </div>
 
             <div
               className={`p-4 rounded-xl border ${
-                uncheckedCount > 0
+                stats.unchecked > 0
                   ? "bg-red-50 border-red-100"
                   : "bg-gray-50 border-gray-200"
               }`}
             >
               <p
                 className={`text-sm font-medium break-keep ${
-                  uncheckedCount > 0 ? "text-red-600" : "text-gray-500"
+                  stats.unchecked > 0 ? "text-red-600" : "text-gray-500"
                 }`}
               >
                 미체크
               </p>
               <p
                 className={`mt-2 text-3xl font-bold ${
-                  uncheckedCount > 0 ? "text-red-700" : "text-gray-600"
+                  stats.unchecked > 0 ? "text-red-700" : "text-gray-600"
                 }`}
               >
-                {uncheckedCount}
+                {stats.unchecked}
               </p>
             </div>
           </div>
@@ -765,7 +795,6 @@ const CellDetailPage: React.FC = () => {
   const [activeSemester, setActiveSemester] = useState<SemesterDto | null>(
     null
   );
-  // ✅ [수정] unitType에 "year" 추가
   const [unitType, setUnitType] = useState<"semester" | "month" | "year">(
     "semester"
   );
@@ -821,9 +850,8 @@ const CellDetailPage: React.FC = () => {
     loadSemesters();
   }, []);
 
-  // ✅ [수정] periodRange 계산 로직에 연간 조회 추가
+  // periodRange 계산 (연간, 학기, 월간)
   const periodRange = useMemo(() => {
-    // 1. 연간 조회일 때
     if (unitType === "year") {
       const targetYear = activeSemester
         ? new Date(activeSemester.startDate).getFullYear()
@@ -835,7 +863,6 @@ const CellDetailPage: React.FC = () => {
       };
     }
 
-    // 2. 기존 로직 (학기/월간)
     if (!activeSemester) return { startDate: "", endDate: "" };
     const { startDate: semStart, endDate: semEnd } = activeSemester;
 
@@ -933,7 +960,6 @@ const CellDetailPage: React.FC = () => {
     }
   };
 
-  // ✅ [수정] 핸들러에서 "year" 처리 추가
   const handleUnitTypeChange = (type: "semester" | "month" | "year") => {
     setUnitType(type);
     if (type === "semester" || type === "year") {
