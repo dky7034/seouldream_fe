@@ -1034,7 +1034,7 @@ const CellLeaderDashboard: React.FC = () => {
           {dashboardSummary && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <StatCard
-                title="현재 셀 멤버"
+                title="셀 인원"
                 value={`${members.length.toLocaleString()}명`}
                 icon={<FaUsers size={20} />}
               />

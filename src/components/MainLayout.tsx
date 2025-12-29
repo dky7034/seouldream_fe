@@ -228,7 +228,7 @@ const MainLayout: React.FC = () => {
                 to="/dashboard"
                 className="inline-flex items-center px-1 py-1 rounded-md hover:bg-gray-50"
               >
-                <h1 className="text-xl font-bold text-gray-900">넥스트드림</h1>
+                <h1 className="text-xl font-bold text-gray-900">NEXTDREAM</h1>
               </Link>
               <nav className="hidden md:flex space-x-4 lg:space-x-6 text-xs lg:text-sm">
                 {renderNavLinks("desktop")}

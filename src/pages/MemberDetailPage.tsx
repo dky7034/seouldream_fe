@@ -106,7 +106,6 @@ const BasicInfoCard: React.FC<{
   isCurrentUser: boolean;
   onEditProfile: () => void;
 }> = ({ member, isCurrentUser, onEditProfile }) => {
-  // ✅ 백엔드에서 주는 age(만 나이) 우선 사용
   const ageDisplay =
     member.age !== undefined && member.age !== null
       ? `(만 ${member.age}세)`
@@ -244,7 +243,7 @@ const PrayersCard: React.FC<{ prayers: PrayerDto[] }> = ({ prayers }) => (
 );
 
 // ─────────────────────────────────────────────────────────────
-// [핵심] 출석 요약 카드 (미체크 정책 + 임원/셀장 권한별 UI 적용)
+// [핵심] 출석 요약 카드
 // ─────────────────────────────────────────────────────────────
 const AttendanceSummaryCard: React.FC<{
   summary: MemberAttendanceSummaryDto | null;
@@ -285,8 +284,6 @@ const AttendanceSummaryCard: React.FC<{
   userRole,
 }) => {
   const totalSummary = summary?.totalSummary;
-
-  // ✅ 임원 권한 확인
   const isExecutive = userRole === "EXECUTIVE";
 
   const semesterMonths = useMemo(() => {
@@ -303,25 +300,37 @@ const AttendanceSummaryCard: React.FC<{
     return months;
   }, [activeSemester]);
 
-  // 미체크(빈칸) 계산 로직
+  // ✅ [수정] 미체크(빈칸) 계산 로직 - timezone safe 적용
   const uncheckedCount = useMemo(() => {
     if (!startDate || !endDate) return 0;
+
     const filterStart = new Date(startDate);
     const filterEnd = new Date(endDate);
     filterStart.setHours(0, 0, 0, 0);
     filterEnd.setHours(23, 59, 59, 999);
 
+    // 날짜 문자열을 안전하게 로컬 시간 Date 객체로 변환하는 헬퍼 함수
+    const getSafeDateObj = (dateStr: string) => {
+      const safeStr = dateStr.includes("T") ? dateStr : `${dateStr}T00:00:00`;
+      const d = new Date(safeStr);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    };
+
     let baseDate: Date;
+
+    // 배정일/가입일 처리 강화
     if (cellAssignmentDate) {
-      baseDate = new Date(cellAssignmentDate);
+      baseDate = getSafeDateObj(cellAssignmentDate);
     } else if (memberJoinDate) {
-      baseDate = new Date(memberJoinDate);
+      baseDate = getSafeDateObj(memberJoinDate);
     } else if (memberJoinYear) {
       baseDate = new Date(memberJoinYear, 0, 1);
+      baseDate.setHours(0, 0, 0, 0);
     } else {
-      baseDate = new Date("2000-01-01");
+      baseDate = new Date("2000-01-01T00:00:00");
+      baseDate.setHours(0, 0, 0, 0);
     }
-    baseDate.setHours(0, 0, 0, 0);
 
     const effectiveStart = filterStart < baseDate ? baseDate : filterStart;
     if (effectiveStart > filterEnd) return 0;
@@ -329,15 +338,18 @@ const AttendanceSummaryCard: React.FC<{
     const targetSundays = new Set<string>();
     const current = new Date(effectiveStart);
 
+    // 시작일이 일요일이 아니면 다음 일요일로
     if (current.getDay() !== 0) {
       current.setDate(current.getDate() + (7 - current.getDay()));
     }
 
+    // 기간 내 일요일 수집
     while (current <= filterEnd) {
       targetSundays.add(toISODate(current));
       current.setDate(current.getDate() + 7);
     }
 
+    // 출석 기록 수집
     const recordedDates = new Set<string>();
     attendances.forEach((att) => {
       if ((att.status === "PRESENT" || att.status === "ABSENT") && att.date) {
@@ -345,6 +357,7 @@ const AttendanceSummaryCard: React.FC<{
       }
     });
 
+    // 미체크 카운트
     let missingCount = 0;
     targetSundays.forEach((sunday) => {
       if (!recordedDates.has(sunday)) {
@@ -367,7 +380,6 @@ const AttendanceSummaryCard: React.FC<{
   return (
     <InfoCard title="출석 요약 & 현황">
       <div className="p-4 sm:p-6 space-y-6">
-        {/* --- 컨트롤 패널 --- */}
         <div className="bg-gray-50 p-3 sm:p-4 rounded-xl border border-gray-100 flex flex-col gap-4">
           <div className="flex flex-col gap-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -447,10 +459,8 @@ const AttendanceSummaryCard: React.FC<{
           </div>
         </div>
 
-        {/* --- ✅ [수정] 통계 요약 (그리드: 출석률 & 미체크) --- */}
         {totalSummary ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-center border-t border-b py-4">
-            {/* 1. 출석률 (임원만 표시) */}
             {isExecutive ? (
               <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100 flex flex-col items-center justify-center">
                 <p className="text-sm font-medium text-indigo-600 whitespace-nowrap">
@@ -462,19 +472,15 @@ const AttendanceSummaryCard: React.FC<{
                 </p>
               </div>
             ) : (
-              // 임원이 아닐 경우 빈 공간을 채우거나, 미체크 카드를 전체 너비로 쓸 수 있음.
-              // 여기서는 미체크 카드가 강조되도록 빈 div 처리는 생략하고 아래 로직에 맡김
-              // (만약 임원이 아니면 grid가 2개 생기는데 첫번째가 없으므로 자동으로 레이아웃 조정됨)
               <></>
             )}
 
-            {/* 2. 미체크 (누락) - 셀장/임원 모두 표시 */}
             <div
               className={`p-4 rounded-xl border flex flex-col items-center justify-center ${
                 uncheckedCount > 0
                   ? "bg-red-50 border-red-100"
                   : "bg-gray-50 border-gray-200"
-              } ${!isExecutive ? "sm:col-span-2" : ""}`} // 임원이 아니면 미체크 카드를 꽉 채움
+              } ${!isExecutive ? "sm:col-span-2" : ""}`}
             >
               <p
                 className={`text-sm font-medium whitespace-nowrap ${
@@ -498,7 +504,6 @@ const AttendanceSummaryCard: React.FC<{
           </p>
         )}
 
-        {/* 출석 매트릭스 */}
         <div className="pt-2">
           <h4 className="text-sm font-medium text-gray-700 mb-3 ml-1 break-keep">
             {unitType === "semester"
@@ -525,6 +530,7 @@ const AttendanceSummaryCard: React.FC<{
 };
 
 // ... (이후 AdminActionsCard, TeamManagementModal, TempPasswordModal 등 기존과 동일) ...
+// Main Page 등 나머지는 변경 없음.
 
 const AdminActionsCard: React.FC<{
   onResetPassword: () => void;
@@ -637,10 +643,6 @@ const TempPasswordModal: React.FC<{
     </div>
   );
 };
-
-// ─────────────────────────────────────────────────────────────
-// [Main Page] MemberDetailPage
-// ─────────────────────────────────────────────────────────────
 
 const MemberDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -936,12 +938,10 @@ const MemberDetailPage: React.FC = () => {
         멤버 정보를 찾을 수 없습니다.
       </div>
     );
-
   const isExecutive = user?.role === "EXECUTIVE";
 
   return (
     <div className="container mx-auto px-4 py-8 pb-10">
-      {/* 상단 타이틀 + 버튼 */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 break-keep">
           {member.name} 상세 정보
@@ -970,9 +970,7 @@ const MemberDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* 메인 그리드 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 왼쪽: 기본정보 + 출석요약(컨트롤 포함) */}
         <div className="lg:col-span-2 space-y-6">
           <BasicInfoCard
             member={member}
@@ -997,12 +995,10 @@ const MemberDetailPage: React.FC = () => {
             onMatrixMonthChange={handleMatrixMonthChange}
             startDate={periodRange.startDate}
             endDate={periodRange.endDate}
-            // ✅ [추가] 사용자 권한 정보 전달
             userRole={user?.role}
           />
         </div>
 
-        {/* 오른쪽: 교회정보, 팀, 관리자도구, 기도제목 */}
         <div className="space-y-6">
           <ChurchInfoCard member={member} />
           <TeamsCard
@@ -1020,7 +1016,6 @@ const MemberDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 모달들 */}
       <TeamManagementModal
         key={isTeamModalOpen ? "modal-open" : "modal-closed"}
         isOpen={isTeamModalOpen}

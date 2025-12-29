@@ -128,7 +128,7 @@ const EditProfileForm: React.FC<{
     setSuccess("");
     try {
       await profileService.updateMyProfile(formData);
-      const msg = "프로필 정보가 성공적으로 업데이트되었습니다.";
+      const msg = "프로필 정보가 업데이트되었습니다.";
       setSuccess(msg);
       onNotify({ type: "success", message: msg });
       onUpdate();
@@ -307,8 +307,7 @@ const ChangePasswordForm: React.FC<{
     try {
       const { currentPassword, newPassword } = formData;
       await profileService.changePassword({ currentPassword, newPassword });
-      const msg =
-        "비밀번호가 성공적으로 변경되었습니다. 2초 후 로그아웃됩니다.";
+      const msg = "비밀번호가 변경되었습니다. 2초 후 로그아웃됩니다.";
       setSuccess(msg);
       onNotify({ type: "success", message: "비밀번호가 변경되었습니다." });
       setTimeout(() => logout(), 2000);

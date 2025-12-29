@@ -395,7 +395,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
       // ✅ [수정] 저장 성공 시 알림 후 대시보드로 이동
       showAlert(
         "저장 완료",
-        "출석 및 보고서가 성공적으로 저장되었습니다.\n확인을 누르면 대시보드로 이동합니다.",
+        "출석 및 보고서가 저장되었습니다.\n확인을 누르면 대시보드로 이동합니다.",
         () => {
           navigate("/"); // 대시보드 경로로 이동 (기본값 '/')
         }

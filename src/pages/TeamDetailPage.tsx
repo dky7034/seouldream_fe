@@ -235,7 +235,7 @@ const TeamDetailPage: React.FC = () => {
       setAlertInfo({
         isOpen: true,
         title: "성공",
-        message: "멤버가 성공적으로 추가되었습니다.",
+        message: "멤버가 추가되었습니다.",
       });
     } catch (error) {
       console.error("Failed to add members:", error);

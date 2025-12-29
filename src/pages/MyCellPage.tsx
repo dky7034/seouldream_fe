@@ -125,7 +125,7 @@ const MyCellPage: React.FC = () => {
           )}
 
           <p className="mt-2 text-sm sm:text-base text-gray-600">
-            셀 모임 보고서 작성 및 셀원 정보를 관리할 수 있습니다.
+            셀 보고서 작성 및 셀원 정보를 관리할 수 있습니다.
           </p>
         </div>
 

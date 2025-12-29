@@ -380,13 +380,9 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
       // 모드 변경 (읽기 전용)
       setIsEditMode(true);
 
-      showAlert(
-        "저장 완료",
-        "출석 및 보고서가 성공적으로 저장되었습니다.",
-        () => {
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }
-      );
+      showAlert("저장 완료", "출석 및 보고서가 저장되었습니다.", () => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
     } catch (err: any) {
       const errorMsg = err.response?.data?.message || "오류가 발생했습니다.";
       setSubmitError(errorMsg);
@@ -523,7 +519,6 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                     key={member.id}
                     className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 space-y-3"
                   >
-                    {/* 🔹 수정됨: flex justify-between 및 파란 점 로직 삭제 */}
                     <div className="border-b border-gray-100 pb-2 mb-2">
                       <span className="text-base font-bold text-gray-800 break-keep">
                         {formatDisplayName(member, allMembers)}
@@ -548,9 +543,13 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                     </div>
 
                     <div className="space-y-1.5 pt-1">
+                      {/* ▼ 수정된 부분: 라벨 옆에 필수 표시(*) 추가 ▼ */}
                       <label className="text-xs font-semibold text-gray-700 flex items-center">
                         기도제목 및 특이사항
+                        <span className="text-red-500 ml-0.5">*</span>
                       </label>
+                      {/* ▲ 수정 완료 ▲ */}
+
                       <textarea
                         placeholder="상세 내용을 기록해 주세요."
                         required
@@ -634,7 +633,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                         </td>
                         <td className="w-[65%] px-6 py-4 align-top">
                           <textarea
-                            placeholder="상세 내용을 기록해 주세요. (필수)"
+                            placeholder="상세 내용을 기록해 주세요."
                             required
                             value={attendance.prayerContent || ""}
                             onChange={(e) =>
@@ -682,7 +681,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                     value={cellShare}
                     onChange={(e) => setCellShare(e.target.value)}
                     readOnly={isEditMode}
-                    placeholder="셀 나눔 내용과 은혜를 나눠주세요. (필수)"
+                    placeholder="셀 나눔 내용과 은혜를 나눠주세요."
                     rows={4}
                     className={`w-full text-sm p-3 rounded-md shadow-sm min-h-[100px]
                     ${
@@ -701,7 +700,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                     value={specialNotes}
                     onChange={(e) => setSpecialNotes(e.target.value)}
                     readOnly={isEditMode}
-                    placeholder="공유할 내용을 적어주세요. (필수)"
+                    placeholder="공유할 내용을 적어주세요."
                     rows={3}
                     className={`w-full text-sm p-3 rounded-md shadow-sm min-h-[80px]
                     ${
