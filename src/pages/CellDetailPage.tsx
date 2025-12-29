@@ -891,6 +891,14 @@ const CellDetailPage: React.FC = () => {
         startDate: periodRange.startDate,
         endDate: periodRange.endDate,
       });
+
+      // 🔍 [로그 추가] 100으로 세탁된 데이터 확인
+      console.log(
+        "🔥 [CellDetailPage] 상세 요약 데이터:",
+        summary.totalSummary
+      );
+      console.log("➡️ 받은 출석률 값:", summary.totalSummary.attendanceRate);
+
       setPeriodSummary(summary.totalSummary);
 
       const listData = await attendanceService.getAttendances({

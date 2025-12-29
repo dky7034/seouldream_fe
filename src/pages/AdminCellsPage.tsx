@@ -291,7 +291,15 @@ const AdminCellsPage: React.FC = () => {
     );
 
     try {
-      setCellPage(await cellService.getAllCells(cleanedParams));
+      const response = await cellService.getAllCells(cleanedParams);
+
+      // 🔍 [로그 추가] 백엔드가 보낸 범죄 현장 포착
+      console.log("🔥 [AdminCellsPage] 전체 셀 목록 데이터:", response.content);
+      response.content.forEach((cell) => {
+        console.log(`➡️ ${cell.name}의 출석률:`, cell.attendanceRate);
+      });
+
+      setCellPage(response);
     } catch {
       setError("셀 목록 로드 실패");
     } finally {
