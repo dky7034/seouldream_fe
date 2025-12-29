@@ -98,9 +98,9 @@ const AttendanceMatrixView: React.FC<{
   const uncheckedCount = useMemo(() => {
     if (!startDate || !endDate || members.length === 0) return 0;
 
+    // 1. 조회 기간 설정
     const startStr = safeFormatDate(startDate, "-");
     const endStr = safeFormatDate(endDate, "-");
-
     const start = new Date(startStr);
     const end = new Date(endStr);
     start.setHours(0, 0, 0, 0);
@@ -108,7 +108,7 @@ const AttendanceMatrixView: React.FC<{
 
     if (start > end) return 0;
 
-    // 기간 내 일요일 수집
+    // 2. 기간 내 모든 일요일(Target Sundays) 수집
     const targetSundays: string[] = [];
     const cur = new Date(start);
     while (cur <= end) {
@@ -118,7 +118,7 @@ const AttendanceMatrixView: React.FC<{
       cur.setDate(cur.getDate() + 1);
     }
 
-    // 출석 기록 Set (MemberId-YYYY-MM-DD)
+    // 3. 출석 기록을 Set으로 변환하여 검색 속도 향상
     const attendanceSet = new Set<string>();
     for (const a of attendances) {
       const mId = getAttendanceMemberId(a);
@@ -132,11 +132,27 @@ const AttendanceMatrixView: React.FC<{
 
     let incompleteWeeks = 0;
 
+    // 4. 각 일요일별로 검사
     for (const sundayStr of targetSundays) {
-      const activeMembers = members;
+      const sundayDate = new Date(sundayStr);
+      sundayDate.setHours(0, 0, 0, 0);
+
+      // ✅ [핵심 수정] 해당 주일(일요일) 날짜 기준으로, 셀에 이미 배정된 멤버만 필터링
+      const activeMembers = members.filter((m) => {
+        // 배정일이 없으면(기존 멤버 or 데이터 누락) 체크 대상에 포함
+        if (!m.cellAssignmentDate) return true;
+
+        const assignDate = new Date(m.cellAssignmentDate);
+        assignDate.setHours(0, 0, 0, 0);
+
+        // 배정일 <= 해당 주일 이면 체크 대상
+        return assignDate <= sundayDate;
+      });
+
+      // 해당 주차에 체크해야 할 멤버가 한 명도 없다면(ex: 모두 아직 배정 전) 패스
       if (activeMembers.length === 0) continue;
 
-      // 해당 주차(일요일)에 기록이 없는 멤버가 한 명이라도 있으면 누락으로 간주
+      // 체크 대상 멤버 중 기록이 없는 사람이 있는지 확인
       const isWeekIncomplete = activeMembers.some((m) => {
         const key = `${m.id}-${sundayStr}`;
         return !attendanceSet.has(key);
