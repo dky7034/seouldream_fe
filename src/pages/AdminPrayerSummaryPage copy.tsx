@@ -66,42 +66,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
 
-  // [추가] 현재 날짜 기준 적절한 학기를 찾는 헬퍼 함수
-  // const findCurrentSemester = useCallback((semesterList: SemesterDto[]) => {
-  //   if (semesterList.length === 0) return null;
-
-  //   const now = new Date();
-  //   // YYYY-MM-DD 포맷 (시간대 오차 제거를 위해 문자열 처리)
-  //   const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-  //     .toISOString()
-  //     .split("T")[0];
-
-  //   // 1. 오늘 날짜가 기간 내에 포함된 학기
-  //   let target = semesterList.find((s) => {
-  //     const start = s.startDate.split("T")[0]; // T00:00:00 제거
-  //     const end = s.endDate.split("T")[0];
-  //     return todayStr >= start && todayStr <= end;
-  //   });
-
-  //   // 2. 없으면 이번 달이 걸쳐있는 학기 (기존 로직 보완)
-  //   if (!target) {
-  //     const currentYearMonth = todayStr.substring(0, 7); // YYYY-MM
-  //     target = semesterList.find((s) => {
-  //       const start = s.startDate.substring(0, 7);
-  //       const end = s.endDate.substring(0, 7);
-  //       return currentYearMonth >= start && currentYearMonth <= end;
-  //     });
-  //   }
-
-  //   // 3. 그래도 없으면 가장 최신 학기 (ID 역순 정렬 후 첫 번째)
-  //   if (!target) {
-  //     const sorted = [...semesterList].sort((a, b) => b.id - a.id);
-  //     target = sorted[0];
-  //   }
-
-  //   return target;
-  // }, []);
-
   const savedState = loadSavedFilterState();
 
   const urlMode: SummaryMode = useMemo(() => {
@@ -122,7 +86,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
 
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
-  const [hasAutoSelectedSemester, setHasAutoSelectedSemester] = useState(false);
 
   const [allMembersForNameCheck, setAllMembersForNameCheck] = useState<
     { id: number; name: string; birthDate?: string }[]
@@ -139,13 +102,11 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     savedState?.unitType ?? "semester"
   );
 
-  // [수정] year 타입을 'number'에서 'number | ""'로 변경해야 학기 모드일 때 빈 값("") 할당 가능
   const [filters, setFilters] = useState({
     cell: savedState?.filters?.cell ?? "all",
     member: savedState?.filters?.member ?? "all",
     startDate: savedState?.filters?.startDate ?? "",
     endDate: savedState?.filters?.endDate ?? "",
-    // ▼ 여기가 문제였습니다. as number 뒤에 | "" 를 추가해주세요.
     year: (savedState?.filters?.year ?? new Date().getFullYear()) as
       | number
       | "",
@@ -219,6 +180,63 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     fetchAllMembers();
   }, [user]);
 
+  // ✅ [추가] 현재 날짜 기준 적절한 학기를 찾는 헬퍼 함수
+  const findCurrentSemester = useCallback((semesterList: SemesterDto[]) => {
+    if (semesterList.length === 0) return null;
+
+    const now = new Date();
+    // YYYY-MM-DD 포맷 (시간대 오차 제거를 위해 문자열 처리)
+    // 로컬 시간 기준의 날짜 문자열 생성
+    const offset = now.getTimezoneOffset() * 60000;
+    const localDate = new Date(now.getTime() - offset);
+    const todayStr = localDate.toISOString().split("T")[0];
+    const currentYearMonth = todayStr.substring(0, 7); // YYYY-MM
+
+    // 1. 오늘 날짜가 기간 내에 정확히 포함된 학기 (1순위)
+    let target = semesterList.find((s) => {
+      const start = s.startDate.split("T")[0];
+      const end = s.endDate.split("T")[0];
+      return todayStr >= start && todayStr <= end;
+    });
+
+    // 2. 포함된 학기가 없다면 이번 달이 걸쳐있는 학기 (2순위 - 방학 등 고려)
+    if (!target) {
+      target = semesterList.find((s) => {
+        const start = s.startDate.substring(0, 7);
+        const end = s.endDate.substring(0, 7);
+        return currentYearMonth >= start && currentYearMonth <= end;
+      });
+    }
+
+    // 3. 그래도 없으면 가장 최신 학기 (3순위)
+    if (!target) {
+      const sorted = [...semesterList].sort((a, b) => b.id - a.id);
+      target = sorted[0];
+    }
+
+    return target;
+  }, []);
+
+  // ✅ [수정] 학기 데이터 로드 후 자동 선택 로직
+  // 저장된 값이 있더라도, 현재 unitType이 'semester'인데 semesterId가 비어있다면 자동 선택 수행
+  useEffect(() => {
+    if (semesters.length === 0) return;
+
+    // 현재 모드가 '학기'이고, 선택된 학기 ID가 없을 때만 자동 선택 실행
+    if (unitType === "semester" && !filters.semesterId) {
+      const targetSemester = findCurrentSemester(semesters);
+
+      if (targetSemester) {
+        setFilters((prev) => ({
+          ...prev,
+          semesterId: targetSemester.id,
+          year: "", // 학기 모드에서는 연도/월 비움
+          month: "",
+        }));
+      }
+    }
+  }, [semesters, unitType, filters.semesterId, findCurrentSemester]);
+
   const buildBaseParams = useCallback((): GetPrayersParams => {
     const params: GetPrayersParams = {
       page: currentPage,
@@ -240,8 +258,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
         }
       } else {
         // year가 숫자면 normalizeNumberInput이 숫자 반환
-        // 만약 비어있다면 normalize가 undefined 반환 -> 백엔드가 전체 조회하려 하겠지만
-        // UI에서 연도를 강제하므로 여기엔 항상 값이 들어옴.
         params.year = normalizeNumberInput(filters.year);
         params.month = normalizeNumberInput(filters.month);
       }
@@ -316,113 +332,35 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     sessionStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(stateToSave));
   }, [mode, filterType, unitType, filters, currentPage, sortConfig]);
 
-  // 첫 진입 시 학기 자동 선택 로직
-  useEffect(() => {
-    if (!savedState && semesters.length > 0 && !hasAutoSelectedSemester) {
-      const now = new Date();
-      // ✅ [수정] 월 단위 비교 (YYYY-MM)
-      const currentYearMonth = `${now.getFullYear()}-${String(
-        now.getMonth() + 1
-      ).padStart(2, "0")}`;
-
-      let targetSemester = semesters.find((s) => {
-        const startYearMonth = s.startDate.substring(0, 7);
-        const endYearMonth = s.endDate.substring(0, 7);
-        return (
-          currentYearMonth >= startYearMonth && currentYearMonth <= endYearMonth
-        );
-      });
-
-      if (!targetSemester) {
-        const sorted = [...semesters].sort((a, b) => b.id - a.id);
-        targetSemester = sorted[0];
-      }
-
-      if (targetSemester) {
-        setFilters((prev) => ({
-          ...prev,
-          semesterId: targetSemester!.id,
-          year: "", // 학기 모드에선 연도 무시
-          month: "",
-        }));
-      } else {
-        setUnitType("month");
-        setFilters((prev) => ({
-          ...prev,
-          year: now.getFullYear(),
-          month: now.getMonth() + 1,
-          semesterId: "",
-        }));
-      }
-      setHasAutoSelectedSemester(true);
-    }
-  }, [semesters, hasAutoSelectedSemester, savedState]);
-
   const handleFilterChange = (field: keyof typeof filters, value: any) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
     setCurrentPage(0);
   };
 
-  // ✅ [수정] 단위 변경 핸들러
-  // ✅ [수정] 단위 변경 핸들러 (학기 선택 시 현재 날짜 기준 자동 선택 강화)
+  // ✅ [수정] 단위 변경 핸들러 (버튼 클릭 시 동작)
   const handleUnitTypeClick = (type: UnitType) => {
     setUnitType(type);
     setFilters((prev) => {
       const next = { ...prev };
       const now = new Date();
       const currentYear = now.getFullYear();
-      const currentMonth = now.getMonth() + 1;
 
       if (type === "year") {
-        // 연도 모드: 저장된 연도가 없으면 현재 연도 자동 선택
         next.year = next.year || currentYear;
         next.month = "";
         next.semesterId = "";
       } else if (type === "month") {
-        // 월 모드: 연도/월이 없으면 현재 시점 선택
         next.year = next.year || currentYear;
-        next.month = next.month || currentMonth;
+        next.month = next.month || now.getMonth() + 1;
         next.semesterId = "";
       } else if (type === "semester") {
-        // 학기 모드: 연도/월 비활성화 (UI 표시용 초기화)
         next.year = "";
         next.month = "";
 
-        if (semesters.length > 0) {
-          // 1. 오늘 날짜 포맷팅 (YYYY-MM-DD) - 시간대 이슈 방지를 위해 문자열 처리 권장
-          const year = now.getFullYear();
-          const month = String(now.getMonth() + 1).padStart(2, "0");
-          const day = String(now.getDate()).padStart(2, "0");
-          const todayStr = `${year}-${month}-${day}`;
-
-          // 2. 오늘 날짜가 포함된 학기 찾기 (시작일 <= 오늘 <= 종료일)
-          let target = semesters.find((s) => {
-            // DB 데이터가 T시간을 포함할 경우를 대비해 앞부분(YYYY-MM-DD)만 추출
-            const start = s.startDate.split("T")[0];
-            const end = s.endDate.split("T")[0];
-            return todayStr >= start && todayStr <= end;
-          });
-
-          // 3. 만약 오늘이 방학 기간이라 포함된 학기가 없다면?
-          // -> '현재 월'이 포함된 학기를 찾거나(기존 로직), 가장 최근 학기를 선택
-          if (!target) {
-            const currentYearMonth = `${year}-${month}`;
-            target = semesters.find((s) => {
-              const start = s.startDate.substring(0, 7);
-              const end = s.endDate.substring(0, 7);
-              return currentYearMonth >= start && currentYearMonth <= end;
-            });
-          }
-
-          // 4. 그래도 없으면 가장 최신 학기(ID 역순) 선택
-          if (!target) {
-            const sorted = [...semesters].sort((a, b) => b.id - a.id);
-            target = sorted[0];
-          }
-
-          if (target) {
-            next.semesterId = target.id;
-          }
+        // 헬퍼 함수를 재사용하여 학기 찾기 로직 통일
+        const target = findCurrentSemester(semesters);
+        if (target) {
+          next.semesterId = target.id;
         }
       }
 
@@ -503,7 +441,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
         if (semester) return `조회 단위: 학기 (${semester.name})`;
       }
 
-      // [수정] year가 비어있을 수 없지만, 만약 비어있다면 표시 처리
       const yearText = filters.year ? `${filters.year}년` : "연도 미선택";
 
       if (unitType === "year") return `조회 단위: 연간 (${yearText})`;
@@ -696,13 +633,11 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                   <select
                     value={filters.year}
                     onChange={(e) =>
-                      // [수정] 빈 값 없이 무조건 숫자로 변환
                       handleFilterChange("year", Number(e.target.value))
                     }
                     className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
                     disabled={unitType === "semester"}
                   >
-                    {/* [수정] 전체 연도 <option value=""> 제거됨 */}
                     {yearOptions.map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.label}

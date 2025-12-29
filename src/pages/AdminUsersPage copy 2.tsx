@@ -260,32 +260,28 @@ const AdminUsersPage: React.FC = () => {
             <h3 className="font-bold text-gray-700">검색 필터</h3>
           </div>
 
-          {/* ✅ [수정] items-end -> items-start로 변경하여 라벨 기준으로 정렬 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 items-end">
             <div className="relative">
-              {/* ✅ [수정] mb-1 -> mb-2 (여백 증가) */}
-              <label className="text-xs font-bold text-gray-500 mb-2 block">
+              <label className="text-xs font-bold text-gray-500 mb-1 block">
                 이름 검색
               </label>
               <div className="relative">
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                {/* ✅ [수정] h-[42px]로 높이 통일, bg-white */}
                 <input
                   type="text"
                   placeholder="검색..."
                   value={filters.name}
                   onChange={(e) => handleFilterChange("name", e.target.value)}
-                  className="w-full pl-10 h-[42px] border-gray-200 rounded-xl text-base bg-white focus:bg-white transition-all"
+                  className="w-full pl-10 py-3 border-gray-200 rounded-xl text-base bg-gray-50 focus:bg-white transition-all h-[46px]"
                 />
               </div>
             </div>
             <div>
-              {/* ✅ [수정] mb-1 -> mb-2 */}
-              <label className="text-xs font-bold text-gray-500 mb-2 block">
+              <label className="text-xs font-bold text-gray-500 mb-1 block">
                 소속 셀
               </label>
-              {/* ✅ [수정] h-[42px]로 높이 통일 */}
-              <div className="h-[42px]">
+              {/* ✅ [수정] SimpleSearchableSelect의 컨테이너 높이와 내부 높이 조정 */}
+              <div className="h-[46px]">
                 <SimpleSearchableSelect
                   options={cellOptions}
                   value={filters.cellId}
@@ -295,15 +291,13 @@ const AdminUsersPage: React.FC = () => {
               </div>
             </div>
             <div>
-              {/* ✅ [수정] mb-1 -> mb-2 */}
-              <label className="text-xs font-bold text-gray-500 mb-2 block">
+              <label className="text-xs font-bold text-gray-500 mb-1 block">
                 성별
               </label>
-              {/* ✅ [수정] h-[42px], bg-white */}
               <select
                 value={filters.gender}
                 onChange={(e) => handleFilterChange("gender", e.target.value)}
-                className="w-full h-[42px] px-3 border-gray-200 rounded-xl text-base bg-white focus:bg-white"
+                className="w-full py-3 border-gray-200 rounded-xl text-base bg-gray-50 focus:bg-white h-[46px]"
               >
                 <option value="all">모든 성별</option>
                 <option value="MALE">남성</option>
@@ -311,15 +305,13 @@ const AdminUsersPage: React.FC = () => {
               </select>
             </div>
             <div>
-              {/* ✅ [수정] mb-1 -> mb-2 */}
-              <label className="text-xs font-bold text-gray-500 mb-2 block">
+              <label className="text-xs font-bold text-gray-500 mb-1 block">
                 등록 연도
               </label>
-              {/* ✅ [수정] h-[42px], bg-white */}
               <select
                 value={filters.year}
                 onChange={(e) => handleFilterChange("year", e.target.value)}
-                className="w-full h-[42px] px-3 border-gray-200 rounded-xl text-base bg-white focus:bg-white"
+                className="w-full py-3 border-gray-200 rounded-xl text-base bg-gray-50 focus:bg-white h-[46px]"
               >
                 <option value="all">모든 연도</option>
                 {yearOptions.map((y) => (
@@ -330,15 +322,13 @@ const AdminUsersPage: React.FC = () => {
               </select>
             </div>
             <div>
-              {/* ✅ [수정] mb-1 -> mb-2 */}
-              <label className="text-xs font-bold text-gray-500 mb-2 block">
+              <label className="text-xs font-bold text-gray-500 mb-1 block">
                 역할
               </label>
-              {/* ✅ [수정] h-[42px], bg-white */}
               <select
                 value={filters.role}
                 onChange={(e) => handleFilterChange("role", e.target.value)}
-                className="w-full h-[42px] px-3 border-gray-200 rounded-xl text-base bg-white focus:bg-white"
+                className="w-full py-3 border-gray-200 rounded-xl text-base bg-gray-50 focus:bg-white h-[46px]"
               >
                 <option value="all">모든 역할</option>
                 <option value="EXECUTIVE">임원</option>

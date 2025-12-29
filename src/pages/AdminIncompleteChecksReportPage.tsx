@@ -8,12 +8,15 @@ import type {
 } from "../types";
 import { useAuth } from "../hooks/useAuth";
 import { normalizeNumberInput } from "../utils/numberUtils";
-import { FaFileAlt } from "react-icons/fa";
 import { memberService } from "../services/memberService";
 import { formatDisplayName } from "../utils/memberUtils";
 import { semesterService } from "../services/semesterService";
 import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
 import { useNavigate } from "react-router-dom";
+import {
+  ExclamationCircleIcon,
+  UserGroupIcon,
+} from "@heroicons/react/24/solid";
 
 type FilterType = "unit" | "range";
 type UnitType = "year" | "month" | "semester";
@@ -38,11 +41,9 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
-
   const [allMembersForNameCheck, setAllMembersForNameCheck] = useState<
     { id: number; name: string; birthDate?: string }[]
   >([]);
-
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const hasActiveSemesters = semesters.length > 0;
   const [hasAutoSelectedSemester, setHasAutoSelectedSemester] = useState(false);
@@ -50,7 +51,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
   const [filters, setFilters] = useState<Filters>({
     startDate: "",
     endDate: "",
-    // ✅ [수정 1] 초기값을 '전체("")'가 아닌 '올해(currentYear)'로 설정
     year: currentYear,
     month: "" as number | "",
     semesterId: "" as number | "",
@@ -58,26 +58,19 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
   const [filterType, setFilterType] = useState<FilterType>("unit");
   const [unitType, setUnitType] = useState<UnitType>("semester");
 
-  // ✅ [수정 2] "전체 연도" 옵션 제거하고 DB 연도들만 표시 (없으면 올해 표시)
   const yearOptions = useMemo(() => {
-    if (availableYears.length === 0) {
+    if (availableYears.length === 0)
       return [{ value: currentYear, label: `${currentYear}년` }];
-    }
-    // { value: "", label: "전체 연도" } 제거됨
-    return availableYears.map((year) => ({
-      value: year,
-      label: `${year}년`,
-    }));
+    return availableYears.map((year) => ({ value: year, label: `${year}년` }));
   }, [availableYears, currentYear]);
 
   const handleFilterChange = (field: keyof Filters, value: any) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
   };
 
-  // ✅ [수정 3] 날짜 포맷팅 함수 개선 (타임존 문제 해결)
   const formatShortDate = (dateStr: string) => {
     if (!dateStr) return "";
-    const date = new Date(dateStr); // 브라우저 로컬 시간대 반영
+    const date = new Date(dateStr);
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
     return `${month}/${day}`;
@@ -89,22 +82,16 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
         filters.endDate
       )}`;
     }
-
     if (filterType === "unit") {
       if (unitType === "semester" && filters.semesterId && semesters.length) {
         const semester = semesters.find((s) => s.id === filters.semesterId);
-        if (semester) {
-          return `조회 단위: 학기 (${semester.name})`;
-        }
+        if (semester) return `학기: ${semester.name}`;
       }
-
       const yearText = filters.year ? `${filters.year}년` : "전체 연도";
-
-      if (unitType === "year") return `조회 단위: ${yearText} (학기 기간만)`;
+      if (unitType === "year") return `연간: ${yearText}`;
       if (unitType === "month" && filters.month)
-        return `조회 단위: ${yearText} ${filters.month}월 (학기 기간만)`;
+        return `월간: ${yearText} ${filters.month}월`;
     }
-
     return "";
   }, [filterType, unitType, filters, semesters]);
 
@@ -114,28 +101,22 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
       const currentYearMonth = `${today.getFullYear()}-${String(
         today.getMonth() + 1
       ).padStart(2, "0")}`;
+      let targetSemester = semesters.find(
+        (s) =>
+          s.startDate.substring(0, 7) <= currentYearMonth &&
+          s.endDate.substring(0, 7) >= currentYearMonth
+      );
+      if (!targetSemester)
+        targetSemester = [...semesters].sort((a, b) => b.id - a.id)[0];
 
-      let targetSemester = semesters.find((s) => {
-        const startYearMonth = s.startDate.substring(0, 7);
-        const endYearMonth = s.endDate.substring(0, 7);
-        return (
-          currentYearMonth >= startYearMonth && currentYearMonth <= endYearMonth
-        );
-      });
-
-      if (!targetSemester) {
-        const sorted = [...semesters].sort((a, b) => b.id - a.id);
-        targetSemester = sorted[0];
-      }
-
-      if (targetSemester) {
+      if (targetSemester)
         setFilters((prev) => ({
           ...prev,
           semesterId: targetSemester!.id,
           year: "",
           month: "",
         }));
-      } else {
+      else {
         setUnitType("month");
         setFilters((prev) => ({
           ...prev,
@@ -153,9 +134,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
     setFilters((prev) => {
       const baseYear = typeof prev.year === "number" ? prev.year : currentYear;
       const next: Filters = { ...prev };
-
       if (type === "year") {
-        // ✅ [수정 4] 연도 필수 유지
         next.year = baseYear;
         next.month = "";
         next.semesterId = "";
@@ -171,17 +150,12 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
           const currentYM = `${today.getFullYear()}-${String(
             today.getMonth() + 1
           ).padStart(2, "0")}`;
-
-          let target = semesters.find((s) => {
-            const start = s.startDate.substring(0, 7);
-            const end = s.endDate.substring(0, 7);
-            return currentYM >= start && currentYM <= end;
-          });
-
-          if (!target) {
-            const sorted = [...semesters].sort((a, b) => b.id - a.id);
-            target = sorted[0];
-          }
+          let target = semesters.find(
+            (s) =>
+              s.startDate.substring(0, 7) <= currentYM &&
+              s.endDate.substring(0, 7) >= currentYM
+          );
+          if (!target) target = [...semesters].sort((a, b) => b.id - a.id)[0];
           if (target) next.semesterId = target.id;
         }
       }
@@ -190,90 +164,76 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
   };
 
   const handleUnitValueChange = (value: number) => {
-    setFilters((prev) => {
-      const baseYear = typeof prev.year === "number" ? prev.year : currentYear;
-      return {
-        ...prev,
-        year: baseYear,
-        month: value,
-        semesterId: "",
-      };
-    });
-  };
-
-  const handleSemesterClick = (semesterId: number) => {
     setFilters((prev) => ({
       ...prev,
-      semesterId,
-      year: "",
-      month: "",
+      year: typeof prev.year === "number" ? prev.year : currentYear,
+      month: value,
+      semesterId: "",
     }));
+  };
+  const handleSemesterClick = (semesterId: number) => {
+    setFilters((prev) => ({ ...prev, semesterId, year: "", month: "" }));
   };
 
   const renderUnitButtons = () => {
-    switch (unitType) {
-      case "month":
-        return (
-          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => handleUnitValueChange(m)}
-                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
-                  filters.month === m ? "bg-blue-500 text-white" : "bg-white"
-                }`}
-              >
-                {m}월
-              </button>
-            ))}
-          </div>
-        );
-      case "semester":
-        if (semesters.length === 0) {
-          return (
-            <div className="mt-3 rounded-md bg-yellow-50 p-3 text-[11px] sm:text-xs text-yellow-800">
-              현재 활성 상태인 학기가 없습니다.
-            </div>
-          );
-        }
-        return (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-            {semesters.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => handleSemesterClick(s.id)}
-                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
-                  filters.semesterId === s.id
-                    ? "bg-blue-500 text-white"
-                    : "bg-white"
-                }`}
-              >
-                {s.name}
-              </button>
-            ))}
-          </div>
-        );
-      case "year":
-      default:
-        return null;
+    if (unitType === "month") {
+      return (
+        <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x">
+          {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+            <button
+              key={m}
+              onClick={() => handleUnitValueChange(m)}
+              className={`flex-shrink-0 snap-start px-3 py-1.5 border rounded-full text-xs font-bold ${
+                filters.month === m
+                  ? "bg-indigo-600 text-white border-indigo-600"
+                  : "bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              {m}월
+            </button>
+          ))}
+        </div>
+      );
     }
+    if (unitType === "semester") {
+      if (semesters.length === 0)
+        return (
+          <div className="text-xs text-yellow-600 bg-yellow-50 p-2 rounded">
+            활성 학기 없음
+          </div>
+        );
+      return (
+        <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x">
+          {semesters.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => handleSemesterClick(s.id)}
+              className={`flex-shrink-0 snap-start px-3 py-1.5 border rounded-full text-xs font-bold ${
+                filters.semesterId === s.id
+                  ? "bg-indigo-600 text-white border-indigo-600"
+                  : "bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              {s.name}
+            </button>
+          ))}
+        </div>
+      );
+    }
+    return null;
   };
 
   const fetchIncompleteChecks = useCallback(
     async (opts?: { skipLoading?: boolean }) => {
       if (!user || user.role !== "EXECUTIVE") {
         setLoading(false);
-        setError("접근 권한이 없습니다.");
+        setError("권한이 없습니다.");
         return;
       }
-
       if (!opts?.skipLoading) setLoading(true);
       setError(null);
 
       let params: GetAttendancesParams = {};
-
       if (filterType === "range") {
         params = {
           startDate: filters.startDate || undefined,
@@ -282,26 +242,21 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
       } else {
         if (filters.semesterId && semesters.length > 0) {
           const semester = semesters.find((s) => s.id === filters.semesterId);
-          if (semester) {
+          if (semester)
             params = {
               startDate: semester.startDate,
               endDate: semester.endDate,
             };
-          }
         } else {
           const yearVal = normalizeNumberInput(filters.year);
           const monthVal = normalizeNumberInput(filters.month);
-
           if (!yearVal) {
-            // 연도가 선택되지 않았다면 조회하지 않음
             setLoading(false);
             setReport([]);
             return;
           }
-
-          let rangeStart = "";
-          let rangeEnd = "";
-
+          let rangeStart = "",
+            rangeEnd = "";
           if (monthVal) {
             const startD = new Date(yearVal, monthVal - 1, 1);
             const endD = new Date(yearVal, monthVal, 0);
@@ -320,30 +275,23 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
           const overlappingSemesters = semesters.filter(
             (s) => s.startDate <= rangeEnd && s.endDate >= rangeStart
           );
-
           if (overlappingSemesters.length === 0) {
             setReport([]);
             if (!opts?.skipLoading) setLoading(false);
             return;
           }
 
-          const semestersMinStart = overlappingSemesters.reduce(
-            (min, s) => (s.startDate < min ? s.startDate : min),
+          const minS = overlappingSemesters.reduce(
+            (m, s) => (s.startDate < m ? s.startDate : m),
             overlappingSemesters[0].startDate
           );
-          const semestersMaxEnd = overlappingSemesters.reduce(
-            (max, s) => (s.endDate > max ? s.endDate : max),
+          const maxE = overlappingSemesters.reduce(
+            (m, s) => (s.endDate > m ? s.endDate : m),
             overlappingSemesters[0].endDate
           );
-
-          const finalStart =
-            rangeStart > semestersMinStart ? rangeStart : semestersMinStart;
-          const finalEnd =
-            rangeEnd < semestersMaxEnd ? rangeEnd : semestersMaxEnd;
-
           params = {
-            startDate: finalStart,
-            endDate: finalEnd,
+            startDate: rangeStart > minS ? rangeStart : minS,
+            endDate: rangeEnd < maxE ? rangeEnd : maxE,
           };
         }
       }
@@ -353,7 +301,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
           ([, v]) => v !== null && v !== "" && v !== undefined
         )
       );
-
       if (Object.keys(cleanedParams).length === 0) {
         setReport([]);
         if (!opts?.skipLoading) setLoading(false);
@@ -361,20 +308,11 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
       }
 
       try {
-        const data = await reportService.getIncompleteCheckReport(
-          cleanedParams
-        );
-        setReport(data);
+        setReport(await reportService.getIncompleteCheckReport(cleanedParams));
       } catch (err: any) {
-        console.error("Failed to fetch incomplete checks report:", err);
-        setError(
-          err?.response?.data?.message ||
-            "출석 누락 현황 정보를 불러오는 데 실패했습니다."
-        );
+        setError(err?.response?.data?.message || "데이터 로드 실패");
       } finally {
-        if (!opts?.skipLoading) {
-          setLoading(false);
-        }
+        if (!opts?.skipLoading) setLoading(false);
       }
     },
     [user, filters, filterType, semesters]
@@ -382,147 +320,101 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
 
   const fetchAvailableYears = useCallback(async () => {
     try {
-      const years = await reportService.getAvailableYearsForReports();
-      setAvailableYears(years);
-    } catch (err) {
-      console.error("Failed to fetch available years for reports:", err);
+      setAvailableYears(await reportService.getAvailableYearsForReports());
+    } catch {
       setAvailableYears([]);
     }
   }, []);
-
   const fetchSemesters = useCallback(async () => {
     try {
-      const data = await semesterService.getAllSemesters(true);
-      setSemesters(data);
-    } catch (err) {
-      console.error("Failed to fetch semesters for reports:", err);
+      setSemesters(await semesterService.getAllSemesters(true));
+    } catch {
       setSemesters([]);
     }
   }, []);
 
   useEffect(() => {
     if (!user || user.role !== "EXECUTIVE") return;
-    if (semesters.length > 0 || hasActiveSemesters === false) {
+    if (semesters.length > 0 || hasActiveSemesters === false)
       fetchIncompleteChecks();
-    }
   }, [user, fetchIncompleteChecks, semesters.length, hasActiveSemesters]);
-
   useEffect(() => {
     if (!user || user.role !== "EXECUTIVE") return;
     fetchAvailableYears();
     fetchSemesters();
   }, [user, fetchAvailableYears, fetchSemesters]);
-
   useEffect(() => {
     if (!user || user.role !== "EXECUTIVE") return;
-
-    const fetchAllMembersForNameCheck = async () => {
-      try {
-        const page = await memberService.getAllMembers({
-          page: 0,
-          size: 1000,
-          sort: "id,asc",
-        });
-
-        const list =
-          page?.content?.map((m) => ({
+    memberService
+      .getAllMembers({ page: 0, size: 1000, sort: "id,asc" })
+      .then((p) =>
+        setAllMembersForNameCheck(
+          p?.content?.map((m) => ({
             id: m.id,
             name: m.name,
             birthDate: m.birthDate,
-          })) ?? [];
-
-        setAllMembersForNameCheck(list);
-      } catch (e) {
-        console.error("동명이인 판별용 멤버 목록 로딩 실패:", e);
-        setAllMembersForNameCheck([]);
-      }
-    };
-
-    fetchAllMembersForNameCheck();
+          })) ?? []
+        )
+      )
+      .catch(console.error);
   }, [user]);
 
-  if (!user || user.role !== "EXECUTIVE") {
+  if (!user || user.role !== "EXECUTIVE")
     return (
-      <div className="bg-gray-50 min-h-screen flex justify-center items-center px-4">
-        <div className="bg-white rounded-lg shadow-sm p-6 max-w-md w-full text-center">
-          <p className="mt-1 text-red-600 text-sm sm:text-base">
-            이 페이지에 접근할 권한이 없습니다.
-          </p>
-        </div>
-      </div>
+      <div className="p-10 text-center text-red-500">권한이 없습니다.</div>
     );
-  }
-
-  if (loading) {
-    return (
-      <div className="bg-gray-50 min-h-screen flex items-center justify-center px-4">
-        <div className="flex flex-col items-center space-y-3">
-          <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-indigo-500" />
-          <p className="text-xs sm:text-sm text-gray-500">
-            리포트 정보를 불러오는 중입니다...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-gray-50 min-h-screen flex items-center justify-center px-4">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6 max-w-md w-full text-center">
-          <p className="text-red-700 mb-3 text-sm sm:text-base">{error}</p>
-          <button
-            type="button"
-            onClick={() => fetchIncompleteChecks({ skipLoading: false })}
-            className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
-          >
-            다시 시도
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <div className="container mx-auto max-w-6xl px-3 sm:px-4 py-6 sm:py-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 sm:mb-8">
+    <div className="bg-gray-50 min-h-screen pb-20">
+      <div className="container mx-auto max-w-6xl px-4 py-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-              출석 누락 현황
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <ExclamationCircleIcon className="h-7 w-7 text-red-500" /> 출석
+              누락 현황
             </h1>
-            <p className="mt-1 text-sm text-gray-600">
-              지정된 기간 동안 출석 체크를 완료하지 않은 셀장 및 날짜 정보를
-              확인할 수 있습니다.
+            <p className="text-sm text-gray-500 mt-1">
+              출석 체크를 완료하지 않은 셀장 및 날짜를 확인합니다.
             </p>
           </div>
         </div>
 
-        <div className="p-4 bg-gray-50 rounded-lg mb-4 sm:mb-6 shadow-sm space-y-4">
-          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-            <h3 className="text-base sm:text-lg font-semibold">기간 설정</h3>
-            <div className="flex flex-wrap items-center gap-2">
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm font-bold text-red-700 flex items-center gap-2">
+            <ExclamationCircleIcon className="h-5 w-5" /> {error}
+            <button
+              onClick={() => fetchIncompleteChecks({ skipLoading: false })}
+              className="ml-auto text-xs bg-white border border-red-200 px-3 py-1 rounded-lg hover:bg-red-50"
+            >
+              다시 시도
+            </button>
+          </div>
+        )}
+
+        {/* Filter Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6 space-y-5">
+          <div className="flex flex-col sm:flex-row gap-4 mb-2">
+            <div className="flex bg-gray-100 p-1 rounded-xl w-full sm:w-auto self-start">
               <button
-                type="button"
                 onClick={() => setFilterType("unit")}
-                className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
+                className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all ${
                   filterType === "unit"
-                    ? "bg-blue-500 text-white"
-                    : "bg-white border"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-gray-500"
                 }`}
               >
-                단위로 조회
+                단위별
               </button>
               <button
-                type="button"
                 onClick={() => setFilterType("range")}
-                className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
+                className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all ${
                   filterType === "range"
-                    ? "bg-blue-500 text-white"
-                    : "bg-white border"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-gray-500"
                 }`}
               >
-                기간으로 조회
+                기간설정
               </button>
             </div>
           </div>
@@ -530,29 +422,29 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
           {filterType === "range" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  기간 시작
+                <label className="text-xs font-bold text-gray-500 mb-1 block">
+                  시작일
                 </label>
                 <KoreanCalendarPicker
                   value={filters.startDate}
-                  onChange={(date) => handleFilterChange("startDate", date)}
+                  onChange={(d) => handleFilterChange("startDate", d)}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  기간 종료
+                <label className="text-xs font-bold text-gray-500 mb-1 block">
+                  종료일
                 </label>
                 <KoreanCalendarPicker
                   value={filters.endDate}
-                  onChange={(date) => handleFilterChange("endDate", date)}
+                  onChange={(d) => handleFilterChange("endDate", d)}
                 />
               </div>
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="sm:w-1/3">
+                  <label className="text-xs font-bold text-gray-500 mb-1 block">
                     연도
                   </label>
                   <select
@@ -563,70 +455,42 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                         e.target.value ? Number(e.target.value) : ""
                       )
                     }
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
+                    className="w-full border-gray-200 rounded-xl text-sm bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500"
                     disabled={unitType === "semester"}
                   >
-                    {yearOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
+                    {yearOptions.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
                       </option>
                     ))}
                   </select>
-                  {unitType === "semester" && (
-                    <p className="mt-1 text-[11px] text-gray-500">
-                      학기 단위 조회 시 학기별 연도가 자동 적용됩니다.
-                    </p>
-                  )}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
+                <div className="flex-1">
+                  <label className="text-xs font-bold text-gray-500 mb-1 block">
                     조회 단위
                   </label>
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <button
-                      type="button"
-                      onClick={() => handleUnitTypeClick("month")}
-                      className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
-                        unitType === "month"
-                          ? "bg-blue-500 text-white"
-                          : "bg-white border"
-                      }`}
-                    >
-                      월간
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        hasActiveSemesters && handleUnitTypeClick("semester")
-                      }
-                      disabled={!hasActiveSemesters}
-                      className={`px-3 py-1 text-xs sm:text-sm rounded-full border ${
-                        hasActiveSemesters
-                          ? unitType === "semester"
-                            ? "bg-blue-500 text-white border-blue-500"
-                            : "bg-white"
-                          : "bg-gray-100 text-gray-400 border-dashed cursor-not-allowed"
-                      }`}
-                    >
-                      학기
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleUnitTypeClick("year")}
-                      className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
-                        unitType === "year"
-                          ? "bg-blue-500 text-white"
-                          : "bg-white border"
-                      }`}
-                    >
-                      연간
-                    </button>
+                  <div className="flex bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+                    {(
+                      [
+                        { t: "month", l: "월간" },
+                        { t: "semester", l: "학기" },
+                        { t: "year", l: "연간" },
+                      ] as const
+                    ).map((u) => (
+                      <button
+                        key={u.t}
+                        onClick={() => handleUnitTypeClick(u.t)}
+                        className={`flex-1 py-2 text-xs font-bold ${
+                          unitType === u.t
+                            ? "bg-indigo-50 text-indigo-600"
+                            : "text-gray-500 hover:bg-gray-100"
+                        }`}
+                        disabled={u.t === "semester" && !hasActiveSemesters}
+                      >
+                        {u.l}
+                      </button>
+                    ))}
                   </div>
-                  {!hasActiveSemesters && (
-                    <p className="mt-1 text-[11px] text-red-500">
-                      활성화된 학기가 없어 학기 단위 조회를 사용할 수 없습니다.
-                    </p>
-                  )}
                 </div>
               </div>
               {renderUnitButtons()}
@@ -634,183 +498,176 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
           )}
         </div>
 
-        {(periodSummary || report.length > 0) && (
-          <div className="mb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 text-xs sm:text-sm text-gray-600">
-            <div>{periodSummary}</div>
-            <div>
-              총{" "}
-              <span className="font-semibold text-gray-800">
-                {report.length}
-              </span>
-              명의 셀장이 출석 체크를 누락했습니다.
-            </div>
-          </div>
-        )}
-
-        {report.length === 0 ? (
-          <div className="bg-white p-6 rounded-lg shadow-md text-center text-gray-500">
-            <FaFileAlt className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mb-3" />
-            <p className="text-base sm:text-lg font-semibold">
-              조건에 맞는 출석 누락 결과가 없습니다.
-            </p>
-            <p className="mt-1 text-xs sm:text-sm">
-              기간 또는 단위를 조정해 다시 조회해 보세요.
-            </p>
+        {/* Results */}
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
           </div>
         ) : (
           <>
-            {/* Mobile View */}
-            <div className="md:hidden space-y-3 mb-4">
-              {report.map((item) => {
-                const leaderMember = allMembersForNameCheck.find(
-                  (m) => m.id === item.leaderId
-                );
-                const displayName = leaderMember
-                  ? formatDisplayName(leaderMember, allMembersForNameCheck)
-                  : item.leaderName;
-
-                const badgeClass =
-                  item.missedDatesCount >= 5
-                    ? "bg-red-100 text-red-700"
-                    : item.missedDatesCount >= 2
-                    ? "bg-yellow-100 text-yellow-700"
-                    : "bg-gray-100 text-gray-700";
-
-                return (
-                  <div
-                    key={item.leaderId}
-                    onClick={() => navigate(`/admin/cells/${item.cellId}`)}
-                    className="bg-white rounded-lg shadow border border-gray-100 p-4 text-xs space-y-2 cursor-pointer hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex justify-between items-start gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">
-                          {displayName}
-                        </p>
-                        <p className="mt-1 text-[11px] text-gray-500">
-                          셀:{" "}
-                          <span className="font-medium text-gray-700">
-                            {item.cellName}
-                          </span>
-                        </p>
-                      </div>
-                      <span
-                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold ${badgeClass}`}
-                      >
-                        {item.missedDatesCount}회 누락
-                      </span>
-                    </div>
-
-                    <div className="pt-1 border-t border-gray-100 mt-2">
-                      <p className="text-[11px] text-gray-500 mb-1">
-                        미완료 날짜
-                      </p>
-                      <div className="max-h-32 overflow-y-auto pr-1">
-                        <ul className="space-y-1">
-                          {item.missedDates.map(
-                            (date: string, index: number) => (
-                              <li
-                                key={`${date}-${index}`}
-                                className="flex items-center text-[11px] text-gray-700"
-                              >
-                                <span className="mr-1 text-gray-400">•</span>
-                                {/* ✅ safeFormatDate 적용 */}
-                                <span>{formatShortDate(date)}</span>
-                              </li>
-                            )
-                          )}
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="flex items-center justify-between mb-4 px-1">
+              <div className="flex items-center gap-2">
+                <UserGroupIcon className="h-5 w-5 text-gray-400" />
+                <span className="font-bold text-gray-700">
+                  검색 결과{" "}
+                  <span className="text-red-600">{report.length}</span>명
+                </span>
+              </div>
+              <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
+                {periodSummary}
+              </span>
             </div>
 
-            {/* Desktop View */}
-            <div className="hidden md:block bg-white shadow-md rounded-lg overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
-                  <thead className="bg-gray-50">
+            <div className="space-y-3 md:hidden">
+              {report.length === 0 ? (
+                <div className="py-12 text-center bg-white rounded-2xl border border-dashed border-gray-200 text-gray-400 text-sm">
+                  누락된 기록이 없습니다.
+                </div>
+              ) : (
+                report.map((item) => {
+                  const leaderMember = allMembersForNameCheck.find(
+                    (m) => m.id === item.leaderId
+                  );
+                  const displayName = leaderMember
+                    ? formatDisplayName(leaderMember, allMembersForNameCheck)
+                    : item.leaderName;
+                  const badgeClass =
+                    item.missedDatesCount >= 5
+                      ? "bg-red-100 text-red-700"
+                      : item.missedDatesCount >= 2
+                      ? "bg-yellow-100 text-yellow-700"
+                      : "bg-gray-100 text-gray-700";
+
+                  return (
+                    <div
+                      key={item.leaderId}
+                      onClick={() => navigate(`/admin/cells/${item.cellId}`)}
+                      className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 cursor-pointer hover:border-indigo-200 transition-all active:scale-[0.99]"
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h3 className="text-base font-bold text-gray-900">
+                            {displayName}
+                          </h3>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {item.cellName}
+                          </p>
+                        </div>
+                        <span
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold ${badgeClass}`}
+                        >
+                          {item.missedDatesCount}회 누락
+                        </span>
+                      </div>
+                      <div className="bg-gray-50 p-3 rounded-xl">
+                        <p className="text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-wider">
+                          미완료 날짜
+                        </p>
+                        {/* ✅ 수정: slice 없이 모든 날짜 표시 */}
+                        <div className="flex flex-wrap gap-1.5">
+                          {item.missedDates.map((d, i) => (
+                            <span
+                              key={i}
+                              className="text-xs font-medium text-gray-600 bg-white border border-gray-200 px-1.5 py-0.5 rounded"
+                            >
+                              {formatShortDate(d)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Desktop Table */}
+            <div className="hidden md:block bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs w-1/4">
+                      셀장 이름
+                    </th>
+                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs w-1/4">
+                      셀 이름
+                    </th>
+                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs w-1/6">
+                      누락 횟수
+                    </th>
+                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">
+                      미완료 날짜
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {report.length === 0 ? (
                     <tr>
-                      <th className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        셀장 이름
-                      </th>
-                      <th className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        셀 이름
-                      </th>
-                      <th className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        미완료 횟수
-                      </th>
-                      <th className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        미완료 날짜
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {report.map((item: any) => (
-                      <tr
-                        key={item.leaderId}
-                        onClick={() => navigate(`/admin/cells/${item.cellId}`)}
-                        className="cursor-pointer hover:bg-gray-50 transition-colors"
+                      <td
+                        colSpan={4}
+                        className="px-6 py-12 text-center text-gray-400"
                       >
-                        <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">
-                          {(() => {
-                            const leaderMember = allMembersForNameCheck.find(
-                              (m) => m.id === item.leaderId
-                            );
-                            return leaderMember
-                              ? formatDisplayName(
-                                  leaderMember,
-                                  allMembersForNameCheck
-                                )
-                              : item.leaderName;
-                          })()}
-                        </td>
-                        <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-700">
-                          {item.cellName}
-                        </td>
-                        <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm">
-                          <span
-                            className={`
-                              inline-flex items-center px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-semibold
-                              ${
-                                item.missedDatesCount >= 5
-                                  ? "bg-red-100 text-red-700"
-                                  : item.missedDatesCount >= 2
-                                  ? "bg-yellow-100 text-yellow-700"
-                                  : "bg-gray-100 text-gray-700"
-                              }
-                            `}
-                          >
-                            {item.missedDatesCount}회
-                          </span>
-                        </td>
-                        <td className="px-4 sm:px-6 py-3 align-top text-xs sm:text-sm text-gray-700">
-                          <div className="max-h-32 overflow-y-auto pr-1">
-                            <ul className="space-y-1">
-                              {item.missedDates.map(
-                                (date: string, index: number) => (
-                                  <li
-                                    key={`${date}-${index}`}
-                                    className="flex items-center text-[11px] sm:text-xs text-gray-700"
-                                  >
-                                    <span className="mr-1 text-gray-400">
-                                      •
-                                    </span>
-                                    {/* ✅ safeFormatDate 적용 */}
-                                    <span>{formatShortDate(date)}</span>
-                                  </li>
-                                )
-                              )}
-                            </ul>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        결과가 없습니다.
+                      </td>
+                    </tr>
+                  ) : (
+                    report.map((item) => {
+                      const leaderMember = allMembersForNameCheck.find(
+                        (m) => m.id === item.leaderId
+                      );
+                      const displayName = leaderMember
+                        ? formatDisplayName(
+                            leaderMember,
+                            allMembersForNameCheck
+                          )
+                        : item.leaderName;
+                      const badgeClass =
+                        item.missedDatesCount >= 5
+                          ? "bg-red-100 text-red-700"
+                          : item.missedDatesCount >= 2
+                          ? "bg-yellow-100 text-yellow-700"
+                          : "bg-gray-100 text-gray-700";
+
+                      return (
+                        <tr
+                          key={item.leaderId}
+                          onClick={() =>
+                            navigate(`/admin/cells/${item.cellId}`)
+                          }
+                          className="hover:bg-gray-50 transition-colors cursor-pointer group"
+                        >
+                          <td className="px-6 py-4 font-bold text-gray-900 group-hover:text-indigo-600 align-top">
+                            {displayName}
+                          </td>
+                          <td className="px-6 py-4 text-gray-600 align-top">
+                            {item.cellName}
+                          </td>
+                          <td className="px-6 py-4 align-top">
+                            <span
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold ${badgeClass}`}
+                            >
+                              {item.missedDatesCount}회
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 align-top">
+                            {/* ✅ 수정: slice 없이 모든 날짜 표시 */}
+                            <div className="flex flex-wrap gap-1.5">
+                              {item.missedDates.map((d, i) => (
+                                <span
+                                  key={i}
+                                  className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded"
+                                >
+                                  {formatShortDate(d)}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
           </>
         )}

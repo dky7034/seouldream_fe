@@ -1,20 +1,14 @@
+// src/pages/AdminCellsPage.tsx
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { cellService } from "../services/cellService";
-import { attendanceService } from "../services/attendanceService";
-import type {
-  GetAllCellsParams,
-  CellDto,
-  Page,
-  SimpleAttendanceRateDto,
-} from "../types";
+import type { GetAllCellsParams, CellDto, Page, SemesterDto } from "../types";
 import { useAuth } from "../hooks/useAuth";
 import Pagination from "../components/Pagination";
 import { useDebounce } from "../hooks/useDebounce";
 import { formatDisplayName } from "../utils/memberUtils";
 import { memberService } from "../services/memberService";
 import { semesterService } from "../services/semesterService";
-import type { SemesterDto } from "../types";
 import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
 
 type SortKey =
@@ -53,35 +47,59 @@ const AdminCellsPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // 데이터 상태
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
-  const hasActiveSemesters = semesters.length > 0;
-  const [hasAutoSelectedSemester, setHasAutoSelectedSemester] = useState(false);
-
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [cellPage, setCellPage] = useState<Page<CellDto> | null>(null);
+
+  // UI 상태
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [hasInitialized, setHasInitialized] = useState(false);
+
+  // 삭제 모달 상태
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [cellToDelete, setCellToDelete] = useState<CellDto | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  const [availableYears, setAvailableYears] = useState<number[]>([]);
 
   const [allMembersForNameCheck, setAllMembersForNameCheck] = useState<
     { name: string; birthDate?: string }[]
   >([]);
 
-  const now = new Date();
-  const currentYear = now.getFullYear();
+  // ───────────────── 검색어 IME(한글) 버그 해결을 위한 로컬 상태 ─────────────────
+  // URL의 'name' 파라미터와 분리하여 입력 UI를 제어합니다.
+  const [localSearchName, setLocalSearchName] = useState(
+    searchParams.get("name") || ""
+  );
+  // 로컬 입력값에 대해 0.5초 디바운스 적용
+  const debouncedSearchName = useDebounce(localSearchName, 500);
 
-  const [filters, setFilters] = useState<Filters>({
-    name: "",
-    active: "all",
-    startDate: "",
-    endDate: "",
-    year: currentYear,
-    month: "",
-    semesterId: "",
+  // ───────────────── 필터 상태 (URL 기반 초기값) ─────────────────
+  const [filters, setFilters] = useState<Filters>(() => {
+    const name = searchParams.get("name") || "";
+    const active = (searchParams.get("active") as Filters["active"]) || "all";
+    const startDate = searchParams.get("startDate") || "";
+    const endDate = searchParams.get("endDate") || "";
+    const yearParam = searchParams.get("year");
+    const monthParam = searchParams.get("month");
+    const semesterIdParam = searchParams.get("semesterId");
+
+    let initialYear: number | "" = "";
+    if (yearParam && yearParam !== "all") {
+      const parsed = Number(yearParam);
+      if (!isNaN(parsed)) initialYear = parsed;
+    }
+
+    return {
+      name,
+      active,
+      startDate,
+      endDate,
+      year: initialYear,
+      month: monthParam ? Number(monthParam) : "",
+      semesterId: semesterIdParam ? Number(semesterIdParam) : "",
+    };
   });
 
   const [filterType, setFilterType] = useState<"unit" | "range">("unit");
@@ -89,13 +107,30 @@ const AdminCellsPage: React.FC = () => {
     "semester"
   );
 
-  const [attendanceRates, setAttendanceRates] = useState<
-    Map<number, SimpleAttendanceRateDto>
-  >(new Map());
-  const [rateLoading, setRateLoading] = useState<boolean>(false);
+  const hasActiveSemesters = semesters.length > 0;
 
-  const debouncedNameFilter = useDebounce(filters.name, 500);
+  const updateQueryParams = useCallback(
+    (updates: Record<string, string | number | undefined | null>) => {
+      const newParams = new URLSearchParams(searchParams);
 
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === undefined || value === null || value === "") {
+          newParams.delete(key);
+        } else {
+          newParams.set(key, String(value));
+        }
+      });
+
+      if (!Object.prototype.hasOwnProperty.call(updates, "page")) {
+        newParams.set("page", "0");
+      }
+
+      setSearchParams(newParams);
+    },
+    [searchParams, setSearchParams]
+  );
+
+  // --- 정렬 설정 (URL에서 읽기) ---
   const getValidSortKey = (value: string | null): SortKey => {
     if (value === "name") return "name";
     if (value === "leaderName") return "leaderName";
@@ -122,78 +157,83 @@ const AdminCellsPage: React.FC = () => {
     return Number.isNaN(pageNum) || pageNum < 0 ? 0 : pageNum;
   });
 
+  // 1. 디바운스된 검색어가 변경되면 URL 업데이트 (검색 실행)
+  useEffect(() => {
+    const currentParamsName = searchParams.get("name") || "";
+    if (debouncedSearchName !== currentParamsName) {
+      updateQueryParams({ name: debouncedSearchName });
+    }
+  }, [debouncedSearchName, searchParams, updateQueryParams]);
+
+  // 2. 브라우저 뒤로가기 등으로 URL이 변경되었을 때 입력창 동기화
+  useEffect(() => {
+    const paramsName = searchParams.get("name") || "";
+    if (paramsName !== localSearchName) {
+      setLocalSearchName(paramsName);
+    }
+    // localSearchName을 의존성에 넣으면 루프 돌 수 있으므로 제외 (단방향 동기화)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   useEffect(() => {
     const key = getValidSortKey(searchParams.get("sortKey"));
     const dirParam = searchParams.get("sortDir");
     const direction: SortConfig["direction"] =
       dirParam === "descending" ? "descending" : "ascending";
-
     const pageParam = searchParams.get("page");
     const pageNum = pageParam ? Number(pageParam) : 0;
     const safePage = Number.isNaN(pageNum) || pageNum < 0 ? 0 : pageNum;
 
-    setSortConfig((prev) =>
-      prev.key === key && prev.direction === direction
-        ? prev
-        : { key, direction }
-    );
-    setCurrentPage((prev) => (prev === safePage ? prev : safePage));
+    setSortConfig({ key, direction });
+    setCurrentPage(safePage);
+
+    const urlUnitType = searchParams.get("unitType") as
+      | "year"
+      | "month"
+      | "semester"
+      | null;
+    const urlFilterType = searchParams.get("filterType") as
+      | "unit"
+      | "range"
+      | null;
+
+    if (urlUnitType) setUnitType(urlUnitType);
+    if (urlFilterType) setFilterType(urlFilterType);
+
+    setFilters((prev) => ({
+      ...prev,
+      // name은 로컬 스테이트가 관리하지만 filters 객체 동기화를 위해 업데이트
+      name: searchParams.get("name") || "",
+      active: (searchParams.get("active") as Filters["active"]) || "all",
+      startDate: searchParams.get("startDate") || "",
+      endDate: searchParams.get("endDate") || "",
+      year: searchParams.get("year") ? Number(searchParams.get("year")) : "",
+      month: searchParams.get("month") ? Number(searchParams.get("month")) : "",
+      semesterId: searchParams.get("semesterId")
+        ? Number(searchParams.get("semesterId"))
+        : "",
+    }));
   }, [searchParams]);
 
-  useEffect(() => {
-    if (semesters.length > 0 && !hasAutoSelectedSemester) {
-      const now = new Date();
-      const currentYearMonth = `${now.getFullYear()}-${String(
-        now.getMonth() + 1
-      ).padStart(2, "0")}`;
-
-      let targetSemester = semesters.find((s) => {
-        const startYearMonth = s.startDate.substring(0, 7);
-        const endYearMonth = s.endDate.substring(0, 7);
-        return (
-          currentYearMonth >= startYearMonth && currentYearMonth <= endYearMonth
-        );
-      });
-
-      if (!targetSemester) {
-        const sorted = [...semesters].sort((a, b) => b.id - a.id);
-        targetSemester = sorted[0];
-      }
-
-      if (targetSemester) {
-        setFilters((prev) => ({
-          ...prev,
-          semesterId: targetSemester!.id,
-          year: "",
-          month: "",
-        }));
-      } else {
-        setUnitType("month");
-        setFilters((prev) => ({
-          ...prev,
-          year: now.getFullYear(),
-          month: now.getMonth() + 1,
-          semesterId: "",
-        }));
-      }
-
-      setHasAutoSelectedSemester(true);
-    }
-  }, [semesters, hasAutoSelectedSemester]);
+  // --- 데이터 페칭 ---
 
   const fetchAvailableYears = useCallback(async () => {
     try {
-      const years = await attendanceService.getAvailableYears();
-      setAvailableYears(years);
+      const years = await cellService.getAvailableYears();
+      if (years.length === 0) {
+        setAvailableYears([new Date().getFullYear()]);
+      } else {
+        setAvailableYears(years.sort((a, b) => b - a));
+      }
     } catch (err) {
-      console.error("Failed to fetch available years:", err);
-      setAvailableYears([]);
+      console.error(err);
+      setAvailableYears([new Date().getFullYear()]);
     }
   }, []);
 
   const fetchSemesters = useCallback(async () => {
     try {
-      const data = await semesterService.getAllSemesters(true);
+      const data = await semesterService.getAllSemesters();
       setSemesters(data);
     } catch (err) {
       console.error("Failed to fetch semesters:", err);
@@ -201,48 +241,28 @@ const AdminCellsPage: React.FC = () => {
     }
   }, []);
 
-  // ✅ [수정 1] 날짜 범위 계산 로직 개선
-  // '전체 연도' 선택(year === "") 시 null을 반환하던 문제를 해결하여
-  // 전체 기간(1900~2100)을 반환하도록 수정
   const getDateRangeFromFilters = useCallback((): {
     startDate: string;
     endDate: string;
   } | null => {
     if (filterType === "range") {
       if (!filters.startDate || !filters.endDate) return null;
-      return {
-        startDate: filters.startDate,
-        endDate: filters.endDate,
-      };
+      return { startDate: filters.startDate, endDate: filters.endDate };
     }
 
     if (filters.semesterId) {
       const semester = semesters.find((s) => s.id === filters.semesterId);
       if (semester) {
-        return {
-          startDate: semester.startDate,
-          endDate: semester.endDate,
-        };
+        return { startDate: semester.startDate, endDate: semester.endDate };
       }
     }
 
     const year = typeof filters.year === "number" ? filters.year : undefined;
-
-    // ✅ 여기서 year가 없을 때(전체 연도) 처리가 중요
     if (!year) {
-      // 단위가 'year'이고 값이 비어있다면 "전체 기간"을 의미한다고 간주
-      if (unitType === "year") {
-        return {
-          startDate: "1900-01-01",
-          endDate: "2100-12-31",
-        };
-      }
-      // 그 외(month 단위인데 연도가 없는 경우 등)는 null
       return null;
     }
 
     const { month } = filters;
-
     if (month) {
       const m = month as number;
       const last = lastDayOfMonth(year, m);
@@ -252,20 +272,14 @@ const AdminCellsPage: React.FC = () => {
       };
     }
 
-    // 연도가 선택되어 있으면 해당 연도 1월 1일 ~ 12월 31일
     const last = lastDayOfMonth(year, 12);
-    return {
-      startDate: `${year}-01-01`,
-      endDate: `${year}-12-${pad(last)}`,
-    };
-  }, [filterType, filters, semesters, unitType]); // unitType 의존성 추가
+    return { startDate: `${year}-01-01`, endDate: `${year}-12-${pad(last)}` };
+  }, [filterType, filters, semesters]);
 
   const fetchCells = useCallback(async () => {
     if (!user || user.role !== "EXECUTIVE") return;
-
-    if (unitType === "semester" && !filters.semesterId) {
+    if (unitType === "semester" && !filters.semesterId && filterType === "unit")
       return;
-    }
 
     setLoading(true);
     setError(null);
@@ -273,16 +287,15 @@ const AdminCellsPage: React.FC = () => {
     const sortKeyMap: Record<string, string> = {
       leaderName: "leader.name",
       viceLeaderName: "viceLeader.name",
+      // attendanceRate도 서버 필드명과 일치한다고 가정 (불일치 시 매핑 추가 필요)
     };
 
-    let sortParam: string | undefined = undefined;
-    if (sortConfig.key !== "attendanceRate") {
-      const backendSortKey =
-        sortKeyMap[sortConfig.key as string] || sortConfig.key;
-      sortParam = `${backendSortKey},${
-        sortConfig.direction === "ascending" ? "asc" : "desc"
-      }`;
-    }
+    // ✅ [버그 수정 1] attendanceRate일 때도 항상 서버로 정렬 파라미터 전송
+    const backendSortKey =
+      sortKeyMap[sortConfig.key as string] || sortConfig.key;
+    const sortParam = `${backendSortKey},${
+      sortConfig.direction === "ascending" ? "asc" : "desc"
+    }`;
 
     const dateRange = getDateRangeFromFilters();
 
@@ -290,10 +303,10 @@ const AdminCellsPage: React.FC = () => {
       page: currentPage,
       size: 10,
       sort: sortParam,
-      name: debouncedNameFilter,
+      name: debouncedSearchName, // ✅ URL과 동기화된 디바운스 값 사용
       active: filters.active === "all" ? undefined : filters.active === "true",
-      startDate: dateRange?.startDate,
-      endDate: dateRange?.endDate,
+      startDate: dateRange?.startDate || undefined,
+      endDate: dateRange?.endDate || undefined,
     };
 
     const cleanedParams = Object.fromEntries(
@@ -314,146 +327,130 @@ const AdminCellsPage: React.FC = () => {
     user,
     currentPage,
     sortConfig,
-    debouncedNameFilter,
+    debouncedSearchName,
     filters.active,
     getDateRangeFromFilters,
     unitType,
     filters.semesterId,
+    filterType,
   ]);
 
   useEffect(() => {
     if (!user || user.role !== "EXECUTIVE") {
-      if (user) setError("셀 관리 페이지에 접근할 권한이 없습니다.");
-      else setError("로그인 후 셀 관리 페이지에 접근할 수 있습니다.");
+      if (user) setError("접근 권한이 없습니다.");
+      else setError("로그인이 필요합니다.");
       setLoading(false);
       return;
     }
-  }, [user]);
-
-  useEffect(() => {
-    if (!user || user.role !== "EXECUTIVE") return;
-    fetchCells();
-  }, [user, fetchCells]);
-
-  useEffect(() => {
-    if (!user || user.role !== "EXECUTIVE") return;
     fetchAvailableYears();
     fetchSemesters();
+
+    const fetchMembers = async () => {
+      try {
+        const page = await memberService.getAllMembers({ page: 0, size: 1000 });
+        setAllMembersForNameCheck(
+          page?.content?.map((m) => ({
+            name: m.name,
+            birthDate: m.birthDate,
+          })) ?? []
+        );
+      } catch (e) {
+        /* ignore */
+      }
+    };
+    fetchMembers();
   }, [user, fetchAvailableYears, fetchSemesters]);
 
   useEffect(() => {
     if (!user || user.role !== "EXECUTIVE") return;
-    const fetchAllMembersForNameCheck = async () => {
-      try {
-        const page = await memberService.getAllMembers({
-          page: 0,
-          size: 1000,
-          sort: "id,asc",
-        });
-        const list =
-          page?.content?.map((m) => ({
-            name: m.name,
-            birthDate: m.birthDate,
-          })) ?? [];
-        setAllMembersForNameCheck(list);
-      } catch (e) {
-        setAllMembersForNameCheck([]);
-      }
-    };
-    fetchAllMembersForNameCheck();
-  }, [user]);
+    if (semesters.length === 0 && unitType === "semester") return;
+
+    fetchCells();
+  }, [user, fetchCells, semesters.length, unitType]);
 
   useEffect(() => {
-    if (!cellPage?.content || cellPage.content.length === 0) {
-      setAttendanceRates(new Map());
+    if (semesters.length === 0 || hasInitialized) return;
+
+    const hasUrlParams =
+      searchParams.get("semesterId") ||
+      searchParams.get("year") ||
+      searchParams.get("startDate");
+
+    if (hasUrlParams) {
+      setHasInitialized(true);
       return;
     }
 
-    const dateRange = getDateRangeFromFilters();
-    if (!dateRange) {
-      setAttendanceRates(new Map());
-      return;
+    const now = new Date();
+    const currentYearMonth = `${now.getFullYear()}-${String(
+      now.getMonth() + 1
+    ).padStart(2, "0")}`;
+
+    let targetSemester = semesters.find((s) => {
+      const start = s.startDate.substring(0, 7);
+      const end = s.endDate.substring(0, 7);
+      return currentYearMonth >= start && currentYearMonth <= end;
+    });
+
+    if (!targetSemester) {
+      const sorted = [...semesters].sort((a, b) => b.id - a.id);
+      targetSemester = sorted[0];
     }
 
-    const fetchRates = async () => {
-      setRateLoading(true);
-      const rates = new Map<number, SimpleAttendanceRateDto>();
-      await Promise.all(
-        cellPage.content.map(async (cell) => {
-          try {
-            const rateData = await cellService.getCellAttendanceRate(cell.id, {
-              startDate: dateRange.startDate,
-              endDate: dateRange.endDate,
-            });
-            rates.set(cell.id, rateData);
-          } catch (rateError) {
-            console.error(
-              `Failed to fetch attendance rate for cell ${cell.id}:`,
-              rateError
-            );
-          }
-        })
-      );
-      setAttendanceRates(rates);
-      setRateLoading(false);
-    };
+    if (targetSemester) {
+      updateQueryParams({
+        unitType: "semester",
+        semesterId: targetSemester.id,
+        year: "",
+        month: "",
+        active: "all",
+      });
+    } else {
+      updateQueryParams({
+        unitType: "month",
+        year: now.getFullYear(),
+        month: now.getMonth() + 1,
+        semesterId: "",
+        active: "all",
+      });
+    }
+    setHasInitialized(true);
+  }, [semesters, hasInitialized, searchParams, updateQueryParams]);
 
-    fetchRates();
-  }, [cellPage, getDateRangeFromFilters]);
+  // --- Memoized Data ---
 
   const yearOptions = useMemo(
-    () =>
-      availableYears.map((year) => ({
-        value: year,
-        label: `${year}`,
-      })),
+    () => availableYears.map((year) => ({ value: year, label: `${year}` })),
     [availableYears]
   );
 
+  // ✅ [버그 수정 1 관련] 프론트엔드 정렬 로직 제거
+  // 서버에서 이미 정렬되어 오므로 그대로 렌더링
   const sortedCells = useMemo(() => {
     if (!cellPage) return [];
-    const rows = [...cellPage.content];
-    if (sortConfig.key === "attendanceRate") {
-      rows.sort((a, b) => {
-        const rateA = attendanceRates.get(a.id)?.attendanceRate;
-        const rateB = attendanceRates.get(b.id)?.attendanceRate;
-        const valueA = typeof rateA === "number" ? rateA : -1;
-        const valueB = typeof rateB === "number" ? rateB : -1;
-        if (sortConfig.direction === "ascending") return valueA - valueB;
-        else return valueB - valueA;
-      });
-    }
-    return rows;
-  }, [cellPage, sortConfig, attendanceRates]);
+    return cellPage.content;
+  }, [cellPage]);
+
+  // --- Event Handlers ---
 
   const requestSort = (key: SortKey) => {
     const nextDirection: SortConfig["direction"] =
       sortConfig.key === key && sortConfig.direction === "ascending"
         ? "descending"
         : "ascending";
-    const nextConfig: SortConfig = { key, direction: nextDirection };
-    setSortConfig(nextConfig);
-    setCurrentPage(0);
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("sortKey", nextConfig.key);
-    nextParams.set("sortDir", nextConfig.direction);
-    nextParams.set("page", "0");
-    setSearchParams(nextParams);
-  };
 
-  const getSortIndicator = (key: SortKey) => {
-    if (sortConfig.key !== key) return " ↕";
-    return sortConfig.direction === "ascending" ? " ▲" : " ▼";
+    updateQueryParams({
+      sortKey: key,
+      sortDir: nextDirection,
+      page: 0,
+    });
   };
 
   const handlePageChange = (page: number) => {
     const safePage = page < 0 ? 0 : page;
-    setCurrentPage(safePage);
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("page", String(safePage));
-    nextParams.set("sortKey", sortConfig.key);
-    nextParams.set("sortDir", sortConfig.direction);
-    setSearchParams(nextParams);
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set("page", String(safePage));
+    setSearchParams(newParams);
   };
 
   const handleDelete = (cell: CellDto) => {
@@ -471,7 +468,7 @@ const AdminCellsPage: React.FC = () => {
       setCellToDelete(null);
       fetchCells();
     } catch (err: any) {
-      setDeleteError(err?.response?.data?.message || "셀 삭제에 실패했습니다.");
+      setDeleteError(err?.response?.data?.message || "삭제 실패");
     }
   };
 
@@ -482,90 +479,56 @@ const AdminCellsPage: React.FC = () => {
   };
 
   const handleFilterChange = (field: keyof Filters, value: any) => {
-    const nextFilters = { ...filters, [field]: value };
-    setFilters(nextFilters);
-    setCurrentPage(0);
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("page", "0");
-    setSearchParams(nextParams);
+    updateQueryParams({ [field]: value });
   };
 
   const handleSemesterClick = (id: number) => {
-    const nextFilters: Filters = {
-      ...filters,
-      semesterId: filters.semesterId === id ? "" : id,
-    };
-    setFilters(nextFilters);
-    setCurrentPage(0);
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("page", "0");
-    setSearchParams(nextParams);
+    const newValue = filters.semesterId === id ? "" : id;
+    updateQueryParams({ semesterId: newValue });
   };
 
-  // ✅ [수정 2] 단위 변경(연간/월간) 로직 개선
   const handleUnitTypeClick = (type: "year" | "month" | "semester") => {
-    setUnitType(type);
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
-
-    const next: Filters = { ...filters };
+    const updates: Record<string, string | number> = {
+      unitType: type,
+      filterType: "unit",
+    };
 
     if (type === "year") {
-      // ✅ 문제 2 해결: 연간 모드로 변경 시, availableYears가 있으면
-      // 가장 최신 연도를 기본값으로 선택 (없으면 현재 연도)
-      if (!next.year) {
-        if (availableYears.length > 0) {
-          next.year = Math.max(...availableYears);
-        } else {
-          next.year = currentYear;
-        }
-      }
-      next.month = "";
-      next.semesterId = "";
+      updates.year = filters.year === "" ? "" : filters.year || "";
+      updates.month = "";
+      updates.semesterId = "";
     } else if (type === "month") {
-      if (!next.year) next.year = currentYear;
-      next.month = (next.month as number) || currentMonth;
-      next.semesterId = "";
+      updates.year =
+        filters.year === ""
+          ? now.getFullYear()
+          : filters.year || now.getFullYear();
+      updates.month = filters.month || now.getMonth() + 1;
+      updates.semesterId = "";
     } else if (type === "semester") {
-      next.year = "";
-      next.month = "";
-      if (semesters.length > 0) {
-        const currentYearMonth = `${currentYear}-${String(
-          currentMonth
-        ).padStart(2, "0")}`;
-        let target = semesters.find((s) => {
-          const start = s.startDate.substring(0, 7);
-          const end = s.endDate.substring(0, 7);
-          return currentYearMonth >= start && currentYearMonth <= end;
-        });
-        if (!target) {
-          const sorted = [...semesters].sort((a, b) => b.id - a.id);
-          target = sorted[0];
-        }
-        if (target) {
-          next.semesterId = target.id;
-        }
+      updates.year = "";
+      updates.month = "";
+      if (semesters.length > 0 && !filters.semesterId) {
+        updates.semesterId = semesters[0].id;
       }
     }
 
-    setFilters(next);
-    setCurrentPage(0);
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("page", "0");
-    setSearchParams(nextParams);
+    updateQueryParams(updates);
   };
 
   const handleUnitValueClick = (value: number) => {
-    const nextFilters: Filters = {
-      ...filters,
-      month: value,
-    };
-    setFilters(nextFilters);
-    setCurrentPage(0);
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("page", "0");
-    setSearchParams(nextParams);
+    updateQueryParams({ month: value });
+  };
+
+  const handleFilterTypeChange = (type: "unit" | "range") => {
+    updateQueryParams({ filterType: type });
+  };
+
+  // --- Render Helpers ---
+
+  const getSortIndicator = (key: SortKey) => {
+    if (sortConfig.key !== key) return " ↕";
+    return sortConfig.direction === "ascending" ? " ▲" : " ▼";
   };
 
   const renderUnitButtons = () => {
@@ -587,13 +550,12 @@ const AdminCellsPage: React.FC = () => {
           </div>
         );
       case "semester":
-        if (semesters.length === 0) {
+        if (semesters.length === 0)
           return (
-            <div className="mt-4 rounded-md bg-yellow-50 p-3 text-xs text-yellow-800">
-              현재 활성 상태인 학기가 없습니다.
+            <div className="text-xs text-yellow-800 bg-yellow-50 p-3 rounded">
+              생성된 학기가 없습니다.
             </div>
           );
-        }
         return (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
             {semesters.map((s) => (
@@ -611,23 +573,15 @@ const AdminCellsPage: React.FC = () => {
             ))}
           </div>
         );
-      case "year":
       default:
         return null;
     }
   };
 
-  // ... (나머지 render 코드는 그대로 유지)
+  // --- Main Render ---
+
   if (error && (!user || user.role !== "EXECUTIVE")) {
-    return (
-      <div className="bg-gray-50 min-h-screen">
-        <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
-          <p className="mt-4 text-red-600 text-center text-sm sm:text-base">
-            {error}
-          </p>
-        </div>
-      </div>
-    );
+    return <div className="p-8 text-center text-red-600">{error}</div>;
   }
 
   return (
@@ -644,12 +598,6 @@ const AdminCellsPage: React.FC = () => {
           </div>
         </div>
 
-        {error && user && user.role === "EXECUTIVE" && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-            {error}
-          </div>
-        )}
-
         <div className="p-4 bg-gray-50 rounded-lg mb-6 shadow-sm space-y-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-base sm:text-lg font-semibold">
@@ -657,7 +605,7 @@ const AdminCellsPage: React.FC = () => {
             </h3>
             <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={() => setFilterType("unit")}
+                onClick={() => handleFilterTypeChange("unit")}
                 className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
                   filterType === "unit"
                     ? "bg-blue-500 text-white"
@@ -667,7 +615,7 @@ const AdminCellsPage: React.FC = () => {
                 단위로 조회
               </button>
               <button
-                onClick={() => setFilterType("range")}
+                onClick={() => handleFilterTypeChange("range")}
                 className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
                   filterType === "range"
                     ? "bg-blue-500 text-white"
@@ -685,23 +633,19 @@ const AdminCellsPage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   기간 시작
                 </label>
-                <div className="relative">
-                  <KoreanCalendarPicker
-                    value={filters.startDate}
-                    onChange={(date) => handleFilterChange("startDate", date)}
-                  />
-                </div>
+                <KoreanCalendarPicker
+                  value={filters.startDate}
+                  onChange={(date) => handleFilterChange("startDate", date)}
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   기간 종료
                 </label>
-                <div className="relative">
-                  <KoreanCalendarPicker
-                    value={filters.endDate}
-                    onChange={(date) => handleFilterChange("endDate", date)}
-                  />
-                </div>
+                <KoreanCalendarPicker
+                  value={filters.endDate}
+                  onChange={(date) => handleFilterChange("endDate", date)}
+                />
               </div>
             </div>
           ) : (
@@ -709,16 +653,11 @@ const AdminCellsPage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    연도 (월간/연간 조회용)
+                    연도
                   </label>
                   <select
                     value={filters.year}
-                    onChange={(e) =>
-                      handleFilterChange(
-                        "year",
-                        e.target.value ? Number(e.target.value) : ""
-                      )
-                    }
+                    onChange={(e) => handleFilterChange("year", e.target.value)}
                     className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
                     disabled={unitType === "semester"}
                   >
@@ -729,11 +668,6 @@ const AdminCellsPage: React.FC = () => {
                       </option>
                     ))}
                   </select>
-                  {unitType === "semester" && (
-                    <p className="mt-1 text-[11px] text-gray-500">
-                      학기 단위 조회 시 학기에 설정된 연도가 자동 적용됩니다.
-                    </p>
-                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
@@ -741,9 +675,8 @@ const AdminCellsPage: React.FC = () => {
                   </label>
                   <div className="flex flex-wrap items-center gap-2 mt-1">
                     <button
-                      type="button"
                       onClick={() => handleUnitTypeClick("month")}
-                      className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
+                      className={`px-3 py-1 text-xs rounded-full ${
                         unitType === "month"
                           ? "bg-blue-500 text-white"
                           : "bg-white border"
@@ -751,28 +684,24 @@ const AdminCellsPage: React.FC = () => {
                     >
                       월간
                     </button>
-
                     <button
-                      type="button"
                       onClick={() =>
                         hasActiveSemesters && handleUnitTypeClick("semester")
                       }
                       disabled={!hasActiveSemesters}
-                      className={`px-3 py-1 text-xs sm:text-sm rounded-full border ${
+                      className={`px-3 py-1 text-xs rounded-full border ${
                         hasActiveSemesters
                           ? unitType === "semester"
                             ? "bg-blue-500 text-white border-blue-500"
                             : "bg-white"
-                          : "bg-gray-100 text-gray-400 border-dashed cursor-not-allowed"
+                          : "bg-gray-100 text-gray-400 border-dashed"
                       }`}
                     >
                       학기
                     </button>
-
                     <button
-                      type="button"
                       onClick={() => handleUnitTypeClick("year")}
-                      className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
+                      className={`px-3 py-1 text-xs rounded-full ${
                         unitType === "year"
                           ? "bg-blue-500 text-white"
                           : "bg-white border"
@@ -781,11 +710,6 @@ const AdminCellsPage: React.FC = () => {
                       연간
                     </button>
                   </div>
-                  {!hasActiveSemesters && (
-                    <p className="mt-1 text-xs text-red-500">
-                      활성화된 학기가 없어 학기 단위 조회를 사용할 수 없습니다.
-                    </p>
-                  )}
                 </div>
               </div>
               {renderUnitButtons()}
@@ -801,8 +725,9 @@ const AdminCellsPage: React.FC = () => {
               <input
                 type="text"
                 placeholder="이름으로 검색..."
-                value={filters.name}
-                onChange={(e) => handleFilterChange("name", e.target.value)}
+                // ✅ [버그 수정 2] 로컬 state 사용 및 onChange 분리
+                value={localSearchName}
+                onChange={(e) => setLocalSearchName(e.target.value)}
                 className="p-2 border rounded-md w-full text-sm"
               />
             </div>
@@ -812,12 +737,7 @@ const AdminCellsPage: React.FC = () => {
               </label>
               <select
                 value={filters.active}
-                onChange={(e) =>
-                  handleFilterChange(
-                    "active",
-                    e.target.value as Filters["active"]
-                  )
-                }
+                onChange={(e) => handleFilterChange("active", e.target.value)}
                 className="p-2 border rounded-md w-full text-sm"
               >
                 <option value="all">모든 상태</option>
@@ -831,32 +751,28 @@ const AdminCellsPage: React.FC = () => {
         <div className="flex justify-end mb-4">
           <button
             onClick={() => navigate("/admin/cells/add")}
-            className="rounded-md bg-indigo-600 px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            className="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700"
           >
             + 새 셀 추가
           </button>
         </div>
 
         {loading && (
-          <div className="flex items-center justify-center min-h-[30vh]">
-            <p className="text-sm text-gray-600">로딩 중...</p>
+          <div className="text-center py-10 text-gray-500">
+            데이터를 불러오는 중...
           </div>
         )}
 
         {!loading && cellPage && (
           <>
+            {/* 📱 모바일 카드 뷰 */}
             <div className="space-y-3 md:hidden mb-4">
               {sortedCells.length === 0 ? (
-                <div className="bg-white rounded-lg shadow border border-gray-100 p-4 text-center text-xs text-gray-500">
-                  조건에 맞는 셀이 없습니다. 필터를 변경해 보세요.
+                <div className="p-4 bg-white text-center text-gray-500 text-sm">
+                  데이터가 없습니다.
                 </div>
               ) : (
                 sortedCells.map((cell) => {
-                  const rateInfo = attendanceRates.get(cell.id);
-                  const attendanceText = rateLoading
-                    ? "계산 중..."
-                    : `${(rateInfo?.attendanceRate ?? 0).toFixed(1)}%`;
-
                   const leaderName = cell.leader
                     ? formatDisplayName(
                         {
@@ -867,28 +783,23 @@ const AdminCellsPage: React.FC = () => {
                       )
                     : "미정";
 
+                  const rateText =
+                    cell.attendanceRate !== undefined
+                      ? `${Math.round(cell.attendanceRate)}%`
+                      : "-";
+
                   return (
                     <div
                       key={cell.id}
                       onClick={() => navigate(`/admin/cells/${cell.id}`)}
-                      className={`bg-white rounded-lg shadow border border-gray-100 p-4 text-xs space-y-2 cursor-pointer hover:bg-gray-50 transition-colors ${
-                        !cell.active ? "bg-gray-100 text-gray-500" : ""
-                      }`}
+                      className="bg-white rounded-lg shadow p-4 space-y-2 cursor-pointer border border-gray-100"
                     >
-                      <div className="flex justify-between items-start gap-2">
-                        <div>
-                          <span className="text-sm font-semibold text-indigo-600">
-                            {cell.name}
-                          </span>
-                          <p className="mt-1 text-[11px] text-gray-500">
-                            셀장:{" "}
-                            <span className="font-medium text-gray-700">
-                              {leaderName}
-                            </span>
-                          </p>
-                        </div>
+                      <div className="flex justify-between">
+                        <span className="font-bold text-indigo-600">
+                          {cell.name}
+                        </span>
                         <span
-                          className={`px-2 inline-flex text-[11px] leading-5 font-semibold rounded-full ${
+                          className={`px-2 py-0.5 text-xs rounded-full ${
                             cell.active
                               ? "bg-green-100 text-green-800"
                               : "bg-red-100 text-red-800"
@@ -897,47 +808,26 @@ const AdminCellsPage: React.FC = () => {
                           {cell.active ? "활성" : "비활성"}
                         </span>
                       </div>
-
-                      <div className="grid grid-cols-3 gap-2 mt-2">
-                        <div>
-                          <p className="text-[11px] text-gray-500">총 인원</p>
-                          <p className="text-[12px] font-semibold">
-                            {cell.memberCount}명
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] text-gray-500">남 / 여</p>
-                          <p className="text-[12px] font-semibold">
-                            {cell.maleCount} / {cell.femaleCount}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] text-gray-500">출석률</p>
-                          <p className="text-[12px] font-semibold">
-                            {attendanceText}
-                          </p>
-                        </div>
+                      <div className="text-xs text-gray-500">
+                        셀장: {leaderName}
                       </div>
-
-                      <div className="pt-2 flex justify-end gap-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/admin/cells/${cell.id}/edit`);
-                          }}
-                          className="text-[11px] font-medium text-indigo-600 hover:text-indigo-900 px-2 py-1"
-                        >
-                          수정
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(cell);
-                          }}
-                          className="text-[11px] font-medium text-red-600 hover:text-red-800 px-2 py-1"
-                        >
-                          삭제
-                        </button>
+                      <div className="grid grid-cols-3 gap-2 text-center text-xs mt-2 bg-gray-50 p-2 rounded">
+                        <div>
+                          <div className="text-gray-400">인원</div>
+                          <div>{cell.memberCount}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-400">남/여</div>
+                          <div>
+                            {cell.maleCount}/{cell.femaleCount}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-gray-400">출석률</div>
+                          <div className="font-semibold text-blue-600">
+                            {rateText}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   );
@@ -946,54 +836,52 @@ const AdminCellsPage: React.FC = () => {
             </div>
 
             <div className="hidden md:block bg-white shadow-md rounded-lg overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50">
                   <tr>
                     <th
                       onClick={() => requestSort("name")}
-                      className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
+                      className="px-6 py-3 text-left font-medium text-gray-500 cursor-pointer"
                     >
                       이름{getSortIndicator("name")}
                     </th>
                     <th
                       onClick={() => requestSort("leaderName")}
-                      className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
+                      className="px-6 py-3 text-left font-medium text-gray-500 cursor-pointer"
                     >
                       셀장{getSortIndicator("leaderName")}
                     </th>
                     <th
                       onClick={() => requestSort("active")}
-                      className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
+                      className="px-6 py-3 text-left font-medium text-gray-500 cursor-pointer"
                     >
                       활성{getSortIndicator("active")}
                     </th>
                     <th
                       onClick={() => requestSort("memberCount")}
-                      className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
+                      className="px-6 py-3 text-left font-medium text-gray-500 cursor-pointer"
                     >
                       인원{getSortIndicator("memberCount")}
                     </th>
                     <th
                       onClick={() => requestSort("maleCount")}
-                      className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
+                      className="px-6 py-3 text-left font-medium text-gray-500 cursor-pointer"
                     >
                       남성{getSortIndicator("maleCount")}
                     </th>
                     <th
                       onClick={() => requestSort("femaleCount")}
-                      className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
+                      className="px-6 py-3 text-left font-medium text-gray-500 cursor-pointer"
                     >
                       여성{getSortIndicator("femaleCount")}
                     </th>
                     <th
                       onClick={() => requestSort("attendanceRate")}
-                      className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap"
+                      className="px-6 py-3 text-left font-medium text-gray-500 cursor-pointer"
                     >
                       출석률{getSortIndicator("attendanceRate")}
                     </th>
-                    <th className="relative px-3 sm:px-6 py-2 sm:py-3">
-                      <span className="sr-only">Actions</span>
-                    </th>
+                    <th className="px-6 py-3"></th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -1001,41 +889,41 @@ const AdminCellsPage: React.FC = () => {
                     <tr>
                       <td
                         colSpan={8}
-                        className="px-3 sm:px-6 py-4 text-center text-sm text-gray-500"
+                        className="px-6 py-4 text-center text-gray-500"
                       >
-                        조건에 맞는 셀이 없습니다. 필터를 변경해 보세요.
+                        데이터가 없습니다.
                       </td>
                     </tr>
                   ) : (
                     sortedCells.map((cell) => {
-                      const rateInfo = attendanceRates.get(cell.id);
+                      const leaderName = cell.leader
+                        ? formatDisplayName(
+                            {
+                              name: cell.leader.name,
+                              birthDate: cell.leader.birthDate,
+                            },
+                            allMembersForNameCheck
+                          )
+                        : "미정";
+
+                      const rateText =
+                        cell.attendanceRate !== undefined
+                          ? `${Math.round(cell.attendanceRate)}%`
+                          : "-";
+
                       return (
                         <tr
                           key={cell.id}
                           onClick={() => navigate(`/admin/cells/${cell.id}`)}
-                          className={`cursor-pointer hover:bg-indigo-50 transition-colors ${
-                            !cell.active ? "bg-gray-100 text-gray-500" : ""
-                          }`}
+                          className="hover:bg-indigo-50 cursor-pointer transition-colors"
                         >
-                          <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
-                            <span className="text-indigo-600 font-medium">
-                              {cell.name}
-                            </span>
+                          <td className="px-6 py-4 font-medium text-indigo-600">
+                            {cell.name}
                           </td>
-                          <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
-                            {cell.leader
-                              ? formatDisplayName(
-                                  {
-                                    name: cell.leader.name,
-                                    birthDate: cell.leader.birthDate,
-                                  },
-                                  allMembersForNameCheck
-                                )
-                              : "미정"}
-                          </td>
-                          <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
+                          <td className="px-6 py-4">{leaderName}</td>
+                          <td className="px-6 py-4">
                             <span
-                              className={`px-2 inline-flex text-[11px] sm:text-xs leading-5 font-semibold rounded-full ${
+                              className={`px-2 py-1 text-xs rounded-full ${
                                 cell.active
                                   ? "bg-green-100 text-green-800"
                                   : "bg-red-100 text-red-800"
@@ -1044,30 +932,19 @@ const AdminCellsPage: React.FC = () => {
                               {cell.active ? "활성" : "비활성"}
                             </span>
                           </td>
-                          <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
-                            {cell.memberCount}명
+                          <td className="px-6 py-4">{cell.memberCount}명</td>
+                          <td className="px-6 py-4">{cell.maleCount}명</td>
+                          <td className="px-6 py-4">{cell.femaleCount}명</td>
+                          <td className="px-6 py-4 font-semibold text-blue-600">
+                            {rateText}
                           </td>
-                          <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
-                            {cell.maleCount}명
-                          </td>
-                          <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
-                            {cell.femaleCount}명
-                          </td>
-                          <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
-                            {rateLoading
-                              ? "..."
-                              : `${(rateInfo?.attendanceRate ?? 0).toFixed(
-                                  1
-                                )}%`}
-                          </td>
-
-                          <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
+                          <td className="px-6 py-4 text-right">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 navigate(`/admin/cells/${cell.id}/edit`);
                               }}
-                              className="text-indigo-600 hover:text-indigo-900 mr-3 sm:mr-4"
+                              className="text-indigo-600 hover:text-indigo-900 mr-4"
                             >
                               수정
                             </button>
@@ -1108,25 +985,23 @@ const AdminCellsPage: React.FC = () => {
               <p className="text-gray-700 mb-2 text-sm">
                 정말로 &quot;{cellToDelete?.name}&quot; 셀을 삭제하시겠습니까?
               </p>
-              <p className="text-xs text-gray-500 mb-4">
-                셀을 삭제하면 해당 셀에 소속된 멤버/출석 정보에 영향을 줄 수
-                있습니다.
-              </p>
+
               {deleteError && (
-                <div className="p-3 text-sm font-medium text-red-700 bg-red-100 border border-red-400 rounded-md mb-4">
+                <div className="mt-2 p-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded">
                   {deleteError}
                 </div>
               )}
-              <div className="flex justify-end gap-2">
+
+              <div className="flex justify-end gap-2 mt-4">
                 <button
                   onClick={handleCloseDeleteModal}
-                  className="bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm"
+                  className="bg-gray-300 px-4 py-2 rounded text-sm hover:bg-gray-400"
                 >
                   취소
                 </button>
                 <button
                   onClick={handleConfirmDelete}
-                  className="bg-red-600 text-white px-4 py-2 rounded-md text-sm"
+                  className="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700"
                 >
                   삭제
                 </button>

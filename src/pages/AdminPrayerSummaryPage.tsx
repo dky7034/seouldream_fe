@@ -17,6 +17,13 @@ import type {
 import SimpleSearchableSelect from "../components/SimpleSearchableSelect";
 import Pagination from "../components/Pagination";
 import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
+import {
+  ChatBubbleBottomCenterTextIcon,
+  FunnelIcon,
+  PlusIcon,
+  UserIcon,
+  UserGroupIcon,
+} from "@heroicons/react/24/solid";
 
 type SummaryMode = "members" | "cells";
 type UnitType = "year" | "month" | "semester";
@@ -180,26 +187,24 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     fetchAllMembers();
   }, [user]);
 
-  // ✅ [추가] 현재 날짜 기준 적절한 학기를 찾는 헬퍼 함수
+  // 현재 날짜 기준 적절한 학기를 찾는 헬퍼 함수
   const findCurrentSemester = useCallback((semesterList: SemesterDto[]) => {
     if (semesterList.length === 0) return null;
 
     const now = new Date();
-    // YYYY-MM-DD 포맷 (시간대 오차 제거를 위해 문자열 처리)
-    // 로컬 시간 기준의 날짜 문자열 생성
     const offset = now.getTimezoneOffset() * 60000;
     const localDate = new Date(now.getTime() - offset);
     const todayStr = localDate.toISOString().split("T")[0];
-    const currentYearMonth = todayStr.substring(0, 7); // YYYY-MM
+    const currentYearMonth = todayStr.substring(0, 7);
 
-    // 1. 오늘 날짜가 기간 내에 정확히 포함된 학기 (1순위)
+    // 1. 오늘 날짜가 기간 내에 정확히 포함된 학기
     let target = semesterList.find((s) => {
       const start = s.startDate.split("T")[0];
       const end = s.endDate.split("T")[0];
       return todayStr >= start && todayStr <= end;
     });
 
-    // 2. 포함된 학기가 없다면 이번 달이 걸쳐있는 학기 (2순위 - 방학 등 고려)
+    // 2. 포함된 학기가 없다면 이번 달이 걸쳐있는 학기
     if (!target) {
       target = semesterList.find((s) => {
         const start = s.startDate.substring(0, 7);
@@ -208,7 +213,7 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
       });
     }
 
-    // 3. 그래도 없으면 가장 최신 학기 (3순위)
+    // 3. 그래도 없으면 가장 최신 학기
     if (!target) {
       const sorted = [...semesterList].sort((a, b) => b.id - a.id);
       target = sorted[0];
@@ -217,20 +222,16 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     return target;
   }, []);
 
-  // ✅ [수정] 학기 데이터 로드 후 자동 선택 로직
-  // 저장된 값이 있더라도, 현재 unitType이 'semester'인데 semesterId가 비어있다면 자동 선택 수행
+  // 학기 데이터 로드 후 자동 선택 로직
   useEffect(() => {
     if (semesters.length === 0) return;
-
-    // 현재 모드가 '학기'이고, 선택된 학기 ID가 없을 때만 자동 선택 실행
     if (unitType === "semester" && !filters.semesterId) {
       const targetSemester = findCurrentSemester(semesters);
-
       if (targetSemester) {
         setFilters((prev) => ({
           ...prev,
           semesterId: targetSemester.id,
-          year: "", // 학기 모드에서는 연도/월 비움
+          year: "",
           month: "",
         }));
       }
@@ -257,7 +258,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
           params.endDate = semester.endDate;
         }
       } else {
-        // year가 숫자면 normalizeNumberInput이 숫자 반환
         params.year = normalizeNumberInput(filters.year);
         params.month = normalizeNumberInput(filters.month);
       }
@@ -266,13 +266,11 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     if (filters.cell !== "all") params.cellId = Number(filters.cell);
     if (filters.member !== "all") params.memberId = Number(filters.member);
 
-    const cleaned = Object.fromEntries(
+    return Object.fromEntries(
       Object.entries(params).filter(
         ([, v]) => v !== "" && v !== null && v !== undefined
       )
     ) as GetPrayersParams;
-
-    return cleaned;
   }, [currentPage, filterType, filters, semesters, sortConfig]);
 
   const fetchData = useCallback(async () => {
@@ -297,7 +295,7 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
       }
     } catch (err) {
       console.error("기도제목 요약 로딩 실패:", err);
-      setError("기도제목 요약 데이터를 불러오는 데 실패했습니다.");
+      setError("데이터를 불러오는 데 실패했습니다.");
     } finally {
       setLoading(false);
     }
@@ -318,7 +316,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-
     const stateToSave: SavedFilterState = {
       mode,
       filterType,
@@ -328,7 +325,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
       sortKey: sortConfig.key,
       sortDirection: sortConfig.direction,
     };
-
     sessionStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(stateToSave));
   }, [mode, filterType, unitType, filters, currentPage, sortConfig]);
 
@@ -337,7 +333,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     setCurrentPage(0);
   };
 
-  // ✅ [수정] 단위 변경 핸들러 (버튼 클릭 시 동작)
   const handleUnitTypeClick = (type: UnitType) => {
     setUnitType(type);
     setFilters((prev) => {
@@ -356,36 +351,21 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
       } else if (type === "semester") {
         next.year = "";
         next.month = "";
-
-        // 헬퍼 함수를 재사용하여 학기 찾기 로직 통일
         const target = findCurrentSemester(semesters);
-        if (target) {
-          next.semesterId = target.id;
-        }
+        if (target) next.semesterId = target.id;
       }
-
       return next;
     });
-
     setCurrentPage(0);
   };
 
   const handleUnitValueClick = (value: number) => {
-    setFilters((prev) => ({
-      ...prev,
-      month: value,
-      semesterId: "",
-    }));
+    setFilters((prev) => ({ ...prev, month: value, semesterId: "" }));
     setCurrentPage(0);
   };
 
   const handleSemesterClick = (semesterId: number) => {
-    setFilters((prev) => ({
-      ...prev,
-      semesterId,
-      year: "",
-      month: "",
-    }));
+    setFilters((prev) => ({ ...prev, semesterId, year: "", month: "" }));
     setCurrentPage(0);
   };
 
@@ -398,17 +378,14 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
             prev.direction === "ascending" ? "descending" : "ascending",
         };
       }
-      return {
-        key,
-        direction: "descending",
-      };
+      return { key, direction: "descending" };
     });
     setCurrentPage(0);
   };
 
   const getSortIndicator = (key: SortKey) => {
-    if (sortConfig.key !== key) return "↕";
-    return sortConfig.direction === "ascending" ? "▲" : "▼";
+    if (sortConfig.key !== key) return " ↕";
+    return sortConfig.direction === "ascending" ? " ▲" : " ▼";
   };
 
   const yearOptions = useMemo(() => {
@@ -422,46 +399,19 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     }));
   }, [availableYears]);
 
-  const formatShortDate = (dateStr: string) => {
-    if (!dateStr) return "";
-    const [, m, d] = dateStr.split("-");
-    return `${m}/${d}`;
-  };
-
-  const periodSummary = useMemo(() => {
-    if (filterType === "range" && filters.startDate && filters.endDate) {
-      return `기간: ${formatShortDate(filters.startDate)} ~ ${formatShortDate(
-        filters.endDate
-      )}`;
-    }
-
-    if (filterType === "unit") {
-      if (unitType === "semester" && filters.semesterId && semesters.length) {
-        const semester = semesters.find((s) => s.id === filters.semesterId);
-        if (semester) return `조회 단위: 학기 (${semester.name})`;
-      }
-
-      const yearText = filters.year ? `${filters.year}년` : "연도 미선택";
-
-      if (unitType === "year") return `조회 단위: 연간 (${yearText})`;
-      if (unitType === "month" && filters.month)
-        return `조회 단위: ${yearText} ${filters.month}월`;
-    }
-
-    return "";
-  }, [filterType, unitType, filters, semesters]);
-
   const renderUnitButtons = () => {
     switch (unitType) {
       case "month":
         return (
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5 mt-2">
             {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
               <button
                 key={m}
                 onClick={() => handleUnitValueClick(m)}
-                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
-                  filters.month === m ? "bg-blue-500 text-white" : "bg-white"
+                className={`py-1.5 rounded-md text-xs font-bold transition-colors ${
+                  filters.month === m
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
                 }`}
               >
                 {m}월
@@ -472,21 +422,21 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
       case "semester":
         if (semesters.length === 0) {
           return (
-            <div className="mt-3 rounded-md bg-yellow-50 p-3 text-[11px] sm:text-xs text-yellow-800">
-              등록된 학기가 없습니다. 먼저 학기를 생성해 주세요.
+            <div className="mt-2 rounded-lg bg-yellow-50 p-3 text-xs text-yellow-800 border border-yellow-100">
+              등록된 학기가 없습니다.
             </div>
           );
         }
         return (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+          <div className="flex flex-wrap gap-2 mt-2">
             {semesters.map((s) => (
               <button
                 key={s.id}
                 onClick={() => handleSemesterClick(s.id)}
-                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
                   filters.semesterId === s.id
-                    ? "bg-blue-500 text-white"
-                    : "bg-white"
+                    ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                    : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
                 }`}
               >
                 {s.name}
@@ -500,24 +450,12 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     }
   };
 
-  if (!user) {
+  if (!user || (user.role !== "EXECUTIVE" && user.role !== "CELL_LEADER")) {
     return (
-      <div className="bg-gray-50 min-h-screen flex justify-center items-center px-4">
-        <div className="bg-white rounded-lg shadow-sm p-6 max-w-md w-full text-center">
-          <p className="text-red-600 text-sm sm:text-base">
-            로그인이 필요한 페이지입니다.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (user.role !== "EXECUTIVE" && user.role !== "CELL_LEADER") {
-    return (
-      <div className="bg-gray-50 min-h-screen flex justify-center items-center px-4">
-        <div className="bg-white rounded-lg shadow-sm p-6 max-w-md w-full text-center">
-          <p className="text-red-600 text-sm sm:text-base">
-            기도제목 요약 페이지에 접근할 권한이 없습니다.
+      <div className="bg-gray-50 min-h-screen flex items-center justify-center p-4">
+        <div className="bg-white p-6 rounded-lg shadow-sm text-center max-w-sm w-full">
+          <p className="text-red-600 text-sm font-bold">
+            접근 권한이 없습니다.
           </p>
         </div>
       </div>
@@ -525,244 +463,263 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <div className="container mx-auto max-w-6xl px-3 sm:px-4 py-6 sm:py-8">
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-4 sm:mb-6 gap-4">
+    <div className="bg-gray-50 min-h-screen pb-20">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-              기도제목
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <ChatBubbleBottomCenterTextIcon className="h-7 w-7 text-indigo-500" />
+              기도제목 요약
             </h1>
-            <p className="mt-2 text-sm text-gray-600">
-              기간/셀/멤버 기준으로 &quot;기도제목이 실제로 등록된&quot; 멤버와
-              셀만 확인할 수 있는 페이지입니다.
+            <p className="text-sm text-gray-500 mt-1">
+              기간/셀/멤버 기준으로 등록된 기도제목 현황을 확인합니다.
             </p>
+          </div>
+          {/* Mode Switcher (Pill Style) */}
+          <div className="bg-gray-200 p-1 rounded-xl flex text-xs font-bold self-start sm:self-center">
+            <button
+              onClick={() => {
+                setCurrentPage(0);
+                setSortConfig({ key: "totalCount", direction: "descending" });
+                navigate("/admin/prayers/summary/members");
+              }}
+              className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all ${
+                mode === "members"
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <UserIcon className="h-3 w-3" /> 멤버별
+            </button>
+            <button
+              onClick={() => {
+                setCurrentPage(0);
+                setSortConfig({ key: "totalCount", direction: "descending" });
+                navigate("/admin/prayers/summary/cells");
+              }}
+              className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all ${
+                mode === "cells"
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <UserGroupIcon className="h-3 w-3" /> 셀별
+            </button>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 mb-3">
-          <button
-            type="button"
-            onClick={() => {
-              setCurrentPage(0);
-              setSortConfig({ key: "totalCount", direction: "descending" });
-              navigate("/admin/prayers/summary/members");
-            }}
-            className={`px-3 py-1 text-xs sm:text-sm rounded-full border ${
-              mode === "members"
-                ? "bg-blue-500 text-white border-blue-500"
-                : "bg-white text-gray-700"
-            }`}
-          >
-            멤버별 기도제목
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setCurrentPage(0);
-              setSortConfig({ key: "totalCount", direction: "descending" });
-              navigate("/admin/prayers/summary/cells");
-            }}
-            className={`px-3 py-1 text-xs sm:text-sm rounded-full border ${
-              mode === "cells"
-                ? "bg-blue-500 text-white border-blue-500"
-                : "bg-white text-gray-700"
-            }`}
-          >
-            셀별 기도제목
-          </button>
-        </div>
-
-        <div className="p-4 bg-gray-50 rounded-lg mb-3 sm:mb-4 space-y-4 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <h3 className="text-base sm:text-lg font-semibold">
-              조회 기간 설정
-            </h3>
-            <div className="flex flex-wrap items-center gap-2">
+        {/* Filter Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 border-b border-gray-50 pb-4">
+            <div className="flex items-center gap-2">
+              <FunnelIcon className="h-5 w-5 text-gray-400" />
+              <h3 className="font-bold text-gray-700">조회 조건 설정</h3>
+            </div>
+            {/* Unit vs Range Toggle */}
+            <div className="bg-gray-100 p-1 rounded-xl flex text-xs font-bold w-fit">
               <button
                 onClick={() => setFilterType("unit")}
-                className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
+                className={`px-3 py-1.5 rounded-lg transition-all ${
                   filterType === "unit"
-                    ? "bg-blue-500 text-white"
-                    : "bg-white border"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
                 }`}
               >
-                단위로 조회
+                단위별 조회
               </button>
               <button
                 onClick={() => setFilterType("range")}
-                className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
+                className={`px-3 py-1.5 rounded-lg transition-all ${
                   filterType === "range"
-                    ? "bg-blue-500 text-white"
-                    : "bg-white border"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
                 }`}
               >
-                기간으로 조회
+                기간 직접설정
               </button>
             </div>
           </div>
 
-          {filterType === "range" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  기간 시작
-                </label>
-                <KoreanCalendarPicker
-                  value={filters.startDate}
-                  onChange={(date) => handleFilterChange("startDate", date)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  기간 종료
-                </label>
-                <KoreanCalendarPicker
-                  value={filters.endDate}
-                  onChange={(date) => handleFilterChange("endDate", date)}
-                />
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-5">
+            {/* Date Settings */}
+            {filterType === "range" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    연도
+                  <label className="text-xs font-bold text-gray-500 mb-1 block">
+                    시작일
                   </label>
-                  <select
-                    value={filters.year}
-                    onChange={(e) =>
-                      handleFilterChange("year", Number(e.target.value))
-                    }
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
-                    disabled={unitType === "semester"}
-                  >
-                    {yearOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  {unitType === "semester" && (
-                    <p className="mt-1 text-[11px] text-gray-500">
-                      학기 단위 조회 시 연도를 선택할 수 없습니다.
-                    </p>
-                  )}
+                  <KoreanCalendarPicker
+                    value={filters.startDate}
+                    onChange={(date) => handleFilterChange("startDate", date)}
+                  />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    조회 단위
+                  <label className="text-xs font-bold text-gray-500 mb-1 block">
+                    종료일
                   </label>
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <button
-                      type="button"
-                      onClick={() => handleUnitTypeClick("month")}
-                      className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
-                        unitType === "month"
-                          ? "bg-blue-500 text-white"
-                          : "bg-white border"
-                      }`}
-                    >
-                      월간
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        hasActiveSemesters && handleUnitTypeClick("semester")
+                  <KoreanCalendarPicker
+                    value={filters.endDate}
+                    onChange={(date) => handleFilterChange("endDate", date)}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100">
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center mb-2">
+                  <div className="w-full sm:w-auto">
+                    <label className="text-xs font-bold text-gray-500 mb-1 block">
+                      연도
+                    </label>
+                    <select
+                      value={filters.year}
+                      onChange={(e) =>
+                        handleFilterChange("year", Number(e.target.value))
                       }
-                      disabled={!hasActiveSemesters}
-                      className={`px-3 py-1 text-xs sm:text-sm rounded-full border ${
-                        hasActiveSemesters
-                          ? unitType === "semester"
-                            ? "bg-blue-500 text-white border-blue-500"
-                            : "bg-white"
-                          : "bg-gray-100 text-gray-400 border-dashed cursor-not-allowed"
-                      }`}
+                      className="w-full sm:w-32 py-2 border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-100"
+                      disabled={unitType === "semester"}
                     >
-                      학기
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleUnitTypeClick("year")}
-                      className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
-                        unitType === "year"
-                          ? "bg-blue-500 text-white"
-                          : "bg-white border"
-                      }`}
-                    >
-                      연간
-                    </button>
+                      {yearOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs font-bold text-gray-500 mb-1 block">
+                      조회 단위
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => handleUnitTypeClick("month")}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                          unitType === "month"
+                            ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        월간
+                      </button>
+                      <button
+                        onClick={() =>
+                          hasActiveSemesters && handleUnitTypeClick("semester")
+                        }
+                        disabled={!hasActiveSemesters}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                          hasActiveSemesters
+                            ? unitType === "semester"
+                              ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                            : "bg-gray-50 text-gray-400 border-gray-100 border-dashed cursor-not-allowed"
+                        }`}
+                      >
+                        학기
+                      </button>
+                      <button
+                        onClick={() => handleUnitTypeClick("year")}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                          unitType === "year"
+                            ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        연간
+                      </button>
+                    </div>
                   </div>
                 </div>
+                {/* 상세 선택 버튼 (월/학기) */}
+                {(unitType === "month" || unitType === "semester") && (
+                  <div className="pt-2 border-t border-gray-200/50 mt-2">
+                    <label className="text-xs font-bold text-gray-500 block mb-1">
+                      {unitType === "month" ? "월 선택" : "학기 선택"}
+                    </label>
+                    {renderUnitButtons()}
+                  </div>
+                )}
               </div>
+            )}
 
-              {renderUnitButtons()}
-            </>
-          )}
-
-          <hr />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-            <SimpleSearchableSelect
-              options={cellOptions}
-              value={filters.cell === "all" ? undefined : Number(filters.cell)}
-              onChange={(val) =>
-                handleFilterChange("cell", val != null ? String(val) : "all")
-              }
-              placeholder="셀 필터"
-            />
-
-            <SimpleSearchableSelect
-              options={memberOptions}
-              value={
-                filters.member === "all" ? undefined : Number(filters.member)
-              }
-              onChange={(val) =>
-                handleFilterChange("member", val != null ? String(val) : "all")
-              }
-              placeholder="멤버 필터"
-            />
-          </div>
-
-          {user.role === "EXECUTIVE" && (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => navigate("/admin/prayers/add")}
-                className="mt-2 rounded-md bg-indigo-600 px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-indigo-700"
-              >
-                + 새 기도제목
-              </button>
+            {/* Cell & Member Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-gray-500 mb-1 block">
+                  소속 셀
+                </label>
+                <div className="h-[42px]">
+                  <SimpleSearchableSelect
+                    options={cellOptions}
+                    value={
+                      filters.cell === "all" ? undefined : Number(filters.cell)
+                    }
+                    onChange={(val) =>
+                      handleFilterChange(
+                        "cell",
+                        val != null ? String(val) : "all"
+                      )
+                    }
+                    placeholder="셀 필터"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 mb-1 block">
+                  멤버
+                </label>
+                <div className="h-[42px]">
+                  <SimpleSearchableSelect
+                    options={memberOptions}
+                    value={
+                      filters.member === "all"
+                        ? undefined
+                        : Number(filters.member)
+                    }
+                    onChange={(val) =>
+                      handleFilterChange(
+                        "member",
+                        val != null ? String(val) : "all"
+                      )
+                    }
+                    placeholder="멤버 필터"
+                  />
+                </div>
+              </div>
             </div>
-          )}
+
+            <div className="flex justify-end pt-2">
+              {user.role === "EXECUTIVE" && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/admin/prayers/add")}
+                  className="flex items-center gap-1 bg-indigo-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-indigo-700 transition-all"
+                >
+                  <PlusIcon className="h-4 w-4" /> 새 기도제목
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
-        {periodSummary && (
-          <p className="mb-4 text-[11px] sm:text-xs text-gray-500">
-            {periodSummary}
-          </p>
-        )}
-
+        {/* Loading / Error States */}
         {loading && (
-          <div className="flex items-center justify-center min-h-[30vh] mb-4">
-            <p className="text-sm text-gray-500">
-              기도제목 요약을 불러오는 중입니다...
-            </p>
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
           </div>
         )}
         {error && !loading && (
-          <p className="text-center text-sm text-red-500 mb-4">{error}</p>
+          <div className="text-center p-8 bg-white rounded-2xl border border-red-100 text-red-600 font-bold mb-6">
+            {error}
+          </div>
         )}
 
-        {/* 1. 멤버별 요약 목록 */}
+        {/* 1. Members Summary List */}
         {!loading && !error && mode === "members" && memberSummaryPage && (
           <>
-            {/* 모바일 뷰 */}
+            {/* Mobile Cards */}
             <div className="space-y-3 md:hidden mb-4">
               {memberSummaryPage.content.length === 0 ? (
-                <div className="bg-white rounded-lg shadow border p-4 text-center text-xs sm:text-sm text-gray-500">
+                <div className="py-20 text-center bg-white rounded-2xl border border-dashed border-gray-200 text-gray-400">
                   조건에 맞는 멤버가 없습니다.
                 </div>
               ) : (
@@ -777,49 +734,47 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                   return (
                     <div
                       key={row.memberId}
-                      className="bg-white rounded-lg shadow border p-3 text-xs space-y-2"
+                      className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4"
                     >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
                           <button
                             onClick={() =>
                               navigate(`/admin/prayers/members/${row.memberId}`)
                             }
-                            className="text-sm font-semibold text-indigo-600 hover:underline"
+                            className="text-lg font-bold text-indigo-600 hover:text-indigo-800"
                           >
                             {displayName}
                           </button>
-                          <p className="text-[11px] text-gray-500 mt-1">
-                            셀:{" "}
+                          <div className="text-xs text-gray-500 mt-1">
                             {row.cellId ? (
                               <button
                                 onClick={() =>
                                   navigate(`/admin/prayers/cells/${row.cellId}`)
                                 }
-                                className="hover:underline"
+                                className="hover:underline flex items-center gap-1"
                               >
                                 {row.cellName}
                               </button>
                             ) : (
-                              "-"
+                              "미배정"
                             )}
-                          </p>
+                          </div>
                         </div>
-
-                        <div className="text-right text-[11px] text-gray-500">
-                          최근 작성일
-                          <br />
-                          <span className="font-medium text-gray-800">
+                        <div className="text-right">
+                          <span className="text-xs font-bold text-gray-400 block mb-0.5">
+                            최근 작성
+                          </span>
+                          <span className="text-sm font-medium text-gray-800">
                             {safeFormatDate(row.latestCreatedAt)}
                           </span>
                         </div>
                       </div>
-
-                      <div className="flex justify-between items-center border-t pt-2">
-                        <span className="text-[11px] text-gray-500">
-                          기도제목 수
+                      <div className="pt-3 mt-2 border-t border-gray-50 flex justify-between items-center">
+                        <span className="text-xs text-gray-400 font-bold">
+                          총 기도제목
                         </span>
-                        <span className="text-sm font-semibold text-gray-900">
+                        <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded-lg text-xs font-bold">
                           {row.totalCount.toLocaleString()}건
                         </span>
                       </div>
@@ -829,55 +784,43 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
               )}
             </div>
 
-            {/* 데스크탑 뷰 */}
-            <div className="hidden md:block bg-white shadow-md rounded-lg overflow-x-auto mb-4">
-              <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
-                <thead className="bg-gray-50">
+            {/* Desktop Table */}
+            <div className="hidden md:block bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden mb-4">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50/50">
                   <tr>
                     <th
-                      className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none"
+                      className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
                       onClick={() => requestSort("memberName")}
                     >
-                      이름{" "}
-                      <span className="ml-1">
-                        {getSortIndicator("memberName")}
-                      </span>
+                      이름 {getSortIndicator("memberName")}
                     </th>
                     <th
-                      className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none"
+                      className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
                       onClick={() => requestSort("cellName")}
                     >
-                      셀{" "}
-                      <span className="ml-1">
-                        {getSortIndicator("cellName")}
-                      </span>
+                      셀 {getSortIndicator("cellName")}
                     </th>
                     <th
-                      className="px-3 sm:px-6 py-2 sm:py-3 text-right text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none"
+                      className="px-6 py-3 text-right font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
                       onClick={() => requestSort("totalCount")}
                     >
-                      기도제목 수{" "}
-                      <span className="ml-1">
-                        {getSortIndicator("totalCount")}
-                      </span>
+                      기도제목 수 {getSortIndicator("totalCount")}
                     </th>
                     <th
-                      className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none"
+                      className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
                       onClick={() => requestSort("latestCreatedAt")}
                     >
-                      최근 작성일{" "}
-                      <span className="ml-1">
-                        {getSortIndicator("latestCreatedAt")}
-                      </span>
+                      최근 작성일 {getSortIndicator("latestCreatedAt")}
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="divide-y divide-gray-200 bg-white">
                   {memberSummaryPage.content.length === 0 ? (
                     <tr>
                       <td
                         colSpan={4}
-                        className="px-3 sm:px-6 py-4 text-center text-xs sm:text-sm text-gray-500"
+                        className="px-6 py-10 text-center text-gray-400 text-sm"
                       >
                         조건에 맞는 멤버가 없습니다.
                       </td>
@@ -892,28 +835,29 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                         : row.memberName;
 
                       return (
-                        <tr key={row.memberId}>
-                          <td className="px-3 sm:px-6 py-2 sm:py-3">
+                        <tr
+                          key={row.memberId}
+                          className="hover:bg-gray-50 transition-colors"
+                        >
+                          <td className="px-6 py-4 font-bold text-indigo-600">
                             <button
-                              type="button"
                               onClick={() =>
                                 navigate(
                                   `/admin/prayers/members/${row.memberId}`
                                 )
                               }
-                              className="text-indigo-600 hover:text-indigo-900 underline-offset-2 hover:underline"
+                              className="hover:underline"
                             >
                               {displayName}
                             </button>
                           </td>
-                          <td className="px-3 sm:px-6 py-2 sm:py-3">
+                          <td className="px-6 py-4 text-gray-700 font-medium">
                             {row.cellId ? (
                               <button
-                                type="button"
                                 onClick={() =>
                                   navigate(`/admin/prayers/cells/${row.cellId}`)
                                 }
-                                className="text-gray-700 underline-offset-2 hover:underline"
+                                className="hover:underline"
                               >
                                 {row.cellName}
                               </button>
@@ -921,10 +865,12 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                               "-"
                             )}
                           </td>
-                          <td className="px-3 sm:px-6 py-2 sm:py-3 text-right">
-                            {row.totalCount.toLocaleString()}건
+                          <td className="px-6 py-4 text-right">
+                            <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-xs font-bold">
+                              {row.totalCount.toLocaleString()}건
+                            </span>
                           </td>
-                          <td className="px-3 sm:px-6 py-2 sm:py-3 whitespace-nowrap">
+                          <td className="px-6 py-4 text-gray-500">
                             {safeFormatDate(row.latestCreatedAt)}
                           </td>
                         </tr>
@@ -944,44 +890,44 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
           </>
         )}
 
-        {/* 2. 셀별 요약 목록 */}
+        {/* 2. Cells Summary List */}
         {!loading && !error && mode === "cells" && cellSummaryPage && (
           <>
+            {/* Mobile Cards */}
             <div className="space-y-3 md:hidden mb-4">
               {cellSummaryPage.content.length === 0 ? (
-                <div className="bg-white rounded-lg shadow border p-4 text-center text-xs text-gray-500">
+                <div className="py-20 text-center bg-white rounded-2xl border border-dashed border-gray-200 text-gray-400">
                   조건에 맞는 셀이 없습니다.
                 </div>
               ) : (
                 cellSummaryPage.content.map((row) => (
                   <div
                     key={row.cellId}
-                    className="bg-white rounded-lg shadow border p-3 text-xs space-y-2"
+                    className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4"
                   >
-                    <div className="flex justify-between items-start">
+                    <div className="flex justify-between items-start mb-2">
                       <button
                         onClick={() =>
                           navigate(`/admin/prayers/cells/${row.cellId}`)
                         }
-                        className="text-sm font-semibold text-indigo-600 hover:underline"
+                        className="text-lg font-bold text-indigo-600 hover:text-indigo-800"
                       >
                         {row.cellName}
                       </button>
-
-                      <div className="text-right text-[11px] text-gray-500">
-                        최근 작성일
-                        <br />
-                        <span className="font-medium text-gray-800">
+                      <div className="text-right">
+                        <span className="text-xs font-bold text-gray-400 block mb-0.5">
+                          최근 작성
+                        </span>
+                        <span className="text-sm font-medium text-gray-800">
                           {safeFormatDate(row.latestCreatedAt)}
                         </span>
                       </div>
                     </div>
-
-                    <div className="flex justify-between border-t pt-2">
-                      <span className="text-[11px] text-gray-500">
-                        기도제목 수
+                    <div className="pt-3 mt-2 border-t border-gray-50 flex justify-between items-center">
+                      <span className="text-xs text-gray-400 font-bold">
+                        총 기도제목
                       </span>
-                      <span className="text-sm font-semibold text-gray-900">
+                      <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded-lg text-xs font-bold">
                         {row.totalCount.toLocaleString()}건
                       </span>
                     </div>
@@ -990,67 +936,63 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
               )}
             </div>
 
-            <div className="hidden md:block bg-white shadow-md rounded-lg overflow-x-auto mb-4">
-              <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
-                <thead className="bg-gray-50">
+            {/* Desktop Table */}
+            <div className="hidden md:block bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden mb-4">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50/50">
                   <tr>
                     <th
-                      className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none"
+                      className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
                       onClick={() => requestSort("cellName")}
                     >
-                      셀{" "}
-                      <span className="ml-1">
-                        {getSortIndicator("cellName")}
-                      </span>
+                      셀 {getSortIndicator("cellName")}
                     </th>
                     <th
-                      className="px-3 sm:px-6 py-2 sm:py-3 text-right text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none"
+                      className="px-6 py-3 text-right font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
                       onClick={() => requestSort("totalCount")}
                     >
-                      기도제목 수{" "}
-                      <span className="ml-1">
-                        {getSortIndicator("totalCount")}
-                      </span>
+                      기도제목 수 {getSortIndicator("totalCount")}
                     </th>
                     <th
-                      className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none"
+                      className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
                       onClick={() => requestSort("latestCreatedAt")}
                     >
-                      최근 작성일{" "}
-                      <span className="ml-1">
-                        {getSortIndicator("latestCreatedAt")}
-                      </span>
+                      최근 작성일 {getSortIndicator("latestCreatedAt")}
                     </th>
                   </tr>
                 </thead>
-
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="divide-y divide-gray-200 bg-white">
                   {cellSummaryPage.content.length === 0 ? (
                     <tr>
                       <td
                         colSpan={3}
-                        className="px-3 sm:px-6 py-4 text-center text-xs sm:text-sm text-gray-500"
+                        className="px-6 py-10 text-center text-gray-400 text-sm"
                       >
                         조건에 맞는 셀이 없습니다.
                       </td>
                     </tr>
                   ) : (
                     cellSummaryPage.content.map((row) => (
-                      <tr key={row.cellId}>
-                        <td className="px-3 sm:px-6 py-2 sm:py-3">
+                      <tr
+                        key={row.cellId}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="px-6 py-4 font-bold text-indigo-600">
                           <button
                             onClick={() =>
                               navigate(`/admin/prayers/cells/${row.cellId}`)
                             }
-                            className="text-indigo-600 hover:text-indigo-900 underline-offset-2 hover:underline"
+                            className="hover:underline"
                           >
                             {row.cellName}
                           </button>
                         </td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-3 text-right">
-                          {row.totalCount.toLocaleString()}건
+                        <td className="px-6 py-4 text-right">
+                          <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-xs font-bold">
+                            {row.totalCount.toLocaleString()}건
+                          </span>
                         </td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-3 whitespace-nowrap">
+                        <td className="px-6 py-4 text-gray-500">
                           {safeFormatDate(row.latestCreatedAt)}
                         </td>
                       </tr>

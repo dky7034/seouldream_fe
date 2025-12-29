@@ -2,6 +2,9 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import authService from "../services/authService";
 import type { CreateMemberRequest } from "../types";
+import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
+// 👇 아이콘 추가
+import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 
 interface FormErrors {
   email?: string;
@@ -30,6 +33,10 @@ const RegisterPage: React.FC = () => {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
   const [passwordMatchMsg, setPasswordMatchMsg] = useState<string>("");
+
+  // 👇 비밀번호 보임/숨김 상태 관리
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
   // username validation
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
@@ -100,8 +107,8 @@ const RegisterPage: React.FC = () => {
   const validate = (): FormErrors => {
     const newErrors: FormErrors = {};
 
-    // 이메일
-    if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
+    // 이메일 (선택 항목이지만 입력값이 있다면 형식 검사 수행)
+    if (formData.email && !/^\S+@\S+\.\S+$/.test(formData.email)) {
       newErrors.email = "올바른 이메일 형식이 아닙니다.";
     }
 
@@ -170,10 +177,10 @@ const RegisterPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* 이름 */}
+                {/* 이름 (필수) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    이름
+                    이름 <span className="text-red-500">*</span>
                   </label>
                   <input
                     name="name"
@@ -185,10 +192,10 @@ const RegisterPage: React.FC = () => {
                   />
                 </div>
 
-                {/* 아이디 + 중복 확인 */}
+                {/* 아이디 + 중복 확인 (필수) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    아이디
+                    아이디 <span className="text-red-500">*</span>
                   </label>
                   <div className="mt-1 flex flex-col sm:flex-row gap-2">
                     <input
@@ -227,7 +234,7 @@ const RegisterPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 이메일 */}
+                {/* 이메일 (선택 항목) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     이메일
@@ -235,7 +242,6 @@ const RegisterPage: React.FC = () => {
                   <input
                     name="email"
                     type="email"
-                    required
                     value={formData.email}
                     onChange={handleChange}
                     className="mt-1 block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
@@ -247,10 +253,10 @@ const RegisterPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* 연락처 */}
+                {/* 연락처 (필수) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    연락처
+                    연락처 <span className="text-red-500">*</span>
                   </label>
                   <input
                     name="phone"
@@ -268,34 +274,62 @@ const RegisterPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* 비밀번호 */}
+                {/* 👇 비밀번호 (필수) - 눈 모양 아이콘 추가됨 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    비밀번호
+                    비밀번호 <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    name="password"
-                    type="password"
-                    required
-                    value={formData.password}
-                    onChange={handleChange}
-                    className="mt-1 block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
+                  <div className="mt-1 relative">
+                    <input
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      required
+                      value={formData.password}
+                      onChange={handleChange}
+                      className="block w-full px-3 py-2 pr-10 text-sm border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                      tabIndex={-1}
+                    >
+                      {showPassword ? (
+                        <EyeSlashIcon className="w-5 h-5" aria-hidden="true" />
+                      ) : (
+                        <EyeIcon className="w-5 h-5" aria-hidden="true" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
-                {/* 비밀번호 확인 */}
+                {/* 👇 비밀번호 확인 (필수) - 눈 모양 아이콘 추가됨 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    비밀번호 확인
+                    비밀번호 확인 <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    name="passwordConfirm"
-                    type="password"
-                    required
-                    value={passwordConfirm}
-                    onChange={(e) => setPasswordConfirm(e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
+                  <div className="mt-1 relative">
+                    <input
+                      name="passwordConfirm"
+                      type={showPasswordConfirm ? "text" : "password"}
+                      required
+                      value={passwordConfirm}
+                      onChange={(e) => setPasswordConfirm(e.target.value)}
+                      className="block w-full px-3 py-2 pr-10 text-sm border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswordConfirm((prev) => !prev)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                      tabIndex={-1}
+                    >
+                      {showPasswordConfirm ? (
+                        <EyeSlashIcon className="w-5 h-5" aria-hidden="true" />
+                      ) : (
+                        <EyeIcon className="w-5 h-5" aria-hidden="true" />
+                      )}
+                    </button>
+                  </div>
                   <div className="mt-2 text-xs sm:text-sm min-h-[1.25rem]">
                     {errors.password ? (
                       <p className="text-red-600">{errors.password}</p>
@@ -315,11 +349,11 @@ const RegisterPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 성별 / 생년월일 */}
+                {/* 성별 / 생년월일 (필수) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      성별
+                      성별 <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="gender"
@@ -333,24 +367,23 @@ const RegisterPage: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      생년월일
+                      생년월일 <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      name="birthDate"
-                      type="date"
-                      required
+                    <KoreanCalendarPicker
                       value={formData.birthDate}
-                      onChange={handleChange}
-                      className="mt-1 block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                      onChange={(dateStr) =>
+                        setFormData((prev) => ({ ...prev, birthDate: dateStr }))
+                      }
+                      maxDate={new Date()}
                     />
                   </div>
                 </div>
 
-                {/* 등록 연도 / 역할 */}
+                {/* 등록 연도 / 역할 (필수) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      교회 등록 연도
+                      교회 등록 연도 <span className="text-red-500">*</span>
                     </label>
                     <input
                       name="joinYear"
@@ -371,7 +404,7 @@ const RegisterPage: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      역할
+                      역할 <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="role"

@@ -5,8 +5,18 @@ import { teamService } from "../services/teamService";
 import type { GetAllTeamsParams, TeamDto, Page } from "../types";
 import { useAuth } from "../hooks/useAuth";
 import Pagination from "../components/Pagination";
+import { useDebounce } from "../hooks/useDebounce"; // hooks 파일이 없다면 아래 주석 처리된 인라인 훅을 사용하세요
+import {
+  UserGroupIcon,
+  PlusIcon,
+  MagnifyingGlassIcon,
+  FunnelIcon,
+  ExclamationCircleIcon,
+  UsersIcon,
+} from "@heroicons/react/24/solid";
 
-// --- 간단한 디바운스 훅 ---
+// useDebounce 훅이 별도 파일에 없다면 이 주석을 해제해서 사용하세요.
+/*
 const useDebounce = (value: string, delay: number) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
   useEffect(() => {
@@ -15,6 +25,7 @@ const useDebounce = (value: string, delay: number) => {
   }, [value, delay]);
   return debouncedValue;
 };
+*/
 
 type SortConfig = {
   key: keyof TeamDto;
@@ -34,17 +45,12 @@ const AdminTeamsPage: React.FC = () => {
   const [teamToDelete, setTeamToDelete] = useState<TeamDto | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // ───────────────── URL 기반 초기값 설정 ─────────────────
-  const [nameFilter, setNameFilter] = useState(() => {
-    return searchParams.get("name") ?? "";
-  });
-
-  const [activeFilter, setActiveFilter] = useState<string>(() => {
-    const activeParam = searchParams.get("active");
-    if (activeParam === "true" || activeParam === "false") {
-      return activeParam;
-    }
-    return "all";
+  // 필터 초기값
+  const [filters, setFilters] = useState(() => {
+    return {
+      name: searchParams.get("name") ?? "",
+      active: searchParams.get("active") ?? "all", // 'all' | 'true' | 'false'
+    };
   });
 
   const [sortConfig, setSortConfig] = useState<SortConfig>(() => {
@@ -52,45 +58,41 @@ const AdminTeamsPage: React.FC = () => {
     const dirParam = searchParams.get("sortDir") as
       | SortConfig["direction"]
       | null;
-
-    const key = (keyParam as keyof TeamDto | null) ?? "name";
-    const direction = dirParam ?? "ascending";
-
-    return { key, direction };
+    return {
+      key: (keyParam as keyof TeamDto) ?? "name",
+      direction: dirParam ?? "ascending",
+    };
   });
 
-  const [currentPage, setCurrentPage] = useState(() => {
-    const pageParam = searchParams.get("page");
-    return pageParam ? Number(pageParam) : 0;
-  });
+  const [currentPage, setCurrentPage] = useState(() =>
+    searchParams.get("page") ? Number(searchParams.get("page")) : 0
+  );
 
-  const debouncedNameFilter = useDebounce(nameFilter, 500);
+  const debouncedNameFilter = useDebounce(filters.name, 500);
 
-  // ───────────────── URL 쿼리와 상태 동기화 함수 ─────────────────
+  // URL 동기화
   const syncSearchParams = useCallback(
-    (
-      nextNameFilter: string = nameFilter,
-      nextActiveFilter: string = activeFilter,
-      nextSortConfig: SortConfig = sortConfig,
-      nextPage: number = currentPage
-    ) => {
+    (nextFilters = filters, nextSort = sortConfig, nextPage = currentPage) => {
       const params: Record<string, string> = {};
+      if (nextFilters.name) params.name = nextFilters.name;
+      if (nextFilters.active !== "all") params.active = nextFilters.active;
 
-      if (nextNameFilter) params.name = nextNameFilter;
-      if (nextActiveFilter !== "all") params.active = nextActiveFilter;
-
-      params.sortKey = nextSortConfig.key as string;
-      params.sortDir = nextSortConfig.direction;
+      params.sortKey = nextSort.key as string;
+      params.sortDir = nextSort.direction;
       params.page = String(nextPage);
 
       setSearchParams(params, { replace: true });
     },
-    [nameFilter, activeFilter, sortConfig, currentPage, setSearchParams]
+    [filters, sortConfig, currentPage, setSearchParams]
   );
 
+  // 데이터 Fetching
   const fetchTeams = useCallback(async () => {
-    if (!user || user.role !== "EXECUTIVE") return;
-
+    if (!user || user.role !== "EXECUTIVE") {
+      setLoading(false);
+      setError("권한이 없습니다.");
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -104,49 +106,59 @@ const AdminTeamsPage: React.FC = () => {
       };
 
       if (debouncedNameFilter) params.name = debouncedNameFilter;
-      if (activeFilter !== "all") params.active = activeFilter === "true";
+      if (filters.active !== "all") params.active = filters.active === "true";
 
       const data = await teamService.getAllTeams(params);
       setTeamPage(data);
     } catch (err) {
       console.error(err);
-      setError("팀 목록을 불러오는 데 실패했습니다.");
+      setError("팀 목록 로드 실패");
     } finally {
       setLoading(false);
     }
-  }, [user, currentPage, sortConfig, debouncedNameFilter, activeFilter]);
+  }, [user, currentPage, sortConfig, debouncedNameFilter, filters]);
 
   useEffect(() => {
-    if (!user) {
-      setError("로그인 후에 팀 관리 페이지에 접근할 수 있습니다.");
+    if (user?.role === "EXECUTIVE") fetchTeams();
+    else if (user) {
+      setError("권한이 없습니다.");
       setLoading(false);
-      return;
-    }
-    if (user.role !== "EXECUTIVE") {
-      setError("팀 관리 페이지에 접근할 권한이 없습니다.");
-      setLoading(false);
-      return;
-    }
-
-    fetchTeams();
+    } else setLoading(false);
   }, [user, fetchTeams]);
 
+  // Handlers
   const requestSort = (key: keyof TeamDto) => {
-    let direction: "ascending" | "descending" = "ascending";
-    if (sortConfig.key === key && sortConfig.direction === "ascending") {
-      direction = "descending";
-    }
-    const nextSort: SortConfig = { key, direction };
-    const nextPage = 0;
-
+    const direction =
+      sortConfig.key === key && sortConfig.direction === "ascending"
+        ? "descending"
+        : "ascending";
+    const nextSort = { key, direction } as SortConfig;
     setSortConfig(nextSort);
-    setCurrentPage(nextPage);
-    syncSearchParams(nameFilter, activeFilter, nextSort, nextPage);
+    setCurrentPage(0);
+    syncSearchParams(filters, nextSort, 0);
   };
 
-  const getSortIndicator = (key: keyof TeamDto) => {
-    if (sortConfig.key !== key) return " ↕";
-    return sortConfig.direction === "ascending" ? " ▲" : " ▼";
+  const getSortIndicator = (key: keyof TeamDto) =>
+    sortConfig.key !== key
+      ? " ↕"
+      : sortConfig.direction === "ascending"
+      ? " ▲"
+      : " ▼";
+
+  const handleFilterChange = (key: keyof typeof filters, value: any) => {
+    setFilters((prev) => {
+      const next = { ...prev, [key]: value };
+      setCurrentPage(0);
+      syncSearchParams(next, sortConfig, 0);
+      return next;
+    });
+  };
+
+  const resetFilters = () => {
+    const next = { name: "", active: "all" };
+    setFilters(next);
+    setCurrentPage(0);
+    syncSearchParams(next, sortConfig, 0);
   };
 
   const handleDelete = (team: TeamDto) => {
@@ -158,342 +170,297 @@ const AdminTeamsPage: React.FC = () => {
   const handleConfirmDelete = async () => {
     if (!teamToDelete) return;
     setDeleteError(null);
-
     try {
       await teamService.deleteTeam(teamToDelete.id);
       setShowDeleteConfirm(false);
       setTeamToDelete(null);
       fetchTeams();
     } catch (err: any) {
-      setDeleteError(err?.response?.data?.message || "팀 삭제에 실패했습니다.");
+      setDeleteError(err?.response?.data?.message || "삭제 실패");
     }
   };
 
-  const handleCloseDeleteModal = () => {
-    setShowDeleteConfirm(false);
-    setTeamToDelete(null);
-    setDeleteError(null);
-  };
-
-  // 권한 에러일 때는 간단한 안내 화면
-  if (error && (!user || user.role !== "EXECUTIVE")) {
-    return (
-      <div className="bg-gray-50 min-h-screen">
-        <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
-          <p className="mt-4 text-red-600 text-center text-sm sm:text-base">
-            {error}
-          </p>
-        </div>
-      </div>
-    );
-  }
+  if (error && (!user || user.role !== "EXECUTIVE"))
+    return <div className="p-8 text-center text-red-600">{error}</div>;
 
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
-        {/* 상단 제목 */}
-        <div className="flex flex-col gap-3 mb-6">
+    <div className="bg-gray-50 min-h-screen pb-20">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-              팀 관리
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <UserGroupIcon className="h-7 w-7 text-indigo-500" />팀 관리
             </h1>
-            <p className="mt-1 text-sm text-gray-600">
-              예배·사역·봉사 등의 팀 정보를 한 곳에서 관리하는 임원 전용
-              페이지입니다. 팀은 멤버의 역할 배정과 사역 담당 현황을 파악할 때
-              기준이 됩니다.
+            <p className="text-sm text-gray-500 mt-1">
+              예배/사역/봉사 팀 정보를 조회하고 관리합니다.
             </p>
           </div>
+          <button
+            onClick={() => navigate("/admin/teams/add")}
+            className="flex items-center justify-center gap-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm font-bold shadow-sm transition-all"
+          >
+            <PlusIcon className="h-4 w-4" /> 새 팀 추가
+          </button>
         </div>
 
-        {/* 상단 에러 (임원 권한일 때) */}
-        {error && user && user.role === "EXECUTIVE" && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-xs sm:text-sm">
-            {error}
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm font-bold text-red-700 flex items-center gap-2">
+            <ExclamationCircleIcon className="h-5 w-5" /> {error}
           </div>
         )}
 
-        {/* 필터 영역 */}
-        <div className="mb-4 p-4 bg-gray-50 rounded-lg shadow-sm">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+        {/* Filter Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6">
+          <div className="flex items-center gap-2 mb-4 border-b border-gray-50 pb-2">
+            <FunnelIcon className="h-5 w-5 text-gray-400" />
+            <h3 className="font-bold text-gray-700">검색 필터</h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="relative">
+              <label className="text-xs font-bold text-gray-500 mb-1 block">
                 팀 이름 검색
               </label>
-              <input
-                type="text"
-                placeholder="이름으로 검색..."
-                value={nameFilter}
-                onChange={(e) => {
-                  const nextName = e.target.value;
-                  setNameFilter(nextName);
-                  const nextPage = 0;
-                  setCurrentPage(nextPage);
-                  syncSearchParams(
-                    nextName,
-                    activeFilter,
-                    sortConfig,
-                    nextPage
-                  );
-                }}
-                className="p-2 border rounded-md w-full text-sm"
-              />
+              <div className="relative">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="검색..."
+                  value={filters.name}
+                  onChange={(e) => handleFilterChange("name", e.target.value)}
+                  className="w-full pl-10 py-3 border-gray-200 rounded-xl text-base bg-gray-50 focus:bg-white transition-all"
+                />
+              </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                상태 필터
+              <label className="text-xs font-bold text-gray-500 mb-1 block">
+                상태
               </label>
               <select
-                value={activeFilter}
-                onChange={(e) => {
-                  const nextActive = e.target.value;
-                  setActiveFilter(nextActive);
-                  const nextPage = 0;
-                  setCurrentPage(nextPage);
-                  syncSearchParams(
-                    nameFilter,
-                    nextActive,
-                    sortConfig,
-                    nextPage
-                  );
-                }}
-                className="p-2 border rounded-md w-full text-sm"
+                value={filters.active}
+                onChange={(e) => handleFilterChange("active", e.target.value)}
+                className="w-full py-3 border-gray-200 rounded-xl text-base bg-gray-50 focus:bg-white"
               >
                 <option value="all">모든 상태</option>
-                <option value="true">활성 팀만</option>
-                <option value="false">비활성 팀만</option>
+                <option value="true">활성 팀</option>
+                <option value="false">비활성 팀</option>
               </select>
             </div>
           </div>
-        </div>
 
-        {/* 🔹 필터 바로 아래: 새 팀 추가 버튼 */}
-        {user?.role === "EXECUTIVE" && (
-          <div className="mb-4 flex justify-end">
+          <div className="mt-4 flex justify-end">
             <button
-              onClick={() => navigate("/admin/teams/add")}
-              className="rounded-md bg-indigo-600 px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-              disabled={loading}
+              onClick={resetFilters}
+              className="text-xs font-bold text-gray-500 hover:text-gray-800 underline decoration-gray-300 underline-offset-2"
             >
-              + 새 팀 추가
+              필터 초기화
             </button>
           </div>
-        )}
+        </div>
 
-        {/* 목록 / 로딩 / 빈 상태 */}
-        {loading && (
-          <div className="flex items-center justify-center min-h-[30vh]">
-            <p className="text-sm text-gray-500">
-              팀 목록을 불러오는 중입니다...
-            </p>
+        {/* List / Table */}
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
           </div>
-        )}
-
-        {!loading && teamPage && (
+        ) : !teamPage || teamPage.content.length === 0 ? (
+          <div className="py-20 text-center bg-white rounded-2xl border border-dashed border-gray-200 text-gray-400">
+            조건에 맞는 팀이 없습니다.
+          </div>
+        ) : (
           <>
-            {/* ✅ 모바일: 카드 리스트 (팀 인원 표시 추가) */}
+            {/* Mobile Cards */}
             <div className="space-y-3 md:hidden mb-4">
-              {teamPage.content.length === 0 ? (
-                <div className="bg-white rounded-lg shadow border border-gray-100 p-4 text-center text-xs sm:text-sm text-gray-500">
-                  조건에 맞는 팀이 없습니다. 필터를 변경해 보세요.
-                </div>
-              ) : (
-                teamPage.content.map((team) => (
-                  <div
-                    key={team.id}
-                    className="bg-white rounded-lg shadow border border-gray-100 p-4 text-xs"
-                  >
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="min-w-0">
-                        <Link
-                          to={`/admin/teams/${team.id}`}
-                          className="text-sm font-semibold text-indigo-600 hover:text-indigo-800"
-                        >
-                          {team.name}
-                        </Link>
-                        {team.description && (
-                          <p className="mt-1 text-[11px] text-gray-500 line-clamp-2">
-                            {team.description}
-                          </p>
-                        )}
-                        <p className="mt-2 text-[11px] text-gray-600">
-                          현재 팀 인원{" "}
-                          <span className="font-semibold">
-                            {team.memberCount ?? 0}명
-                          </span>
-                        </p>
-                      </div>
-                      <span
-                        className={`px-2 inline-flex text-[11px] leading-5 font-semibold rounded-full ${
-                          team.active
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
+              {teamPage.content.map((team) => (
+                <div
+                  key={team.id}
+                  className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-4 active:scale-[0.99] transition-all ${
+                    !team.active ? "opacity-75 bg-gray-50" : ""
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <Link
+                        to={`/admin/teams/${team.id}`}
+                        className="text-lg font-bold text-indigo-600 hover:text-indigo-800"
                       >
-                        {team.active ? "활성" : "비활성"}
+                        {team.name}
+                      </Link>
+                      <div className="flex items-center gap-1 mt-1">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            team.active
+                              ? "bg-green-50 text-green-700"
+                              : "bg-gray-100 text-gray-500"
+                          }`}
+                        >
+                          {team.active ? "활성" : "비활성"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-bold text-gray-500 flex items-center gap-1 justify-end">
+                        <UsersIcon className="h-3 w-3" />{" "}
+                        {team.memberCount ?? 0}명
                       </span>
                     </div>
-
-                    {user?.role === "EXECUTIVE" && (
-                      <div className="mt-3 flex justify-end gap-2">
-                        <button
-                          onClick={() =>
-                            navigate(`/admin/teams/${team.id}/edit`)
-                          }
-                          className="text-[11px] font-medium text-indigo-600 hover:text-indigo-900"
-                        >
-                          수정
-                        </button>
-                        <button
-                          onClick={() => handleDelete(team)}
-                          className="text-[11px] font-medium text-red-600 hover:text-red-800"
-                        >
-                          삭제
-                        </button>
-                      </div>
-                    )}
                   </div>
-                ))
-              )}
+
+                  {team.description && (
+                    <p className="text-xs text-gray-500 mb-3 line-clamp-2">
+                      {team.description}
+                    </p>
+                  )}
+
+                  <div className="pt-3 mt-2 border-t border-gray-50 flex justify-end gap-2">
+                    {/* ✅ 모바일 버튼: 기존처럼 보이게 (배경 있음) + 한글 */}
+                    <button
+                      onClick={() => navigate(`/admin/teams/${team.id}/edit`)}
+                      className="bg-gray-50 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-100 hover:bg-indigo-50"
+                    >
+                      수정
+                    </button>
+                    <button
+                      onClick={() => handleDelete(team)}
+                      className="bg-gray-50 text-red-500 px-3 py-1.5 rounded-lg text-xs font-bold border border-red-100 hover:bg-red-50"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
 
-            {/* ✅ 데스크탑: 테이블 (팀 인원 컬럼 + 정렬 추가) */}
-            <div className="hidden md:block bg-white shadow-md rounded-lg overflow-x-auto mb-4">
-              <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
-                <thead className="bg-gray-50">
+            {/* Desktop Table */}
+            <div className="hidden md:block bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50/50">
                   <tr>
                     <th
                       onClick={() => requestSort("name")}
-                      className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    >
-                      이름{getSortIndicator("name")}
-                    </th>
+                      className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
+                    >{`이름${getSortIndicator("name")}`}</th>
                     <th
                       onClick={() => requestSort("memberCount")}
-                      className="px-4 sm:px-6 py-3 text-right text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    >
-                      인원{getSortIndicator("memberCount")}
-                    </th>
+                      className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
+                    >{`인원${getSortIndicator("memberCount")}`}</th>
                     <th
                       onClick={() => requestSort("active")}
-                      className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    >
-                      상태{getSortIndicator("active")}
+                      className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
+                    >{`상태${getSortIndicator("active")}`}</th>
+                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">
+                      설명
                     </th>
-                    <th className="relative px-4 sm:px-6 py-3">
+                    <th className="px-6 py-3">
                       <span className="sr-only">Actions</span>
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {teamPage.content.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={4}
-                        className="px-4 sm:px-6 py-4 text-center text-xs sm:text-sm text-gray-500"
-                      >
-                        조건에 맞는 팀이 없습니다. 필터를 변경해 보세요.
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {teamPage.content.map((team) => (
+                    <tr
+                      key={team.id}
+                      className={`hover:bg-gray-50 transition-colors cursor-pointer group ${
+                        !team.active ? "bg-gray-50 text-gray-400" : ""
+                      }`}
+                      onClick={() => navigate(`/admin/teams/${team.id}`)}
+                    >
+                      <td className="px-6 py-4 font-bold text-indigo-600">
+                        {team.name}
+                      </td>
+                      <td className="px-6 py-4 font-medium text-gray-700">
+                        {team.memberCount ?? 0}명
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`px-2 py-0.5 rounded text-xs font-bold ${
+                            team.active
+                              ? "bg-green-50 text-green-700"
+                              : "bg-gray-100 text-gray-500"
+                          }`}
+                        >
+                          {team.active ? "활성" : "비활성"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-xs text-gray-500 truncate max-w-xs">
+                        {team.description || "-"}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        {/* ✅ 데스크탑 버튼: UsersPage 테이블과 동일하게 텍스트 버튼 + 한글 */}
+                        <div
+                          className="flex justify-end gap-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            onClick={() =>
+                              navigate(`/admin/teams/${team.id}/edit`)
+                            }
+                            className="text-gray-400 hover:text-indigo-600 font-bold text-xs"
+                          >
+                            수정
+                          </button>
+                          <button
+                            onClick={() => handleDelete(team)}
+                            className="text-gray-400 hover:text-red-500 font-bold text-xs"
+                          >
+                            삭제
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  ) : (
-                    teamPage.content.map((team) => (
-                      <tr key={team.id}>
-                        <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm font-medium">
-                          <Link
-                            to={`/admin/teams/${team.id}`}
-                            className="text-indigo-600 hover:text-indigo-900"
-                          >
-                            {team.name}
-                          </Link>
-                        </td>
-                        <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-right text-xs sm:text-sm">
-                          <span className="font-semibold">
-                            {team.memberCount ?? 0}
-                          </span>
-                          <span className="ml-1 text-gray-500">명</span>
-                        </td>
-                        <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm">
-                          <span
-                            className={`px-2 inline-flex text-[11px] sm:text-xs leading-5 font-semibold rounded-full ${
-                              team.active
-                                ? "bg-green-100 text-green-800"
-                                : "bg-gray-100 text-gray-800"
-                            }`}
-                          >
-                            {team.active ? "활성" : "비활성"}
-                          </span>
-                        </td>
-                        <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
-                          {user?.role === "EXECUTIVE" && (
-                            <>
-                              <button
-                                onClick={() =>
-                                  navigate(`/admin/teams/${team.id}/edit`)
-                                }
-                                className="text-indigo-600 hover:text-indigo-900 mr-3"
-                              >
-                                수정
-                              </button>
-                              <button
-                                onClick={() => handleDelete(team)}
-                                className="text-red-600 hover:text-red-900"
-                              >
-                                삭제
-                              </button>
-                            </>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
 
-            {/* 페이지네이션 */}
-            <Pagination
-              currentPage={teamPage.number}
-              totalPages={teamPage.totalPages}
-              totalElements={teamPage.totalElements}
-              onPageChange={(page) => {
-                setCurrentPage(page);
-                syncSearchParams(nameFilter, activeFilter, sortConfig, page);
-              }}
-              itemLabel="개 팀"
-            />
+            <div className="mt-6">
+              <Pagination
+                currentPage={teamPage.number}
+                totalPages={teamPage.totalPages}
+                totalElements={teamPage.totalElements}
+                onPageChange={(p) => {
+                  setCurrentPage(p);
+                  syncSearchParams(filters, sortConfig, p);
+                }}
+                itemLabel="개 팀"
+              />
+            </div>
           </>
         )}
 
-        {/* 삭제 확인 모달 */}
+        {/* Delete Modal */}
         {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-            <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl max-w-sm w-full">
-              <h2 className="text-lg sm:text-xl font-bold mb-4">
-                팀 삭제 확인
-              </h2>
-              <p className="text-sm text-gray-700 mb-2">
-                정말로 &quot;{teamToDelete?.name}&quot; 팀을 삭제하시겠습니까?
+          <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-sm">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">팀 삭제</h3>
+              <p className="text-sm text-gray-600 mb-2 break-keep">
+                정말로{" "}
+                <span className="font-bold text-gray-900">
+                  "{teamToDelete?.name}"
+                </span>{" "}
+                팀을 삭제하시겠습니까?
               </p>
-              <p className="text-[11px] sm:text-xs text-gray-500 mb-4">
-                팀을 삭제하면 해당 팀에 연결된 멤버/역할 배정 정보에 영향을 줄
-                수 있습니다. 필요하다면 먼저 팀 연결 상태를 확인해 주세요.
+              <p className="text-xs text-red-500 bg-red-50 p-2 rounded border border-red-100 mb-4 break-keep">
+                ⚠ 팀을 삭제하면 연결된 멤버들의 정보에 영향을 줄 수 있습니다.
               </p>
               {deleteError && (
-                <div className="p-3 text-xs sm:text-sm font-medium text-red-700 bg-red-100 border border-red-400 rounded-md mb-4">
+                <div className="mb-4 p-3 bg-red-50 text-red-600 text-xs rounded-lg">
                   {deleteError}
                 </div>
               )}
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-3">
                 <button
-                  onClick={handleCloseDeleteModal}
-                  className="bg-gray-300 text-gray-800 px-3 sm:px-4 py-2 rounded-md mr-2 text-xs sm:text-sm"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-4 py-2 rounded-xl text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200"
                 >
                   취소
                 </button>
                 <button
                   onClick={handleConfirmDelete}
-                  className="bg-red-600 text-white px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm"
+                  className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700"
                 >
-                  삭제
+                  삭제하기
                 </button>
               </div>
             </div>

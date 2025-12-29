@@ -12,11 +12,20 @@ import type {
   SemesterDto,
 } from "../types";
 import { useAuth } from "../hooks/useAuth";
-import { MapPinIcon } from "@heroicons/react/24/solid";
 import Pagination from "../components/Pagination";
 import { useDebounce } from "../hooks/useDebounce";
 import { normalizeNumberInput } from "../utils/numberUtils";
 import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
+import {
+  MegaphoneIcon,
+  FunnelIcon,
+  PlusIcon,
+  MagnifyingGlassIcon,
+  MapPinIcon,
+  ExclamationCircleIcon,
+  TrashIcon,
+  PencilIcon,
+} from "@heroicons/react/24/solid";
 
 type SortKey = "createdAt";
 type UnitType = "year" | "month" | "semester";
@@ -28,7 +37,6 @@ const AdminNoticesPage: React.FC = () => {
 
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
-  // const currentYear = now.getFullYear(); // ❌ 초기값 로직에서 제거 (사용 안 함)
 
   const [noticePage, setNoticePage] = useState<Page<NoticeDto> | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -47,12 +55,9 @@ const AdminNoticesPage: React.FC = () => {
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const hasActiveSemesters = semesters.length > 0;
 
-  // ✅ [수정 2] 날짜 포맷팅 함수 개선 (타임존 문제 해결)
-  // 입력값에 'Z'가 없으면 강제로 붙여서 UTC로 인식하게 함 -> 브라우저가 KST로 자동 변환
+  // ✅ 날짜 포맷팅 함수
   const safeFormatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return "-";
-
-    // T는 있는데 Z가 없으면 Z를 붙여줌 (Spring Boot 기본 LocalDateTime 대응)
     const targetStr =
       dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
 
@@ -83,10 +88,7 @@ const AdminNoticesPage: React.FC = () => {
       return isNaN(num) ? "" : num;
     };
 
-    // ✅ [수정 1] 초기값을 무조건 "" (전체 연도)로 설정
-    // URL에 year 파라미터가 없으면 -> 전체 연도("")
-    // URL에 year 파라미터가 있으면 -> 해당 연도 숫자
-    let initialYear: number | "" = ""; // 기본값을 전체 연도로 변경!
+    let initialYear: number | "" = "";
 
     if (yearParam && yearParam !== "all") {
       const parsed = Number(yearParam);
@@ -145,40 +147,6 @@ const AdminNoticesPage: React.FC = () => {
     },
     [memberNameMap]
   );
-
-  const formatShortDate = (dateStr: string) => {
-    if (!dateStr) return "";
-    const [, month, day] = dateStr.split("-");
-    return `${month}/${day}`;
-  };
-
-  const periodSummary = useMemo(() => {
-    if (filterType === "range" && filters.startDate && filters.endDate) {
-      return `기간: ${formatShortDate(filters.startDate)} ~ ${formatShortDate(
-        filters.endDate
-      )}`;
-    }
-
-    if (filterType === "unit") {
-      if (unitType === "semester" && filters.semesterId && semesters.length) {
-        const semester = semesters.find((s) => s.id === filters.semesterId);
-        if (semester) {
-          return `조회 단위: 학기 (${semester.name})`;
-        }
-      }
-
-      const yearText = filters.year === "" ? "전체 연도" : `${filters.year}년`;
-
-      if (unitType === "year") {
-        return `조회 단위: 연간 (${yearText})`;
-      }
-      if (unitType === "month" && filters.month) {
-        return `조회 단위: ${yearText} ${filters.month}월`;
-      }
-    }
-
-    return "";
-  }, [filterType, unitType, filters, semesters]);
 
   const syncSearchParams = useCallback(
     (
@@ -266,7 +234,6 @@ const AdminNoticesPage: React.FC = () => {
       } else {
         params = {
           ...params,
-          // filters.year가 ""(빈문자열)이면 undefined를 할당하여 API 요청에서 제외
           year:
             filters.year === ""
               ? undefined
@@ -385,7 +352,6 @@ const AdminNoticesPage: React.FC = () => {
 
   const handleUnitTypeClick = (type: UnitType) => {
     const cy = new Date().getFullYear();
-    // ✅ 단위 변경 시에도 기본값은 "전체 연도"("")로 설정
     const baseYear = filters.year === "" ? "" : filters.year || "";
     let nextFilters = { ...filters };
 
@@ -397,7 +363,6 @@ const AdminNoticesPage: React.FC = () => {
         semesterId: "" as const,
       };
     } else if (type === "month") {
-      // 월간 선택 시에는 연도가 필수이므로, 없다면 현재 연도로 강제 설정
       const targetYear = baseYear === "" ? cy : baseYear;
       nextFilters = {
         ...filters,
@@ -474,111 +439,98 @@ const AdminNoticesPage: React.FC = () => {
     syncSearchParams(nextFilters, filterType, unitType, sortOrder, nextPage);
   };
 
+  const requestSort = (key: SortKey) => {
+    // 현재는 createdAt만 지원
+    let nextDirection: "asc" | "desc" = "desc";
+    const [currentKey, currentDir] = sortOrder.split(",");
+
+    if (currentKey === key && currentDir === "desc") {
+      nextDirection = "asc";
+    }
+    const nextSort = `${key},${nextDirection}`;
+    setSortOrder(nextSort);
+    setCurrentPage(0);
+    syncSearchParams(filters, filterType, unitType, nextSort, 0);
+  };
+
+  const getSortIndicator = (key: SortKey) => {
+    const [currentKey, currentDir] = sortOrder.split(",");
+    if (currentKey !== key) return " ↕";
+    return currentDir === "asc" ? " ▲" : " ▼";
+  };
+
   const yearOptions = useMemo(() => {
     const validYears = availableYears
       .filter((year): year is number => typeof year === "number" && year > 1970)
       .sort((a, b) => b - a);
+    const cy = new Date().getFullYear();
 
-    if (validYears.length === 0) {
-      const cy = new Date().getFullYear();
-      return [
-        { value: "", label: "전체 연도" },
-        { value: cy, label: `${cy}년` },
-      ];
-    }
-
-    const options = validYears.map((year) => ({
-      value: year,
-      label: `${year}년`,
-    }));
+    // 연도 옵션이 비어있어도 최소한 현재 연도는 보여주도록 함
+    const options =
+      validYears.length > 0
+        ? validYears.map((year) => ({ value: year, label: `${year}년` }))
+        : [{ value: cy, label: `${cy}년` }];
 
     return [{ value: "", label: "전체 연도" }, ...options];
   }, [availableYears]);
-
-  const getSortState = useCallback((): {
-    key: SortKey | null;
-    direction: "asc" | "desc";
-  } => {
-    const [key, dir] = sortOrder.split(",");
-    if (key === "createdAt") {
-      return {
-        key: "createdAt",
-        direction: dir === "asc" ? "asc" : "desc",
-      };
-    }
-    return { key: null, direction: "desc" };
-  }, [sortOrder]);
-
-  const requestSort = (key: SortKey) => {
-    const state = getSortState();
-    let nextDirection: "asc" | "desc" = "desc";
-
-    if (state.key === key && state.direction === "desc") {
-      nextDirection = "asc";
-    }
-
-    const nextSort = `${key},${nextDirection}`;
-    const nextPage = 0;
-
-    setSortOrder(nextSort);
-    setCurrentPage(nextPage);
-    syncSearchParams(filters, filterType, unitType, nextSort, nextPage);
-  };
-
-  const getSortIndicator = (key: SortKey) => {
-    const state = getSortState();
-    if (state.key !== key) return "↕";
-    return state.direction === "asc" ? "▲" : "▼";
-  };
 
   const renderUnitButtons = () => {
     switch (unitType) {
       case "month":
         return (
-          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => handleUnitValueClick(m)}
-                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
-                  filters.month === m ? "bg-blue-500 text-white" : "bg-white"
-                }`}
-              >
-                {m}월
-              </button>
-            ))}
+          <div className="pt-2 border-t border-gray-200/50 mt-2">
+            <label className="text-xs font-bold text-gray-500 mb-2 block">
+              월 선택
+            </label>
+            <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5">
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => handleUnitValueClick(m)}
+                  className={`py-1.5 rounded-md text-xs font-bold transition-colors ${
+                    filters.month === m
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {m}월
+                </button>
+              ))}
+            </div>
           </div>
         );
       case "semester":
         if (semesters.length === 0) {
           return (
-            <div className="mt-3 rounded-md bg-yellow-50 p-3 text-[11px] sm:text-xs text-yellow-800">
-              현재 활성 상태인 학기가 없습니다. 공지 화면에서 학기 선택을
-              사용하려면 최소 1개 이상의 학기를 활성화해 주세요.
+            <div className="mt-3 rounded-md bg-yellow-50 p-3 text-[11px] sm:text-xs text-yellow-800 border border-yellow-100">
+              현재 활성 상태인 학기가 없습니다.
             </div>
           );
         }
-
         return (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-            {semesters.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => handleSemesterClick(s.id)}
-                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
-                  filters.semesterId === s.id
-                    ? "bg-blue-500 text-white"
-                    : "bg-white"
-                }`}
-              >
-                {s.name}
-              </button>
-            ))}
+          <div className="pt-2 border-t border-gray-200/50 mt-2">
+            <label className="text-xs font-bold text-gray-500 mb-2 block">
+              학기 선택
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {semesters.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => handleSemesterClick(s.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                    filters.semesterId === s.id
+                      ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                      : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
           </div>
         );
-      case "year":
       default:
         return null;
     }
@@ -586,368 +538,330 @@ const AdminNoticesPage: React.FC = () => {
 
   if (error && !user) {
     return (
-      <div className="bg-gray-50 min-h-screen flex justify-center items-center px-4">
+      <div className="bg-gray-50 min-h-screen flex justify-center items-center p-4">
         <div className="bg-white rounded-lg shadow-sm p-6 max-w-md w-full text-center">
-          <p className="mt-1 text-red-600 text-sm sm:text-base">{error}</p>
+          <p className="text-red-600 text-sm font-bold">{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <div className="container mx-auto max-w-6xl px-3 sm:px-4 py-6 sm:py-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6 sm:mb-8">
+    <div className="bg-gray-50 min-h-screen pb-20">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <MegaphoneIcon className="h-7 w-7 text-indigo-500" />
               공지사항 {user?.role === "EXECUTIVE" ? "관리" : "목록"}
             </h1>
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="text-sm text-gray-500 mt-1">
               {user?.role === "EXECUTIVE"
-                ? "공지사항을 등록·수정·삭제하고, 고정 공지를 관리하는 페이지입니다."
-                : "공지사항 목록을 확인하는 페이지입니다."}
+                ? "공지사항을 등록하고 고정 공지를 관리합니다."
+                : "등록된 공지사항 목록을 확인합니다."}
             </p>
           </div>
+          {user?.role === "EXECUTIVE" && (
+            <button
+              onClick={() => navigate("/admin/notices/add")}
+              className="flex items-center justify-center gap-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm font-bold shadow-sm transition-all"
+            >
+              <PlusIcon className="h-4 w-4" /> 새 공지사항
+            </button>
+          )}
         </div>
 
         {error && user && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-xs sm:text-sm">
-            {error}
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm font-bold text-red-700 flex items-center gap-2">
+            <ExclamationCircleIcon className="h-5 w-5" /> {error}
           </div>
         )}
 
-        <div className="p-4 bg-gray-50 rounded-lg mb-3 sm:mb-4 space-y-4 shadow-sm">
-          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-            <h3 className="text-base sm:text-lg font-semibold">
-              조회 기간 설정 (작성일 기준)
-            </h3>
-            <div className="flex flex-wrap items-center gap-2">
+        {/* Filter Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 border-b border-gray-50 pb-4">
+            <div className="flex items-center gap-2">
+              <FunnelIcon className="h-5 w-5 text-gray-400" />
+              <h3 className="font-bold text-gray-700">조회 조건 설정</h3>
+            </div>
+            {/* Unit vs Range Toggle */}
+            <div className="bg-gray-100 p-1 rounded-xl flex text-xs font-bold w-fit">
               <button
-                type="button"
                 onClick={() => {
-                  const nextType = "unit" as const;
-                  const nextPage = 0;
-                  setFilterType(nextType);
-                  setCurrentPage(nextPage);
-                  syncSearchParams(
-                    filters,
-                    nextType,
-                    unitType,
-                    sortOrder,
-                    nextPage
-                  );
+                  setFilterType("unit");
+                  setCurrentPage(0);
+                  syncSearchParams(filters, "unit", unitType, sortOrder, 0);
                 }}
-                className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
+                className={`px-3 py-1.5 rounded-lg transition-all ${
                   filterType === "unit"
-                    ? "bg-blue-500 text-white"
-                    : "bg-white border"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
                 }`}
               >
-                단위로 조회
+                단위별 조회
               </button>
               <button
-                type="button"
                 onClick={() => {
-                  const nextType = "range" as const;
-                  const nextPage = 0;
-                  setFilterType(nextType);
-                  setCurrentPage(nextPage);
-                  syncSearchParams(
-                    filters,
-                    nextType,
-                    unitType,
-                    sortOrder,
-                    nextPage
-                  );
+                  setFilterType("range");
+                  setCurrentPage(0);
+                  syncSearchParams(filters, "range", unitType, sortOrder, 0);
                 }}
-                className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
+                className={`px-3 py-1.5 rounded-lg transition-all ${
                   filterType === "range"
-                    ? "bg-blue-500 text-white"
-                    : "bg-white border"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
                 }`}
               >
-                기간으로 조회
+                기간 직접설정
               </button>
             </div>
           </div>
 
-          {filterType === "range" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  기간 시작
-                </label>
-                <KoreanCalendarPicker
-                  value={filters.startDate}
-                  onChange={(date) => handleFilterChange("startDate", date)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  기간 종료
-                </label>
-                <KoreanCalendarPicker
-                  value={filters.endDate}
-                  onChange={(date) => handleFilterChange("endDate", date)}
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-5">
+            {/* Date Settings */}
+            {filterType === "range" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    연도
+                  <label className="text-xs font-bold text-gray-500 mb-1 block">
+                    시작일
                   </label>
-                  <select
-                    // ✅ value 처리: filters.year가 ""이면 ""로 매핑 (전체 연도)
-                    value={filters.year === "" ? "" : filters.year}
-                    onChange={(e) =>
-                      handleFilterChange(
-                        "year",
-                        e.target.value === "" ? "" : Number(e.target.value)
-                      )
-                    }
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
-                    disabled={unitType === "semester"}
-                  >
-                    {yearOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  {unitType === "semester" && (
-                    <p className="mt-1 text-[11px] text-gray-500">
-                      학기 단위 조회 시 연도를 선택할 수 없습니다.
-                    </p>
-                  )}
+                  <KoreanCalendarPicker
+                    value={filters.startDate}
+                    onChange={(date) => handleFilterChange("startDate", date)}
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    조회 단위
+                  <label className="text-xs font-bold text-gray-500 mb-1 block">
+                    종료일
                   </label>
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <button
-                      type="button"
-                      onClick={() => handleUnitTypeClick("month")}
-                      className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
-                        unitType === "month"
-                          ? "bg-blue-500 text-white"
-                          : "bg-white border"
-                      }`}
-                    >
-                      월간
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        hasActiveSemesters && handleUnitTypeClick("semester")
+                  <KoreanCalendarPicker
+                    value={filters.endDate}
+                    onChange={(date) => handleFilterChange("endDate", date)}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100">
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center mb-2">
+                  <div className="w-full sm:w-auto">
+                    <label className="text-xs font-bold text-gray-500 mb-1 block">
+                      연도
+                    </label>
+                    <select
+                      value={filters.year === "" ? "" : filters.year}
+                      onChange={(e) =>
+                        handleFilterChange(
+                          "year",
+                          e.target.value === "" ? "" : Number(e.target.value)
+                        )
                       }
-                      disabled={!hasActiveSemesters}
-                      className={`px-3 py-1 text-xs sm:text-sm rounded-full border ${
-                        hasActiveSemesters
-                          ? unitType === "semester"
-                            ? "bg-blue-500 text-white border-blue-500"
-                            : "bg-white"
-                          : "bg-gray-100 text-gray-400 border-dashed cursor-not-allowed"
-                      }`}
+                      className="w-full sm:w-32 py-2 border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-100"
+                      disabled={unitType === "semester"}
                     >
-                      학기
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleUnitTypeClick("year")}
-                      className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
-                        unitType === "year"
-                          ? "bg-blue-500 text-white"
-                          : "bg-white border"
-                      }`}
-                    >
-                      연간
-                    </button>
+                      {yearOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  {!hasActiveSemesters && (
-                    <p className="mt-1 text-[11px] sm:text-xs text-red-500">
-                      활성화된 학기가 없어 학기 단위 조회를 사용할 수 없습니다.
-                    </p>
-                  )}
+                  <div className="flex-1">
+                    <label className="text-xs font-bold text-gray-500 mb-1 block">
+                      조회 단위
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => handleUnitTypeClick("month")}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                          unitType === "month"
+                            ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        월간
+                      </button>
+                      <button
+                        onClick={() =>
+                          hasActiveSemesters && handleUnitTypeClick("semester")
+                        }
+                        disabled={!hasActiveSemesters}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                          hasActiveSemesters
+                            ? unitType === "semester"
+                              ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                            : "bg-gray-50 text-gray-400 border-gray-100 border-dashed cursor-not-allowed"
+                        }`}
+                      >
+                        학기
+                      </button>
+                      <button
+                        onClick={() => handleUnitTypeClick("year")}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                          unitType === "year"
+                            ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        연간
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                {renderUnitButtons()}
+              </div>
+            )}
+
+            {/* Bottom Row Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="relative">
+                <label className="text-xs font-bold text-gray-500 mb-1 block">
+                  제목 검색
+                </label>
+                <div className="relative">
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="검색..."
+                    value={filters.title}
+                    onChange={(e) =>
+                      handleFilterChange("title", e.target.value)
+                    }
+                    className="w-full pl-10 py-2.5 border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white transition-all"
+                  />
                 </div>
               </div>
-              {renderUnitButtons()}
-            </div>
-          )}
 
-          <hr />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                제목 검색
-              </label>
-              <input
-                type="text"
-                placeholder="제목으로 검색..."
-                value={filters.title}
-                onChange={(e) => handleFilterChange("title", e.target.value)}
-                className="p-2 border rounded-md w-full text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                고정 여부
-              </label>
-              <select
-                value={filters.pinned}
-                onChange={(e) => handleFilterChange("pinned", e.target.value)}
-                className="p-2 border rounded-md w-full text-sm"
-              >
-                <option value="all">전체</option>
-                <option value="true">고정된 공지만</option>
-                <option value="false">고정되지 않은 공지만</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                정렬 순서
-              </label>
-              <div className="flex space-x-1 bg-gray-200 p-1 rounded-lg">
-                <button
-                  onClick={() => requestSort("createdAt")}
-                  className={`w-full px-4 py-1.5 text-xs sm:text-sm font-medium rounded-md ${
-                    sortOrder === "createdAt,desc"
-                      ? "bg-white text-indigo-700 shadow"
-                      : "text-gray-600 hover:bg-gray-300"
-                  }`}
+              <div>
+                <label className="text-xs font-bold text-gray-500 mb-1 block">
+                  고정 여부
+                </label>
+                <select
+                  value={filters.pinned}
+                  onChange={(e) => handleFilterChange("pinned", e.target.value)}
+                  className="w-full py-2.5 border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white"
                 >
-                  최신순
-                </button>
-                <button
-                  onClick={() => {
-                    const nextSort = "createdAt,asc";
-                    const nextPage = 0;
-                    setSortOrder(nextSort);
-                    setCurrentPage(nextPage);
-                    syncSearchParams(
-                      filters,
-                      filterType,
-                      unitType,
-                      nextSort,
-                      nextPage
-                    );
-                  }}
-                  className={`w-full px-4 py-1.5 text-xs sm:text-sm font-medium rounded-md ${
-                    sortOrder === "createdAt,asc"
-                      ? "bg-white text-indigo-700 shadow"
-                      : "text-gray-600 hover:bg-gray-300"
-                  }`}
-                >
-                  오래된순
-                </button>
+                  <option value="all">전체</option>
+                  <option value="true">고정된 공지만</option>
+                  <option value="false">고정되지 않은 공지만</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-500 mb-1 block">
+                  정렬 순서
+                </label>
+                <div className="flex bg-gray-100 p-1 rounded-xl">
+                  <button
+                    onClick={() => requestSort("createdAt")}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                      sortOrder === "createdAt,desc"
+                        ? "bg-white text-indigo-700 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    최신순
+                  </button>
+                  <button
+                    onClick={() => {
+                      const nextSort = "createdAt,asc";
+                      setSortOrder(nextSort);
+                      setCurrentPage(0);
+                      syncSearchParams(
+                        filters,
+                        filterType,
+                        unitType,
+                        nextSort,
+                        0
+                      );
+                    }}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                      sortOrder === "createdAt,asc"
+                        ? "bg-white text-indigo-700 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    오래된순
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-
-          {user?.role === "EXECUTIVE" && (
-            <div className="mt-3 flex justify-end">
-              <button
-                onClick={() => navigate("/admin/notices/add")}
-                className="rounded-md bg-indigo-600 px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-                disabled={loading}
-              >
-                + 새 공지사항
-              </button>
-            </div>
-          )}
         </div>
 
-        {periodSummary && (
-          <p className="mb-4 text-[11px] sm:text-xs text-gray-500">
-            {periodSummary}
-          </p>
-        )}
-
+        {/* Loading */}
         {loading && (
-          <div className="flex items-center justify-center min-h-[30vh]">
-            <p className="text-xs sm:text-sm text-gray-500">
-              공지사항을 불러오는 중입니다...
-            </p>
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
           </div>
         )}
 
+        {/* List */}
         {!loading && noticePage && (
           <>
             {noticePage.content.length === 0 ? (
-              <div className="bg-white p-6 rounded-lg shadow-md text-center text-gray-500 mb-4">
-                <p className="text-base sm:text-lg font-semibold">
-                  등록된 공지사항이 없거나, 조건에 맞는 공지사항이 없습니다.
-                </p>
-                <p className="mt-1 text-xs sm:text-sm">
-                  조회 기간이나 검색 조건을 조정해 다시 확인해 주세요.
-                </p>
+              <div className="py-20 text-center bg-white rounded-2xl border border-dashed border-gray-200 text-gray-400">
+                조건에 맞는 공지사항이 없습니다.
               </div>
             ) : (
               <>
-                {/* 🔹 모바일: 카드 리스트 */}
-                <div className="md:hidden space-y-3 mb-4">
+                {/* Mobile Cards */}
+                <div className="space-y-3 md:hidden mb-4">
                   {noticePage.content.map((notice) => (
                     <div
                       key={notice.id}
-                      className="bg-white rounded-lg shadow border border-gray-100 p-4 text-xs space-y-2"
+                      className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 transition-all"
                     >
-                      <div className="flex justify-between items-start gap-2">
-                        <div className="space-y-1">
+                      <div className="flex justify-between items-start gap-2 mb-2">
+                        <div className="flex-1">
                           <Link
                             to={`/admin/notices/${notice.id}`}
-                            className="text-sm font-semibold text-gray-900 hover:underline"
+                            className="text-lg font-bold text-indigo-600 hover:text-indigo-800 line-clamp-1"
                           >
                             {notice.title}
                           </Link>
-                          <p className="text-[11px] text-gray-500">
-                            작성일 {/* ✅ safeFormatDate 적용 */}
-                            <span className="font-medium text-gray-700">
-                              {safeFormatDate(notice.createdAt)}
+                          <div className="flex flex-col gap-0.5 mt-1">
+                            <span className="text-xs text-gray-500">
+                              작성:{" "}
+                              <span className="font-medium text-gray-700">
+                                {safeFormatDate(notice.createdAt)}
+                              </span>
                             </span>
-                          </p>
-                          <p className="text-[11px] text-gray-500">
-                            작성자{" "}
-                            <span className="font-medium text-gray-700">
-                              {getFormattedName(
-                                notice.createdBy?.id,
-                                notice.createdBy?.name
-                              )}
+                            <span className="text-xs text-gray-500">
+                              작성자:{" "}
+                              <span className="font-medium text-gray-700">
+                                {getFormattedName(
+                                  notice.createdBy?.id,
+                                  notice.createdBy?.name
+                                )}
+                              </span>
                             </span>
-                          </p>
+                          </div>
                         </div>
                         {notice.pinned && (
-                          <div className="inline-flex flex-col items-end">
-                            <div className="inline-flex items-center gap-1">
-                              <MapPinIcon className="h-4 w-4 text-indigo-500" />
-                              <span className="text-[11px] text-indigo-600 font-medium">
-                                고정
-                              </span>
-                            </div>
+                          <div className="bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg flex items-center gap-1">
+                            <MapPinIcon className="h-3 w-3" />
+                            <span className="text-[10px] font-bold">고정</span>
                           </div>
                         )}
                       </div>
 
                       {user?.role === "EXECUTIVE" && (
-                        <div className="pt-2 border-t border-gray-100 mt-2 flex justify-end gap-3">
+                        <div className="pt-3 mt-2 border-t border-gray-50 flex justify-end gap-2">
                           <button
                             onClick={() =>
                               navigate(`/admin/notices/${notice.id}/edit`)
                             }
-                            className="text-[11px] text-indigo-600 hover:text-indigo-900 font-medium"
+                            className="bg-gray-50 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-100 hover:bg-indigo-50 flex items-center gap-1"
                           >
-                            수정
+                            <PencilIcon className="h-3 w-3" /> 수정
                           </button>
                           <button
                             onClick={() => handleDelete(notice)}
-                            className="text-[11px] text-red-600 hover:text-red-900 font-medium"
+                            className="bg-gray-50 text-red-500 px-3 py-1.5 rounded-lg text-xs font-bold border border-red-100 hover:bg-red-50 flex items-center gap-1"
                           >
-                            삭제
+                            <TrashIcon className="h-3 w-3" /> 삭제
                           </button>
                         </div>
                       )}
@@ -955,93 +869,86 @@ const AdminNoticesPage: React.FC = () => {
                   ))}
                 </div>
 
-                {/* 🔹 데스크탑: 테이블 */}
-                <div className="hidden md:block bg-white shadow-md rounded-lg overflow-hidden mb-4">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            제목
-                          </th>
-                          <th className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            고정
-                          </th>
-                          <th
-                            className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none"
-                            onClick={() => requestSort("createdAt")}
-                          >
-                            작성일{" "}
-                            <span className="ml-1">
-                              {getSortIndicator("createdAt")}
-                            </span>
-                          </th>
-                          <th className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            작성자
-                          </th>
-                          <th className="relative px-4 sm:px-6 py-3">
-                            <span className="sr-only">Actions</span>
-                          </th>
+                {/* Desktop Table */}
+                <div className="hidden md:block bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden mb-4">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50/50">
+                      <tr>
+                        <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">
+                          제목
+                        </th>
+                        <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">
+                          고정
+                        </th>
+                        <th
+                          className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
+                          onClick={() => requestSort("createdAt")}
+                        >
+                          작성일 {getSortIndicator("createdAt")}
+                        </th>
+                        <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">
+                          작성자
+                        </th>
+                        <th className="px-6 py-3 text-right font-bold text-gray-500 uppercase text-xs">
+                          관리
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      {noticePage.content.map((notice) => (
+                        <tr
+                          key={notice.id}
+                          className="hover:bg-gray-50 transition-colors"
+                        >
+                          <td className="px-6 py-4 font-bold text-indigo-600">
+                            <Link
+                              to={`/admin/notices/${notice.id}`}
+                              className="hover:underline"
+                            >
+                              {notice.title}
+                            </Link>
+                          </td>
+                          <td className="px-6 py-4">
+                            {notice.pinned && (
+                              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700">
+                                <MapPinIcon className="h-3 w-3" />
+                                <span className="text-xs font-bold">고정</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-gray-500">
+                            {safeFormatDate(notice.createdAt)}
+                          </td>
+                          <td className="px-6 py-4 text-gray-700 font-medium">
+                            {getFormattedName(
+                              notice.createdBy?.id,
+                              notice.createdBy?.name
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            {user?.role === "EXECUTIVE" && (
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={() =>
+                                    navigate(`/admin/notices/${notice.id}/edit`)
+                                  }
+                                  className="text-gray-400 hover:text-indigo-600 font-bold text-xs bg-white border border-gray-200 px-2 py-1 rounded"
+                                >
+                                  수정
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(notice)}
+                                  className="text-gray-400 hover:text-red-500 font-bold text-xs bg-white border border-gray-200 px-2 py-1 rounded"
+                                >
+                                  삭제
+                                </button>
+                              </div>
+                            )}
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {noticePage.content.map((notice) => (
-                          <tr key={notice.id}>
-                            <td className="px-4 sm:px-6 py-3 text-xs sm:text-sm font-medium">
-                              <Link
-                                to={`/admin/notices/${notice.id}`}
-                                className="text-indigo-600 hover:text-indigo-900"
-                              >
-                                {notice.title}
-                              </Link>
-                            </td>
-                            <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500">
-                              {notice.pinned && (
-                                <div className="inline-flex items-center gap-1">
-                                  <MapPinIcon className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-500" />
-                                  <span className="text-[11px] sm:text-xs text-indigo-600 font-medium">
-                                    고정
-                                  </span>
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500">
-                              {/* ✅ safeFormatDate 적용 */}
-                              {safeFormatDate(notice.createdAt)}
-                            </td>
-                            <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500">
-                              {getFormattedName(
-                                notice.createdBy?.id,
-                                notice.createdBy?.name
-                              )}
-                            </td>
-                            <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
-                              {user?.role === "EXECUTIVE" && (
-                                <>
-                                  <button
-                                    onClick={() =>
-                                      navigate(
-                                        `/admin/notices/${notice.id}/edit`
-                                      )
-                                    }
-                                    className="text-indigo-600 hover:text-indigo-900 mr-3"
-                                  >
-                                    수정
-                                  </button>
-                                  <button
-                                    onClick={() => handleDelete(notice)}
-                                    className="text-red-600 hover:text-red-900"
-                                  >
-                                    삭제
-                                  </button>
-                                </>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </>
             )}
@@ -1064,33 +971,37 @@ const AdminNoticesPage: React.FC = () => {
           </>
         )}
 
+        {/* Delete Modal */}
         {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-            <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl max-w-sm w-full">
-              <h2 className="text-lg sm:text-xl font-bold mb-4">
-                공지사항 삭제 확인
-              </h2>
-              <p className="text-sm text-gray-700 mb-4">
-                정말로 &quot;{noticeToDelete?.title}&quot; 공지사항을
-                삭제하시겠습니까?
+          <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-sm">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">
+                공지사항 삭제
+              </h3>
+              <p className="text-sm text-gray-600 mb-2 break-keep">
+                정말로{" "}
+                <span className="font-bold text-gray-900">
+                  "{noticeToDelete?.title}"
+                </span>{" "}
+                공지사항을 삭제하시겠습니까?
               </p>
               {deleteError && (
-                <div className="p-3 text-xs sm:text-sm font-medium text-red-700 bg-red-100 border border-red-400 rounded-md mb-4">
+                <div className="mb-4 p-3 bg-red-50 text-red-600 text-xs rounded-lg">
                   {deleteError}
                 </div>
               )}
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-3 mt-4">
                 <button
                   onClick={handleCloseDeleteModal}
-                  className="bg-gray-300 text-gray-800 px-3 sm:px-4 py-2 rounded-md mr-2 text-xs sm:text-sm"
+                  className="px-4 py-2 rounded-xl text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200"
                 >
                   취소
                 </button>
                 <button
                   onClick={handleConfirmDelete}
-                  className="bg-red-600 text-white px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm"
+                  className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700"
                 >
-                  삭제
+                  삭제하기
                 </button>
               </div>
             </div>

@@ -4,22 +4,16 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { prayerService } from "../services/prayerService";
 import { cellService } from "../services/cellService";
 import { memberService } from "../services/memberService";
-import { semesterService } from "../services/semesterService";
+import { semesterService } from "../services/semesterService"; // ✅ 학기 서비스 추가
 import { formatDisplayName } from "../utils/memberUtils";
 import { normalizeNumberInput } from "../utils/numberUtils";
 import type { Page, PrayerDto, GetPrayersParams, SemesterDto } from "../types";
 import Pagination from "../components/Pagination";
 import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
 import { useAuth } from "../hooks/useAuth";
-import {
-  UserGroupIcon,
-  ArrowLeftIcon,
-  FunnelIcon,
-  CalendarDaysIcon,
-} from "@heroicons/react/24/solid";
 
 // ─────────────────────────────────────────────────────────────
-// ✅ 헬퍼 함수
+// ✅ 헬퍼 함수: 컴포넌트 외부 정의
 // ─────────────────────────────────────────────────────────────
 
 const toLocalDateStr = (d: Date) => {
@@ -33,7 +27,7 @@ const toLocalDateStr = (d: Date) => {
 
 const getThisWeekRange = () => {
   const now = new Date();
-  const day = now.getDay();
+  const day = now.getDay(); // 0(일) ~ 6(토)
   const diffToSunday = day;
 
   const sunday = new Date(now);
@@ -94,12 +88,13 @@ const CellPrayersPage: React.FC = () => {
   const hasActiveSemesters = semesters.length > 0;
 
   // ─────────────────────────────────────────────────────────────
-  // ✅ Effects
+  // ✅ Effects: 초기 데이터 로딩
   // ─────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!user) return;
 
+    // 1. 셀 이름 가져오기
     const fetchCellName = async () => {
       if (cellId) {
         try {
@@ -111,6 +106,7 @@ const CellPrayersPage: React.FC = () => {
       }
     };
 
+    // 2. 전체 멤버 목록 (동명이인 처리용)
     const fetchAllMembers = async () => {
       try {
         const res = await memberService.getAllMembers({
@@ -130,6 +126,7 @@ const CellPrayersPage: React.FC = () => {
       }
     };
 
+    // 3. 학기 목록
     const fetchSemesters = async () => {
       try {
         const data = await semesterService.getAllSemesters(true);
@@ -139,6 +136,7 @@ const CellPrayersPage: React.FC = () => {
       }
     };
 
+    // 4. 연도 목록
     const fetchAvailableYears = async () => {
       try {
         const years = await prayerService.getAvailableYears();
@@ -189,12 +187,13 @@ const CellPrayersPage: React.FC = () => {
   }, [availableYears]);
 
   // ─────────────────────────────────────────────────────────────
-  // ✅ 기도제목 조회
+  // ✅ 기도제목 조회 (fetchPrayers)
   // ─────────────────────────────────────────────────────────────
 
   const fetchPrayers = useCallback(async () => {
     if (!cellId || !user) return;
 
+    // 권한 체크
     if (!isExecutive && !isCellLeader) {
       setError("접근 권한이 없습니다.");
       return;
@@ -215,10 +214,13 @@ const CellPrayersPage: React.FC = () => {
       isDeleted: false,
     };
 
+    // 🔍 필터 로직 적용
     if (filterType === "week") {
       const { startDate, endDate } = getThisWeekRange();
       params.startDate = startDate;
       params.endDate = endDate;
+    } else if (filterType === "all") {
+      // 파라미터 미전송 -> 전체 조회
     } else if (filterType === "range") {
       if (filters.startDate) params.startDate = filters.startDate;
       if (filters.endDate) params.endDate = filters.endDate;
@@ -263,7 +265,7 @@ const CellPrayersPage: React.FC = () => {
   }, [fetchPrayers]);
 
   // ─────────────────────────────────────────────────────────────
-  // ✅ 렌더링
+  // ✅ 렌더링 준비
   // ─────────────────────────────────────────────────────────────
 
   const titleText = useMemo(() => {
@@ -285,84 +287,76 @@ const CellPrayersPage: React.FC = () => {
     return base + rangeSuffix;
   }, [cellName, cellId, filterType, unitType, filters, semesters]);
 
-  if (!user)
-    return (
-      <div className="bg-gray-50 min-h-screen flex items-center justify-center p-4">
-        <div className="bg-white p-6 rounded-lg shadow-sm text-center max-w-sm w-full">
-          <p className="text-red-600 text-sm font-bold">로그인이 필요합니다.</p>
-        </div>
-      </div>
-    );
+  if (!user) return <div className="p-8 text-center">로그인이 필요합니다.</div>;
 
   return (
-    <div className="bg-gray-50 min-h-screen pb-20">
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <div className="bg-gray-50 min-h-screen">
+      <div className="container mx-auto max-w-5xl px-3 sm:px-4 py-6 sm:py-8">
+        {/* 헤더 */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <UserGroupIcon className="h-7 w-7 text-indigo-500" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
               {titleText}
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              선택한 셀에 속한 모든 멤버의 기도제목을 조회합니다.
+            <p className="mt-1 text-sm text-gray-600">
+              선택한 셀의 기도제목을 확인하세요.
             </p>
           </div>
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center justify-center gap-1 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm font-bold shadow-sm transition-all"
-          >
-            <ArrowLeftIcon className="h-4 w-4" /> 뒤로가기
-          </button>
+          <div>
+            <button
+              onClick={() => navigate(-1)}
+              className="text-xs sm:text-sm px-3 py-2 rounded-md border bg-white hover:bg-gray-50"
+            >
+              뒤로가기
+            </button>
+          </div>
         </div>
 
-        {/* Filter Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 border-b border-gray-50 pb-4">
-            <div className="flex items-center gap-2">
-              <FunnelIcon className="h-5 w-5 text-gray-400" />
-              <h3 className="font-bold text-gray-700">조회 조건 설정</h3>
-            </div>
-
-            {/* Segment Control (Filter Type) */}
-            <div className="bg-gray-100 p-1 rounded-xl flex text-xs font-bold overflow-x-auto">
-              {[
-                { id: "week", label: "이번 주" },
-                { id: "unit", label: "월/학기/년" },
-                { id: "range", label: "기간 지정" },
-                { id: "all", label: "전체 기간" },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    setFilterType(tab.id as FilterType);
-                    setCurrentPage(0);
-                  }}
-                  className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${
-                    filterType === tab.id
-                      ? "bg-white text-indigo-600 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+        {/* ─────────────────────────────────────────────────────────────
+            ✅ 필터 UI 섹션 (Mobile Optimized)
+           ───────────────────────────────────────────────────────────── */}
+        <div className="bg-white p-4 sm:p-5 rounded-lg shadow border border-gray-200 mb-6 space-y-5">
+          {/* 1. 상단 탭 (조회 유형) */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { id: "week", label: "이번 주" },
+              { id: "unit", label: "월/학기/년" },
+              { id: "range", label: "기간 지정" },
+              { id: "all", label: "전체 기간" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setFilterType(tab.id as FilterType);
+                  setCurrentPage(0);
+                }}
+                className={`py-3 text-sm font-medium rounded-lg border transition-all active:scale-95 ${
+                  filterType === tab.id
+                    ? "bg-blue-500 text-white border-blue-500 shadow-sm"
+                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
-          <div className="space-y-4">
+          {/* 2. 하단 옵션 영역 */}
+          <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+            {/* Case A: 설명 텍스트 */}
             {(filterType === "week" || filterType === "all") && (
-              <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-xl border border-gray-100 text-center">
+              <p className="text-sm text-gray-600 text-center py-2">
                 {filterType === "week"
                   ? "이번 주(일~토)에 등록된 기도제목을 조회합니다."
-                  : "기간 제한 없이 모든 기도제목을 조회합니다."}
+                  : "등록된 모든 기도제목을 조회합니다."}
               </p>
             )}
 
+            {/* Case B: 기간 직접 입력 */}
             {filterType === "range" && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-gray-500 mb-1 block">
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
                     시작일
                   </label>
                   <KoreanCalendarPicker
@@ -371,7 +365,7 @@ const CellPrayersPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-500 mb-1 block">
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
                     종료일
                   </label>
                   <KoreanCalendarPicker
@@ -382,116 +376,123 @@ const CellPrayersPage: React.FC = () => {
               </div>
             )}
 
+            {/* Case C: 단위 조회 (월/학기/년) - 모바일 최적화 */}
             {filterType === "unit" && (
-              <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-4">
-                {/* Unit Type Selection */}
-                <div className="flex gap-2">
-                  {(["month", "semester", "year"] as UnitType[]).map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => {
-                        setUnitType(type);
-                        setCurrentPage(0);
-                      }}
-                      disabled={type === "semester" && !hasActiveSemesters}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                        type === "semester" && !hasActiveSemesters
-                          ? "bg-gray-100 text-gray-300 cursor-not-allowed border-gray-100"
-                          : unitType === type
-                          ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                          : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      {type === "month"
-                        ? "월별"
-                        : type === "semester"
-                        ? "학기별"
-                        : "연간"}
-                    </button>
-                  ))}
+              <div className="space-y-5">
+                {/* 1) 단위 선택 탭: 3등분 그리드, 높이 증가 */}
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => {
+                      setUnitType("month");
+                      setCurrentPage(0);
+                    }}
+                    className={`py-2.5 text-sm rounded-lg font-medium transition-colors ${
+                      unitType === "month"
+                        ? "bg-blue-100 text-blue-700 ring-1 ring-blue-300"
+                        : "bg-white text-gray-500 border hover:bg-gray-50"
+                    }`}
+                  >
+                    월별
+                  </button>
+                  <button
+                    onClick={() => {
+                      setUnitType("semester");
+                      setCurrentPage(0);
+                    }}
+                    disabled={!hasActiveSemesters}
+                    className={`py-2.5 text-sm rounded-lg font-medium transition-colors ${
+                      !hasActiveSemesters
+                        ? "bg-gray-100 text-gray-300 cursor-not-allowed"
+                        : unitType === "semester"
+                        ? "bg-blue-100 text-blue-700 ring-1 ring-blue-300"
+                        : "bg-white text-gray-500 border hover:bg-gray-50"
+                    }`}
+                  >
+                    학기별
+                  </button>
+                  <button
+                    onClick={() => {
+                      setUnitType("year");
+                      setCurrentPage(0);
+                    }}
+                    className={`py-2.5 text-sm rounded-lg font-medium transition-colors ${
+                      unitType === "year"
+                        ? "bg-blue-100 text-blue-700 ring-1 ring-blue-300"
+                        : "bg-white text-gray-500 border hover:bg-gray-50"
+                    }`}
+                  >
+                    연간
+                  </button>
                 </div>
 
+                {/* 2) 단위별 상세 선택 UI */}
                 {unitType === "month" && (
-                  <div className="pt-2 border-t border-gray-200/50">
-                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center mb-3">
-                      <div className="w-full sm:w-auto">
-                        <label className="text-xs font-bold text-gray-500 mb-1 block">
-                          연도
-                        </label>
-                        <select
-                          value={filters.year}
-                          onChange={(e) =>
-                            handleFilterChange("year", Number(e.target.value))
-                          }
-                          className="w-full sm:w-32 py-2 border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-100"
-                        >
-                          {yearOptions.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-500 mb-2 block">
-                        월 선택
-                      </label>
-                      <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5">
-                        {Array.from({ length: 12 }, (_, i) => i + 1).map(
-                          (m) => (
-                            <button
-                              key={m}
-                              onClick={() => handleFilterChange("month", m)}
-                              className={`py-1.5 rounded-md text-xs font-bold transition-colors ${
-                                filters.month === m
-                                  ? "bg-indigo-600 text-white shadow-sm"
-                                  : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
-                              }`}
-                            >
-                              {m}월
-                            </button>
-                          )
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                  <div className="space-y-4">
+                    {/* 연도 선택 */}
+                    <select
+                      value={filters.year}
+                      onChange={(e) =>
+                        handleFilterChange("year", Number(e.target.value))
+                      }
+                      className="block w-full border-gray-300 rounded-lg shadow-sm text-base py-3 px-4 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      {yearOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
 
-                {unitType === "semester" && (
-                  <div className="pt-2 border-t border-gray-200/50">
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">
-                      학기 선택
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {semesters.map((s) => (
+                    {/* 월 선택 그리드 (크고 누르기 편한 사각형) */}
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 sm:gap-3">
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                         <button
-                          key={s.id}
-                          onClick={() => handleFilterChange("semesterId", s.id)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                            filters.semesterId === s.id
-                              ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                          key={m}
+                          onClick={() => handleFilterChange("month", m)}
+                          className={`py-3 rounded-lg text-sm sm:text-base font-medium transition-all active:scale-95 ${
+                            filters.month === m
+                              ? "bg-blue-500 text-white shadow-md transform scale-105"
+                              : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-100"
                           }`}
                         >
-                          {s.name}
+                          {m}월
                         </button>
                       ))}
                     </div>
                   </div>
                 )}
 
+                {unitType === "semester" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {semesters.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => handleFilterChange("semesterId", s.id)}
+                        className={`py-3 px-4 rounded-lg text-sm sm:text-base font-medium border transition-all active:scale-95 text-left flex justify-between items-center ${
+                          filters.semesterId === s.id
+                            ? "bg-blue-500 text-white border-blue-500 shadow-md"
+                            : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        <span>{s.name}</span>
+                        {filters.semesterId === s.id && (
+                          <span className="text-xs bg-blue-600 px-2 py-0.5 rounded text-white bg-opacity-50">
+                            선택됨
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 {unitType === "year" && (
-                  <div className="pt-2 border-t border-gray-200/50">
-                    <label className="text-xs font-bold text-gray-500 mb-1 block">
-                      연도 선택
-                    </label>
+                  <div>
                     <select
                       value={filters.year}
                       onChange={(e) =>
                         handleFilterChange("year", Number(e.target.value))
                       }
-                      className="w-full sm:w-32 py-2 border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-100"
+                      className="block w-full border-gray-300 rounded-lg shadow-sm text-base py-3 px-4 focus:ring-blue-500 focus:border-blue-500"
                     >
                       {yearOptions.map((opt) => (
                         <option key={opt.value} value={opt.value}>
@@ -506,107 +507,111 @@ const CellPrayersPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Error / Loading */}
+        {/* 에러 메시지 */}
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm font-bold text-red-700">
+          <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 p-3 rounded-md">
             {error}
           </div>
         )}
 
+        {/* 로딩 */}
         {loading && (
-          <div className="flex justify-center py-20">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+          <div className="flex justify-center items-center py-12">
+            <div className="text-gray-500 text-sm">데이터를 불러오는 중...</div>
           </div>
         )}
 
-        {/* Content List */}
+        {/* 데이터 리스트 */}
         {!loading && pageData && !error && (
           <>
-            {/* Mobile Cards */}
+            {/* 📱 모바일: 카드 리스트 (수정됨) */}
             <div className="space-y-3 md:hidden mb-4">
               {pageData.content.length === 0 ? (
-                <div className="py-20 text-center bg-white rounded-2xl border border-dashed border-gray-200 text-gray-400">
+                <div className="bg-white rounded-lg shadow border border-gray-100 p-8 text-center text-sm text-gray-500">
                   조건에 맞는 기도제목이 없습니다.
                 </div>
               ) : (
                 pageData.content.map((prayer) => (
                   <div
                     key={prayer.id}
-                    className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4"
+                    className="bg-white rounded-lg shadow border border-gray-100 p-4 text-xs flex flex-col gap-3"
                   >
-                    <div className="flex justify-between items-center mb-2 pb-2 border-b border-gray-50">
-                      <div className="text-xs text-gray-500 font-bold">
-                        <span className="text-gray-400 font-medium mr-1">
-                          멤버:
+                    {/* 1. 상단: 멤버 이름과 날짜를 양쪽 끝으로 배치 */}
+                    <div className="flex justify-between items-center border-b border-gray-50 pb-2">
+                      <div className="text-[11px] text-gray-500">
+                        멤버:{" "}
+                        <span className="font-semibold text-gray-800 text-sm ml-1">
+                          {getFormattedName(
+                            prayer.member?.id,
+                            prayer.member?.name
+                          )}
                         </span>
-                        {getFormattedName(
-                          prayer.member?.id,
-                          prayer.member?.name
-                        )}
                       </div>
-                      <div className="flex items-center gap-1 text-xs text-gray-400 font-medium">
-                        <CalendarDaysIcon className="h-3.5 w-3.5" />
+                      <span className="text-[11px] text-gray-400">
                         {new Date(prayer.createdAt).toLocaleDateString()}
-                      </div>
+                      </span>
                     </div>
 
-                    <Link
-                      to={`/admin/prayers/${prayer.id}`}
-                      className="block text-sm font-medium text-gray-800 leading-relaxed mb-3 line-clamp-3 hover:text-indigo-600 transition-colors"
-                    >
-                      {prayer.content}
-                    </Link>
+                    {/* 2. 중단: 내용 (꽉 찬 너비 사용) */}
+                    <div>
+                      <Link
+                        to={`/admin/prayers/${prayer.id}`}
+                        className="block text-sm font-semibold text-indigo-600 hover:text-indigo-800 leading-relaxed break-keep"
+                      >
+                        {prayer.content}
+                      </Link>
+                    </div>
 
+                    {/* 3. 하단: 작성자 정보 (우측 정렬) */}
                     <div className="text-right">
-                      <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded-md font-bold">
+                      <p className="text-[11px] text-gray-400 bg-gray-50 inline-block px-2 py-1 rounded">
                         작성:{" "}
-                        {getFormattedName(
-                          prayer.createdBy?.id,
-                          prayer.createdBy?.name
-                        )}
-                      </span>
+                        <span className="font-medium text-gray-600">
+                          {getFormattedName(
+                            prayer.createdBy?.id,
+                            prayer.createdBy?.name
+                          )}
+                        </span>
+                      </p>
                     </div>
                   </div>
                 ))
               )}
             </div>
 
-            {/* Desktop Table */}
-            <div className="hidden md:block bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden mb-4">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50/50">
+            {/* 🖥 데스크탑: 테이블 */}
+            <div className="hidden md:block bg-white shadow-md rounded-lg overflow-hidden mb-4">
+              <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
+                <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs w-32 whitespace-nowrap">
+                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-32 whitespace-nowrap">
                       멤버(기도대상)
                     </th>
-                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">
+                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">
                       내용
                     </th>
-                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs w-32 whitespace-nowrap">
+                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-32 whitespace-nowrap">
                       작성자(셀장)
                     </th>
-                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs w-32 whitespace-nowrap">
+                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-32 whitespace-nowrap">
                       작성일
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="bg-white divide-y divide-gray-200">
                   {pageData.content.length === 0 ? (
                     <tr>
                       <td
                         colSpan={4}
-                        className="px-6 py-10 text-center text-gray-400"
+                        className="px-6 py-8 text-center text-gray-500"
                       >
                         조건에 맞는 기도제목이 없습니다.
                       </td>
                     </tr>
                   ) : (
                     pageData.content.map((prayer) => (
-                      <tr
-                        key={prayer.id}
-                        className="hover:bg-gray-50 transition-colors"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap font-bold text-gray-900">
+                      <tr key={prayer.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
                           {getFormattedName(
                             prayer.member?.id,
                             prayer.member?.name
@@ -615,18 +620,18 @@ const CellPrayersPage: React.FC = () => {
                         <td className="px-6 py-4">
                           <Link
                             to={`/admin/prayers/${prayer.id}`}
-                            className="text-indigo-600 hover:text-indigo-900 line-clamp-2 font-medium"
+                            className="text-indigo-600 hover:text-indigo-900 line-clamp-2"
                           >
                             {prayer.content}
                           </Link>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-gray-500 font-medium">
+                        <td className="px-6 py-4 whitespace-nowrap text-gray-600">
                           {getFormattedName(
                             prayer.createdBy?.id,
                             prayer.createdBy?.name
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-gray-500 text-xs">
+                        <td className="px-6 py-4 whitespace-nowrap text-gray-500">
                           {new Date(prayer.createdAt).toLocaleDateString()}
                         </td>
                       </tr>

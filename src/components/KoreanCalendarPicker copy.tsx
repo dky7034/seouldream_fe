@@ -75,10 +75,6 @@ const KoreanCalendarPicker: React.FC<Props> = ({
   return (
     <div className={wrapperClass}>
       <style>{`
-        /* ✅ react-datepicker wrapper를 100% 폭으로 (정렬/폭 틀어짐 방지) */
-        .react-datepicker-wrapper { width: 100%; }
-        .react-datepicker__input-container { width: 100%; }
-
         /* ─── 색상 커스텀 ─── */
         .react-datepicker__day-name:first-child { color: #dc2626; }
         .react-datepicker__day-name:last-child { color: #2563eb; }
@@ -159,6 +155,7 @@ const KoreanCalendarPicker: React.FC<Props> = ({
       `}</style>
 
       <DatePicker
+        /* [수정] readOnly 제거하고 onKeyDown으로 입력 방지 */
         onKeyDown={(e) => e.preventDefault()}
         // @ts-expect-error: 라이브러리 타입 정의 누락 무시 (모바일 키보드 방지)
         inputMode="none"
@@ -179,8 +176,7 @@ const KoreanCalendarPicker: React.FC<Props> = ({
         maxDate={maxDate}
         showPopperArrow={false}
         placeholderText="YYYY-MM-DD"
-        /* ✅ 여기서 mt-1 제거: “정렬/간격”은 페이지에서 통일 */
-        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer caret-transparent bg-white"
+        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer caret-transparent bg-white"
         dayClassName={getDayClassName}
         showYearPicker={mode === "year"}
         showMonthYearPicker={mode === "month"}

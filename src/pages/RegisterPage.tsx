@@ -355,27 +355,45 @@ const RegisterPage: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700">
                       성별 <span className="text-red-500">*</span>
                     </label>
+
+                    {/* ✅ select 높이 고정 (h-10) */}
                     <select
                       name="gender"
                       value={formData.gender}
                       onChange={handleChange}
-                      className="mt-1 block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="mt-1 block w-full h-10 px-3 text-sm border border-gray-300 rounded-md shadow-sm bg-white
+                 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                     >
                       <option value="MALE">남성</option>
                       <option value="FEMALE">여성</option>
                     </select>
                   </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
                       생년월일 <span className="text-red-500">*</span>
                     </label>
-                    <KoreanCalendarPicker
-                      value={formData.birthDate}
-                      onChange={(dateStr) =>
-                        setFormData((prev) => ({ ...prev, birthDate: dateStr }))
-                      }
-                      maxDate={new Date()}
-                    />
+
+                    {/* ✅ react-datepicker 래퍼/인풋 높이 강제 맞춤 */}
+                    <div
+                      className="mt-1
+                 [&_.react-datepicker-wrapper]:w-full
+                 [&_.react-datepicker__input-container]:w-full
+                 [&_input]:!h-10
+                 [&_input]:!py-0
+                 [&_input]:!leading-10"
+                    >
+                      <KoreanCalendarPicker
+                        value={formData.birthDate}
+                        onChange={(dateStr) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            birthDate: dateStr,
+                          }))
+                        }
+                        maxDate={new Date()}
+                      />
+                    </div>
                   </div>
                 </div>
 

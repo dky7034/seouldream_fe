@@ -1,3 +1,4 @@
+// src/pages/AdminSemestersPage.tsx
 import React, { useEffect, useState, useCallback } from "react";
 import { semesterService } from "../services/semesterService";
 import type {
@@ -37,16 +38,21 @@ const AdminSemestersPage: React.FC = () => {
     isActive: true,
   });
 
+  // 삭제 모달 상태
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [semesterToDelete, setSemesterToDelete] = useState<number | null>(null);
+
+  // 알림 모달 상태
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
   const [alertModalTitle, setAlertModalTitle] = useState("");
   const [alertModalMessage, setAlertModalMessage] = useState("");
 
+  // ✅ 날짜 포맷팅 함수
   const safeFormatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return "-";
     const targetStr =
       dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
+
     const date = new Date(targetStr);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -109,10 +115,12 @@ const AdminSemestersPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!form.name.trim() || !form.startDate || !form.endDate) {
       showAlert("입력 오류", "학기명, 시작일, 종료일을 모두 입력해주세요.");
       return;
     }
+
     if (form.endDate < form.startDate) {
       showAlert("입력 오류", "종료일은 시작일 이후여야 합니다.");
       return;
@@ -128,11 +136,13 @@ const AdminSemestersPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
+
       if (isEditing && editingId !== null) {
         await semesterService.updateSemester(editingId, payload);
       } else {
         await semesterService.createSemester(payload as CreateSemesterRequest);
       }
+
       await loadSemesters();
       resetForm();
     } catch (e) {
@@ -162,6 +172,7 @@ const AdminSemestersPage: React.FC = () => {
 
   const handleConfirmDelete = async () => {
     if (semesterToDelete == null) return;
+
     try {
       setLoading(true);
       setError(null);
@@ -242,30 +253,29 @@ const AdminSemestersPage: React.FC = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* ✅ [수정] items-start로 변경하여 라벨 기준으로 상단 정렬 */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
               <div>
-                <label className="text-xs font-bold text-gray-500 mb-2 block">
+                {/* ✅ [수정] mb-1 -> mb-2 로 여백 증가 */}
+                <label className="text-xs font-bold text-gray-500 mb-3 block">
                   학기명 <span className="text-red-500">*</span>
                 </label>
-
-                {/* ✅ mt-1 추가로 시작일/종료일과 같은 “윗선”으로 정렬 */}
                 <input
                   type="text"
                   name="name"
                   value={form.name}
                   onChange={handleChange}
-                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm"
+                  className="w-full px-4 h-[42px] border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all flex items-center"
                   placeholder="예: 2025년 봄학기"
                 />
               </div>
 
               <div>
+                {/* ✅ [수정] mb-1 -> mb-2 로 여백 증가 */}
                 <label className="text-xs font-bold text-gray-500 mb-2 block">
                   시작일 <span className="text-red-500">*</span>
                 </label>
-
-                {/* ✅ picker는 margin을 갖지 않으므로 여기서 mt-1 부여 */}
-                <div className="mt-1">
+                <div className="h-[42px]">
                   <KoreanCalendarPicker
                     value={form.startDate}
                     onChange={(val) => handleDateStringChange("startDate", val)}
@@ -274,11 +284,11 @@ const AdminSemestersPage: React.FC = () => {
               </div>
 
               <div>
+                {/* ✅ [수정] mb-1 -> mb-2 로 여백 증가 */}
                 <label className="text-xs font-bold text-gray-500 mb-2 block">
                   종료일 <span className="text-red-500">*</span>
                 </label>
-
-                <div className="mt-1">
+                <div className="h-[42px]">
                   <KoreanCalendarPicker
                     value={form.endDate}
                     onChange={(val) => handleDateStringChange("endDate", val)}
@@ -340,6 +350,7 @@ const AdminSemestersPage: React.FC = () => {
                     <h3 className="text-lg font-bold text-gray-900">
                       {semester.name}
                     </h3>
+                    {/* Toggle Switch */}
                     <button
                       type="button"
                       onClick={() =>

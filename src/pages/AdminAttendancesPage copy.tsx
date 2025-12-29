@@ -68,7 +68,7 @@ const translateAttendanceStatus = (status: string) => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// Sub Component 1: AttendanceStats (통계 카드)
+// Sub Component 1: AttendanceStats (상단 종합 통계 카드)
 // ─────────────────────────────────────────────────────────────
 
 const AttendanceStats = memo(
@@ -213,65 +213,94 @@ const AttendanceMatrixView = memo(
     endDate: string;
     unitType: UnitType;
     isLoading: boolean;
-    onNavigate: (direction: "prev" | "next") => void;
   }) => {
+    // ✅ [수정] 미체크 카운트 로직 강화 (가입일/배정일 고려)
     const uncheckedCount = useMemo(() => {
       if (!startDate || !endDate || members.length === 0) return 0;
 
-      const filterStart = new Date(startDate);
-      const filterEnd = new Date(endDate);
+      const toDateKey = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      };
 
-      const sundays: number[] = [];
-      const current = new Date(filterStart);
-      current.setHours(0, 0, 0, 0);
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
 
-      const dayOfWeek = current.getDay();
-      if (dayOfWeek !== 0) {
-        current.setDate(current.getDate() + (7 - dayOfWeek));
+      const targetSundayKeys: string[] = [];
+      const current = new Date(start);
+
+      if (current.getDay() !== 0) {
+        current.setDate(current.getDate() + (7 - current.getDay()));
       }
 
-      const endTimestamp = filterEnd.getTime();
-      while (current.getTime() <= endTimestamp) {
-        sundays.push(current.getTime());
+      while (current <= end) {
+        targetSundayKeys.push(toDateKey(current));
         current.setDate(current.getDate() + 7);
       }
 
-      let totalPossibleChecks = 0;
-      const defaultJoinDate = new Date("2000-01-01").setHours(0, 0, 0, 0);
-
-      members.forEach((member) => {
-        let joinTimestamp = defaultJoinDate;
-        if (member.createdAt) {
-          joinTimestamp = new Date(member.createdAt).setHours(0, 0, 0, 0);
-        } else if (member.joinYear) {
-          joinTimestamp = new Date(member.joinYear, 0, 1).setHours(0, 0, 0, 0);
+      const attendanceMap = new Set<string>();
+      attendances.forEach((att) => {
+        if (
+          ["PRESENT", "ABSENT"].includes(att.status) &&
+          att.member?.id &&
+          att.date
+        ) {
+          const attDate = new Date(att.date);
+          const key = `${att.member.id}-${toDateKey(attDate)}`;
+          attendanceMap.add(key);
         }
-
-        let memberValidSundays = 0;
-        for (const sundayTime of sundays) {
-          if (sundayTime >= joinTimestamp) {
-            memberValidSundays++;
-          }
-        }
-        totalPossibleChecks += memberValidSundays;
       });
 
-      const recordedCount = attendances.filter((a) =>
-        ["PRESENT", "ABSENT"].includes(a.status)
-      ).length;
+      let missingCount = 0;
+      members.forEach((member) => {
+        // 멤버별 유효 시작일 계산 (배정일 > 가입일 > 가입연도)
+        let joinDateStr = "2000-01-01";
+        if (member.cellAssignmentDate) joinDateStr = member.cellAssignmentDate;
+        else if (member.createdAt) joinDateStr = member.createdAt;
+        else if (member.joinYear) joinDateStr = `${member.joinYear}-01-01`;
 
-      return Math.max(0, totalPossibleChecks - recordedCount);
+        // 문자열 비교를 위해 YYYY-MM-DD 포맷 통일 (Date 객체 변환 후 다시 toDateKey)
+        // (단순 문자열 비교도 가능하나, T00:00:00 등 포맷 안전성을 위해 변환 권장)
+        const safeJoinDateStr = toDateKey(new Date(joinDateStr));
+
+        targetSundayKeys.forEach((sundayKey) => {
+          // 유효 시작일 이전 날짜는 카운트에서 제외
+          if (sundayKey < safeJoinDateStr) return;
+
+          const key = `${member.id}-${sundayKey}`;
+          if (!attendanceMap.has(key)) {
+            missingCount++;
+          }
+        });
+      });
+
+      return missingCount;
     }, [startDate, endDate, members, attendances]);
 
     const summary = useMemo(() => {
       const present = attendances.filter((a) => a.status === "PRESENT").length;
-      const absent = attendances.filter((a) => a.status === "ABSENT").length;
-      const total = present + absent;
-      const rate = total > 0 ? (present / total) * 100 : 0;
 
-      return { present, absent, rate, unchecked: uncheckedCount };
+      // [수정 전] 기록된 것(출석+결석)만 분모로 잡음 -> 89% 나옴
+      // const absent = attendances.filter((a) => a.status === "ABSENT").length;
+      // const totalRecorded = present + absent;
+      // const rate = totalRecorded > 0 ? (present / totalRecorded) * 100 : 0;
+
+      // ✅ [수정 후] 미체크(uncheckedCount)까지 분모에 포함 -> 1~2% 나옴 (엄격한 기준)
+      const recordedTotal =
+        present + attendances.filter((a) => a.status === "ABSENT").length;
+      const realTotalPossible = recordedTotal + uncheckedCount;
+
+      const rate =
+        realTotalPossible > 0 ? (present / realTotalPossible) * 100 : 0;
+
+      return { rate, unchecked: uncheckedCount };
     }, [attendances, uncheckedCount]);
 
+    // ✅ [수정] matrixMembers 생성 시 날짜 정보 전달 (회색 점 표시용)
     const matrixMembers = useMemo(
       () =>
         members
@@ -279,6 +308,9 @@ const AttendanceMatrixView = memo(
           .map((m) => ({
             memberId: m.id,
             memberName: formatDisplayName(m, members),
+            cellAssignmentDate: m.cellAssignmentDate,
+            createdAt: m.createdAt,
+            joinYear: m.joinYear,
           })),
       [members]
     );
@@ -290,40 +322,43 @@ const AttendanceMatrixView = memo(
 
     return (
       <div className="space-y-6 animate-fadeIn">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
+        {/* 통계 카드 (출석률, 미체크) */}
+        <div className="grid grid-cols-2 gap-4 text-center">
           <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
-            <p className="text-xs sm:text-sm font-medium text-indigo-500">
+            <p className="text-sm font-medium text-indigo-600 break-keep">
               출석률
             </p>
-            <p className="mt-1 text-2xl sm:text-3xl font-bold text-indigo-600">
+            <p className="mt-2 text-3xl font-bold text-indigo-700">
               {summary.rate.toFixed(0)}
-              <span className="text-lg">%</span>
+              <span className="text-lg ml-0.5">%</span>
             </p>
           </div>
-          <div className="p-4 bg-green-50 rounded-xl border border-green-100">
-            <p className="text-xs sm:text-sm font-medium text-green-600">
-              출석
+
+          <div
+            className={`p-4 rounded-xl border ${
+              summary.unchecked > 0
+                ? "bg-red-50 border-red-100"
+                : "bg-gray-50 border-gray-200"
+            }`}
+          >
+            <p
+              className={`text-sm font-medium break-keep ${
+                summary.unchecked > 0 ? "text-red-600" : "text-gray-500"
+              }`}
+            >
+              미체크 (건)
             </p>
-            <p className="mt-1 text-2xl sm:text-3xl font-bold text-green-700">
-              {summary.present}
-            </p>
-          </div>
-          <div className="p-4 bg-red-50 rounded-xl border border-red-100">
-            <p className="text-xs sm:text-sm font-medium text-red-600">결석</p>
-            <p className="mt-1 text-2xl sm:text-3xl font-bold text-red-700">
-              {summary.absent}
-            </p>
-          </div>
-          <div className="p-4 bg-gray-100 rounded-xl border border-gray-200">
-            <p className="text-xs sm:text-sm font-medium text-gray-500">
-              미체크
-            </p>
-            <p className="mt-1 text-2xl sm:text-3xl font-bold text-gray-600">
+            <p
+              className={`mt-2 text-3xl font-bold ${
+                summary.unchecked > 0 ? "text-red-700" : "text-gray-600"
+              }`}
+            >
               {summary.unchecked}
             </p>
           </div>
         </div>
 
+        {/* 매트릭스 컨테이너 */}
         <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-4">
           <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
             <h4 className="text-sm font-bold text-gray-700 flex items-center">
@@ -394,7 +429,6 @@ const AdminAttendancesPage: React.FC = () => {
         ? { value: user.cellId, label: user.cellName }
         : null,
     status: "",
-    // ✅ [수정 1] 초기값을 '전체("")'가 아닌 '올해(currentYear)'로 설정
     year: currentYear,
     month: "" as number | "",
     semesterId: "" as number | "",
@@ -406,10 +440,7 @@ const AdminAttendancesPage: React.FC = () => {
   const isExecutive = useMemo(() => user?.role === "EXECUTIVE", [user]);
   const isCellLeader = useMemo(() => user?.role === "CELL_LEADER", [user]);
 
-  // ─────────────────────────────────────────────────────────────
   // Effects & Logic
-  // ─────────────────────────────────────────────────────────────
-
   useEffect(() => {
     if (semesters.length > 0 && !hasAutoSelectedSemester) {
       const today = new Date();
@@ -598,39 +629,6 @@ const AdminAttendancesPage: React.FC = () => {
     }
   }, [user]);
 
-  const handleMonthNavigation = useCallback(
-    (direction: "prev" | "next") => {
-      setFilters((prev) => {
-        if (unitType !== "month" || !prev.year || !prev.month) return prev;
-
-        let newYear = Number(prev.year);
-        let newMonth = Number(prev.month);
-
-        if (direction === "prev") {
-          newMonth -= 1;
-          if (newMonth < 1) {
-            newMonth = 12;
-            newYear -= 1;
-          }
-        } else {
-          newMonth += 1;
-          if (newMonth > 12) {
-            newMonth = 1;
-            newYear += 1;
-          }
-        }
-
-        return {
-          ...prev,
-          year: newYear,
-          month: newMonth,
-          semesterId: "",
-        };
-      });
-    },
-    [unitType]
-  );
-
   const handleFilterChange = (key: keyof Filters, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
@@ -666,7 +664,6 @@ const AdminAttendancesPage: React.FC = () => {
           typeof prev.year === "number" ? prev.year : currentYear;
         const next: Filters = { ...prev };
         if (type === "year") {
-          // ✅ [수정 2] 연간 선택 시 year가 없으면 현재년도로 강제 설정 (전체 연도 불허)
           next.year = baseYear || currentYear;
           next.month = "";
           next.semesterId = "";
@@ -736,12 +733,10 @@ const AdminAttendancesPage: React.FC = () => {
     ];
   }, [allMembers, isCellLeader, user?.cellId]);
 
-  // ✅ [수정 3] "전체 연도" 옵션 제거하고 DB 연도들만 표시 (없으면 올해라도 표시)
   const yearOptions = useMemo(() => {
     if (availableYears.length === 0) {
       return [{ value: currentYear, label: `${currentYear}년` }];
     }
-    // "전체 연도" { value: "", label: "전체 연도" } 제거
     return availableYears.map((y) => ({ value: y, label: `${y}년` }));
   }, [availableYears, currentYear]);
 
@@ -779,6 +774,7 @@ const AdminAttendancesPage: React.FC = () => {
       <AttendanceStats stats={overallStats} loading={statsLoading} />
 
       <div className="p-4 bg-gray-50 rounded-lg mb-6 shadow-sm space-y-4">
+        {/* 필터 영역 */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="text-base sm:text-lg font-semibold">조회 기간 설정</h3>
           <div className="flex flex-wrap gap-2">
@@ -1034,7 +1030,6 @@ const AdminAttendancesPage: React.FC = () => {
         endDate={effectiveDateRange?.endDate || ""}
         unitType={unitType}
         isLoading={loading}
-        onNavigate={handleMonthNavigation}
       />
     </div>
   );

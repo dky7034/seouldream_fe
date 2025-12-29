@@ -10,6 +10,13 @@ import { formatDisplayName } from "../utils/memberUtils";
 import { memberService } from "../services/memberService";
 import { semesterService } from "../services/semesterService";
 import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
+import {
+  PlusIcon,
+  MagnifyingGlassIcon,
+  UserGroupIcon,
+  UsersIcon,
+  ChartBarIcon,
+} from "@heroicons/react/24/solid";
 
 type SortKey =
   | "name"
@@ -27,10 +34,8 @@ type SortConfig = {
 };
 
 const pad = (n: number) => n.toString().padStart(2, "0");
-
-const lastDayOfMonth = (year: number, month: number) => {
-  return new Date(year, month, 0).getDate();
-};
+const lastDayOfMonth = (year: number, month: number) =>
+  new Date(year, month, 0).getDate();
 
 type Filters = {
   name: string;
@@ -55,7 +60,6 @@ const AdminCellsPage: React.FC = () => {
   // UI 상태
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-
   const [hasInitialized, setHasInitialized] = useState(false);
 
   // 삭제 모달 상태
@@ -67,15 +71,13 @@ const AdminCellsPage: React.FC = () => {
     { name: string; birthDate?: string }[]
   >([]);
 
-  // ───────────────── 검색어 IME(한글) 버그 해결을 위한 로컬 상태 ─────────────────
-  // URL의 'name' 파라미터와 분리하여 입력 UI를 제어합니다.
+  // 검색어 로컬 상태
   const [localSearchName, setLocalSearchName] = useState(
     searchParams.get("name") || ""
   );
-  // 로컬 입력값에 대해 0.5초 디바운스 적용
   const debouncedSearchName = useDebounce(localSearchName, 500);
 
-  // ───────────────── 필터 상태 (URL 기반 초기값) ─────────────────
+  // 필터 상태
   const [filters, setFilters] = useState<Filters>(() => {
     const name = searchParams.get("name") || "";
     const active = (searchParams.get("active") as Filters["active"]) || "all";
@@ -106,49 +108,44 @@ const AdminCellsPage: React.FC = () => {
   const [unitType, setUnitType] = useState<"year" | "month" | "semester">(
     "semester"
   );
-
   const hasActiveSemesters = semesters.length > 0;
 
   const updateQueryParams = useCallback(
     (updates: Record<string, string | number | undefined | null>) => {
       const newParams = new URLSearchParams(searchParams);
-
       Object.entries(updates).forEach(([key, value]) => {
-        if (value === undefined || value === null || value === "") {
+        if (value === undefined || value === null || value === "")
           newParams.delete(key);
-        } else {
-          newParams.set(key, String(value));
-        }
+        else newParams.set(key, String(value));
       });
-
-      if (!Object.prototype.hasOwnProperty.call(updates, "page")) {
+      if (!Object.prototype.hasOwnProperty.call(updates, "page"))
         newParams.set("page", "0");
-      }
-
       setSearchParams(newParams);
     },
     [searchParams, setSearchParams]
   );
 
-  // --- 정렬 설정 (URL에서 읽기) ---
   const getValidSortKey = (value: string | null): SortKey => {
-    if (value === "name") return "name";
-    if (value === "leaderName") return "leaderName";
-    if (value === "viceLeaderName") return "viceLeaderName";
-    if (value === "memberCount") return "memberCount";
-    if (value === "attendanceRate") return "attendanceRate";
-    if (value === "active") return "active";
-    if (value === "maleCount") return "maleCount";
-    if (value === "femaleCount") return "femaleCount";
-    return "name";
+    const validKeys: SortKey[] = [
+      "name",
+      "leaderName",
+      "viceLeaderName",
+      "memberCount",
+      "attendanceRate",
+      "active",
+      "maleCount",
+      "femaleCount",
+    ];
+    return validKeys.includes(value as SortKey) ? (value as SortKey) : "name";
   };
 
   const [sortConfig, setSortConfig] = useState<SortConfig>(() => {
     const key = getValidSortKey(searchParams.get("sortKey"));
     const dirParam = searchParams.get("sortDir");
-    const direction: SortConfig["direction"] =
-      dirParam === "descending" ? "descending" : "ascending";
-    return { key, direction };
+    return {
+      key,
+      direction: dirParam === "descending" ? "descending" : "ascending",
+    };
   });
 
   const [currentPage, setCurrentPage] = useState(() => {
@@ -157,35 +154,30 @@ const AdminCellsPage: React.FC = () => {
     return Number.isNaN(pageNum) || pageNum < 0 ? 0 : pageNum;
   });
 
-  // 1. 디바운스된 검색어가 변경되면 URL 업데이트 (검색 실행)
+  // Effects
   useEffect(() => {
     const currentParamsName = searchParams.get("name") || "";
-    if (debouncedSearchName !== currentParamsName) {
+    if (debouncedSearchName !== currentParamsName)
       updateQueryParams({ name: debouncedSearchName });
-    }
   }, [debouncedSearchName, searchParams, updateQueryParams]);
 
-  // 2. 브라우저 뒤로가기 등으로 URL이 변경되었을 때 입력창 동기화
   useEffect(() => {
     const paramsName = searchParams.get("name") || "";
-    if (paramsName !== localSearchName) {
-      setLocalSearchName(paramsName);
-    }
-    // localSearchName을 의존성에 넣으면 루프 돌 수 있으므로 제외 (단방향 동기화)
+    if (paramsName !== localSearchName) setLocalSearchName(paramsName);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   useEffect(() => {
     const key = getValidSortKey(searchParams.get("sortKey"));
     const dirParam = searchParams.get("sortDir");
-    const direction: SortConfig["direction"] =
-      dirParam === "descending" ? "descending" : "ascending";
     const pageParam = searchParams.get("page");
     const pageNum = pageParam ? Number(pageParam) : 0;
-    const safePage = Number.isNaN(pageNum) || pageNum < 0 ? 0 : pageNum;
 
-    setSortConfig({ key, direction });
-    setCurrentPage(safePage);
+    setSortConfig({
+      key,
+      direction: dirParam === "descending" ? "descending" : "ascending",
+    });
+    setCurrentPage(Number.isNaN(pageNum) || pageNum < 0 ? 0 : pageNum);
 
     const urlUnitType = searchParams.get("unitType") as
       | "year"
@@ -202,7 +194,6 @@ const AdminCellsPage: React.FC = () => {
 
     setFilters((prev) => ({
       ...prev,
-      // name은 로컬 스테이트가 관리하지만 filters 객체 동기화를 위해 업데이트
       name: searchParams.get("name") || "",
       active: (searchParams.get("active") as Filters["active"]) || "all",
       startDate: searchParams.get("startDate") || "",
@@ -215,25 +206,22 @@ const AdminCellsPage: React.FC = () => {
     }));
   }, [searchParams]);
 
-  // --- 데이터 페칭 ---
-
   const fetchAvailableYears = useCallback(async () => {
     try {
       const years = await cellService.getAvailableYears();
-      if (years.length === 0) {
-        setAvailableYears([new Date().getFullYear()]);
-      } else {
-        setAvailableYears(years.sort((a, b) => b - a));
-      }
+      setAvailableYears(
+        years.length === 0
+          ? [new Date().getFullYear()]
+          : years.sort((a, b) => b - a)
+      );
     } catch (err) {
-      console.error(err);
       setAvailableYears([new Date().getFullYear()]);
     }
   }, []);
 
   const fetchSemesters = useCallback(async () => {
     try {
-      const data = await semesterService.getAllSemesters();
+      const data = await semesterService.getAllSemesters(true);
       setSemesters(data);
     } catch (err) {
       console.error("Failed to fetch semesters:", err);
@@ -249,19 +237,13 @@ const AdminCellsPage: React.FC = () => {
       if (!filters.startDate || !filters.endDate) return null;
       return { startDate: filters.startDate, endDate: filters.endDate };
     }
-
     if (filters.semesterId) {
       const semester = semesters.find((s) => s.id === filters.semesterId);
-      if (semester) {
+      if (semester)
         return { startDate: semester.startDate, endDate: semester.endDate };
-      }
     }
-
     const year = typeof filters.year === "number" ? filters.year : undefined;
-    if (!year) {
-      return null;
-    }
-
+    if (!year) return null;
     const { month } = filters;
     if (month) {
       const m = month as number;
@@ -271,7 +253,6 @@ const AdminCellsPage: React.FC = () => {
         endDate: `${year}-${pad(m)}-${pad(last)}`,
       };
     }
-
     const last = lastDayOfMonth(year, 12);
     return { startDate: `${year}-01-01`, endDate: `${year}-12-${pad(last)}` };
   }, [filterType, filters, semesters]);
@@ -283,32 +264,26 @@ const AdminCellsPage: React.FC = () => {
 
     setLoading(true);
     setError(null);
-
     const sortKeyMap: Record<string, string> = {
       leaderName: "leader.name",
       viceLeaderName: "viceLeader.name",
-      // attendanceRate도 서버 필드명과 일치한다고 가정 (불일치 시 매핑 추가 필요)
     };
-
-    // ✅ [버그 수정 1] attendanceRate일 때도 항상 서버로 정렬 파라미터 전송
     const backendSortKey =
       sortKeyMap[sortConfig.key as string] || sortConfig.key;
     const sortParam = `${backendSortKey},${
       sortConfig.direction === "ascending" ? "asc" : "desc"
     }`;
-
     const dateRange = getDateRangeFromFilters();
 
     const params: GetAllCellsParams = {
       page: currentPage,
       size: 10,
       sort: sortParam,
-      name: debouncedSearchName, // ✅ URL과 동기화된 디바운스 값 사용
+      name: debouncedSearchName,
       active: filters.active === "all" ? undefined : filters.active === "true",
       startDate: dateRange?.startDate || undefined,
       endDate: dateRange?.endDate || undefined,
     };
-
     const cleanedParams = Object.fromEntries(
       Object.entries(params).filter(
         ([, v]) => v !== null && v !== "" && v !== undefined
@@ -316,10 +291,9 @@ const AdminCellsPage: React.FC = () => {
     );
 
     try {
-      const data = await cellService.getAllCells(cleanedParams);
-      setCellPage(data);
-    } catch (err) {
-      setError("셀 목록을 불러오는 데 실패했습니다.");
+      setCellPage(await cellService.getAllCells(cleanedParams));
+    } catch {
+      setError("셀 목록 로드 실패");
     } finally {
       setLoading(false);
     }
@@ -337,75 +311,61 @@ const AdminCellsPage: React.FC = () => {
 
   useEffect(() => {
     if (!user || user.role !== "EXECUTIVE") {
-      if (user) setError("접근 권한이 없습니다.");
-      else setError("로그인이 필요합니다.");
       setLoading(false);
+      if (!user) setError("로그인이 필요합니다.");
+      else setError("권한이 없습니다.");
       return;
     }
     fetchAvailableYears();
     fetchSemesters();
-
-    const fetchMembers = async () => {
-      try {
-        const page = await memberService.getAllMembers({ page: 0, size: 1000 });
+    memberService
+      .getAllMembers({ page: 0, size: 1000 })
+      .then((p) =>
         setAllMembersForNameCheck(
-          page?.content?.map((m) => ({
-            name: m.name,
-            birthDate: m.birthDate,
-          })) ?? []
-        );
-      } catch (e) {
-        /* ignore */
-      }
-    };
-    fetchMembers();
+          p?.content?.map((m) => ({ name: m.name, birthDate: m.birthDate })) ??
+            []
+        )
+      )
+      .catch(() => {});
   }, [user, fetchAvailableYears, fetchSemesters]);
 
   useEffect(() => {
     if (!user || user.role !== "EXECUTIVE") return;
     if (semesters.length === 0 && unitType === "semester") return;
-
     fetchCells();
   }, [user, fetchCells, semesters.length, unitType]);
 
   useEffect(() => {
     if (semesters.length === 0 || hasInitialized) return;
-
-    const hasUrlParams =
+    if (
       searchParams.get("semesterId") ||
       searchParams.get("year") ||
-      searchParams.get("startDate");
-
-    if (hasUrlParams) {
+      searchParams.get("startDate")
+    ) {
       setHasInitialized(true);
       return;
     }
 
     const now = new Date();
-    const currentYearMonth = `${now.getFullYear()}-${String(
+    const currentYM = `${now.getFullYear()}-${String(
       now.getMonth() + 1
     ).padStart(2, "0")}`;
+    let target = semesters.find(
+      (s) =>
+        s.startDate.substring(0, 7) <= currentYM &&
+        s.endDate.substring(0, 7) >= currentYM
+    );
+    if (!target) target = [...semesters].sort((a, b) => b.id - a.id)[0];
 
-    let targetSemester = semesters.find((s) => {
-      const start = s.startDate.substring(0, 7);
-      const end = s.endDate.substring(0, 7);
-      return currentYearMonth >= start && currentYearMonth <= end;
-    });
-
-    if (!targetSemester) {
-      const sorted = [...semesters].sort((a, b) => b.id - a.id);
-      targetSemester = sorted[0];
-    }
-
-    if (targetSemester) {
+    if (target)
       updateQueryParams({
         unitType: "semester",
-        semesterId: targetSemester.id,
+        semesterId: target.id,
         year: "",
         month: "",
         active: "all",
       });
-    } else {
+    else
       updateQueryParams({
         unitType: "month",
         year: now.getFullYear(),
@@ -413,55 +373,36 @@ const AdminCellsPage: React.FC = () => {
         semesterId: "",
         active: "all",
       });
-    }
     setHasInitialized(true);
   }, [semesters, hasInitialized, searchParams, updateQueryParams]);
 
-  // --- Memoized Data ---
-
+  // Handlers
   const yearOptions = useMemo(
-    () => availableYears.map((year) => ({ value: year, label: `${year}` })),
+    () => availableYears.map((y) => ({ value: y, label: `${y}` })),
     [availableYears]
   );
-
-  // ✅ [버그 수정 1 관련] 프론트엔드 정렬 로직 제거
-  // 서버에서 이미 정렬되어 오므로 그대로 렌더링
-  const sortedCells = useMemo(() => {
-    if (!cellPage) return [];
-    return cellPage.content;
-  }, [cellPage]);
-
-  // --- Event Handlers ---
+  const sortedCells = useMemo(
+    () => (cellPage ? cellPage.content : []),
+    [cellPage]
+  );
 
   const requestSort = (key: SortKey) => {
-    const nextDirection: SortConfig["direction"] =
+    const nextDir =
       sortConfig.key === key && sortConfig.direction === "ascending"
         ? "descending"
         : "ascending";
-
-    updateQueryParams({
-      sortKey: key,
-      sortDir: nextDirection,
-      page: 0,
-    });
+    updateQueryParams({ sortKey: key, sortDir: nextDir, page: 0 });
   };
-
   const handlePageChange = (page: number) => {
-    const safePage = page < 0 ? 0 : page;
-    const newParams = new URLSearchParams(searchParams);
-    newParams.set("page", String(safePage));
-    setSearchParams(newParams);
+    updateQueryParams({ page: page < 0 ? 0 : page });
   };
-
   const handleDelete = (cell: CellDto) => {
     setCellToDelete(cell);
     setDeleteError(null);
     setShowDeleteConfirmModal(true);
   };
-
   const handleConfirmDelete = async () => {
     if (!cellToDelete) return;
-    setDeleteError(null);
     try {
       await cellService.deleteCell(cellToDelete.id);
       setShowDeleteConfirmModal(false);
@@ -478,14 +419,10 @@ const AdminCellsPage: React.FC = () => {
     setDeleteError(null);
   };
 
-  const handleFilterChange = (field: keyof Filters, value: any) => {
+  const handleFilterChange = (field: keyof Filters, value: any) =>
     updateQueryParams({ [field]: value });
-  };
-
-  const handleSemesterClick = (id: number) => {
-    const newValue = filters.semesterId === id ? "" : id;
-    updateQueryParams({ semesterId: newValue });
-  };
+  const handleSemesterClick = (id: number) =>
+    updateQueryParams({ semesterId: filters.semesterId === id ? "" : id });
 
   const handleUnitTypeClick = (type: "year" | "month" | "semester") => {
     const now = new Date();
@@ -493,38 +430,27 @@ const AdminCellsPage: React.FC = () => {
       unitType: type,
       filterType: "unit",
     };
-
     if (type === "year") {
-      updates.year = filters.year === "" ? "" : filters.year || "";
+      updates.year = filters.year || "";
       updates.month = "";
       updates.semesterId = "";
     } else if (type === "month") {
-      updates.year =
-        filters.year === ""
-          ? now.getFullYear()
-          : filters.year || now.getFullYear();
+      updates.year = filters.year || now.getFullYear();
       updates.month = filters.month || now.getMonth() + 1;
       updates.semesterId = "";
     } else if (type === "semester") {
       updates.year = "";
       updates.month = "";
-      if (semesters.length > 0 && !filters.semesterId) {
+      if (semesters.length > 0 && !filters.semesterId)
         updates.semesterId = semesters[0].id;
-      }
     }
-
     updateQueryParams(updates);
   };
 
-  const handleUnitValueClick = (value: number) => {
+  const handleUnitValueClick = (value: number) =>
     updateQueryParams({ month: value });
-  };
-
-  const handleFilterTypeChange = (type: "unit" | "range") => {
+  const handleFilterTypeChange = (type: "unit" | "range") =>
     updateQueryParams({ filterType: type });
-  };
-
-  // --- Render Helpers ---
 
   const getSortIndicator = (key: SortKey) => {
     if (sortConfig.key !== key) return " ↕";
@@ -532,154 +458,166 @@ const AdminCellsPage: React.FC = () => {
   };
 
   const renderUnitButtons = () => {
-    switch (unitType) {
-      case "month":
-        return (
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+    if (unitType === "month") {
+      return (
+        <div className="pt-2 border-t border-gray-200/50 mt-2">
+          <label className="text-xs font-bold text-gray-500 mb-2 block">
+            월 선택
+          </label>
+          <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5">
             {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
               <button
                 key={m}
                 onClick={() => handleUnitValueClick(m)}
-                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
-                  filters.month === m ? "bg-blue-500 text-white" : "bg-white"
+                className={`py-1.5 rounded-md text-xs font-bold transition-colors ${
+                  filters.month === m
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
                 }`}
               >
                 {m}월
               </button>
             ))}
           </div>
-        );
-      case "semester":
-        if (semesters.length === 0)
-          return (
-            <div className="text-xs text-yellow-800 bg-yellow-50 p-3 rounded">
-              생성된 학기가 없습니다.
-            </div>
-          );
+        </div>
+      );
+    }
+    if (unitType === "semester") {
+      if (semesters.length === 0)
         return (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+          <div className="text-xs text-yellow-800 bg-yellow-50 p-3 rounded-lg border border-yellow-100">
+            활성화된 학기가 없습니다.
+          </div>
+        );
+      return (
+        <div className="pt-2 border-t border-gray-200/50 mt-2">
+          <label className="text-xs font-bold text-gray-500 mb-2 block">
+            학기 선택
+          </label>
+          <div className="flex flex-wrap gap-2">
             {semesters.map((s) => (
               <button
                 key={s.id}
                 onClick={() => handleSemesterClick(s.id)}
-                className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
                   filters.semesterId === s.id
-                    ? "bg-blue-500 text-white"
-                    : "bg-white"
+                    ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                    : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
                 }`}
               >
                 {s.name}
               </button>
             ))}
           </div>
-        );
-      default:
-        return null;
+        </div>
+      );
     }
+    return null;
   };
 
-  // --- Main Render ---
-
-  if (error && (!user || user.role !== "EXECUTIVE")) {
+  if (error && (!user || user.role !== "EXECUTIVE"))
     return <div className="p-8 text-center text-red-600">{error}</div>;
-  }
 
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
+    <div className="bg-gray-50 min-h-screen pb-20">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-              셀 관리
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <UserGroupIcon className="h-7 w-7 text-indigo-500" />셀 관리
             </h1>
-            <p className="mt-1 text-sm text-gray-600">
-              셀과 셀장 정보를 관리하고, 기간별 출석률을 확인합니다.
+            <p className="text-sm text-gray-500 mt-1">
+              셀 정보를 관리하고 출석 현황을 모니터링합니다.
             </p>
           </div>
+          <button
+            onClick={() => navigate("/admin/cells/add")}
+            className="flex items-center justify-center gap-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm font-bold shadow-sm transition-all"
+          >
+            <PlusIcon className="h-4 w-4" /> 셀 추가
+          </button>
         </div>
 
-        <div className="p-4 bg-gray-50 rounded-lg mb-6 shadow-sm space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="text-base sm:text-lg font-semibold">
-              조회 기간 설정
-            </h3>
-            <div className="flex flex-wrap items-center gap-2">
+        {/* Filters Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6 space-y-5">
+          <div className="flex flex-col sm:flex-row gap-4 mb-2">
+            <div className="flex bg-gray-100 p-1 rounded-xl w-full sm:w-auto self-start">
               <button
                 onClick={() => handleFilterTypeChange("unit")}
-                className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
+                className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all ${
                   filterType === "unit"
-                    ? "bg-blue-500 text-white"
-                    : "bg-white border"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-gray-500"
                 }`}
               >
-                단위로 조회
+                단위별
               </button>
               <button
                 onClick={() => handleFilterTypeChange("range")}
-                className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
+                className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all ${
                   filterType === "range"
-                    ? "bg-blue-500 text-white"
-                    : "bg-white border"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-gray-500"
                 }`}
               >
-                기간으로 조회
+                기간설정
               </button>
             </div>
           </div>
 
           {filterType === "range" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  기간 시작
+                <label className="text-xs font-bold text-gray-500 mb-1 block">
+                  시작일
                 </label>
                 <KoreanCalendarPicker
                   value={filters.startDate}
-                  onChange={(date) => handleFilterChange("startDate", date)}
+                  onChange={(d) => handleFilterChange("startDate", d)}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  기간 종료
+                <label className="text-xs font-bold text-gray-500 mb-1 block">
+                  종료일
                 </label>
                 <KoreanCalendarPicker
                   value={filters.endDate}
-                  onChange={(date) => handleFilterChange("endDate", date)}
+                  onChange={(d) => handleFilterChange("endDate", d)}
                 />
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
+            <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100">
+              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center mb-2">
+                <div className="w-full sm:w-auto">
+                  <label className="text-xs font-bold text-gray-500 mb-1 block">
                     연도
                   </label>
                   <select
                     value={filters.year}
                     onChange={(e) => handleFilterChange("year", e.target.value)}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
-                    disabled={unitType === "semester"}
+                    className="w-full sm:w-32 py-2 border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-100"
                   >
                     <option value="">전체 연도</option>
-                    {yearOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}년
+                    {yearOptions.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}년
                       </option>
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
+                <div className="flex-1">
+                  <label className="text-xs font-bold text-gray-500 mb-1 block">
                     조회 단위
                   </label>
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => handleUnitTypeClick("month")}
-                      className={`px-3 py-1 text-xs rounded-full ${
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
                         unitType === "month"
-                          ? "bg-blue-500 text-white"
-                          : "bg-white border"
+                          ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                          : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
                       }`}
                     >
                       월간
@@ -689,22 +627,22 @@ const AdminCellsPage: React.FC = () => {
                         hasActiveSemesters && handleUnitTypeClick("semester")
                       }
                       disabled={!hasActiveSemesters}
-                      className={`px-3 py-1 text-xs rounded-full border ${
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
                         hasActiveSemesters
                           ? unitType === "semester"
-                            ? "bg-blue-500 text-white border-blue-500"
-                            : "bg-white"
-                          : "bg-gray-100 text-gray-400 border-dashed"
+                            ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                          : "bg-gray-50 text-gray-400 border-gray-100 border-dashed cursor-not-allowed"
                       }`}
                     >
                       학기
                     </button>
                     <button
                       onClick={() => handleUnitTypeClick("year")}
-                      className={`px-3 py-1 text-xs rounded-full ${
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
                         unitType === "year"
-                          ? "bg-blue-500 text-white"
-                          : "bg-white border"
+                          ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                          : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
                       }`}
                     >
                       연간
@@ -716,235 +654,232 @@ const AdminCellsPage: React.FC = () => {
             </div>
           )}
 
-          <hr />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="relative">
+              <label className="text-xs font-bold text-gray-500 mb-1 block">
                 셀 이름
               </label>
-              <input
-                type="text"
-                placeholder="이름으로 검색..."
-                // ✅ [버그 수정 2] 로컬 state 사용 및 onChange 분리
-                value={localSearchName}
-                onChange={(e) => setLocalSearchName(e.target.value)}
-                className="p-2 border rounded-md w-full text-sm"
-              />
+              <div className="relative">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="검색..."
+                  value={localSearchName}
+                  onChange={(e) => setLocalSearchName(e.target.value)}
+                  className="w-full pl-10 py-2.5 border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white transition-all"
+                />
+              </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="text-xs font-bold text-gray-500 mb-1 block">
                 상태
               </label>
               <select
                 value={filters.active}
                 onChange={(e) => handleFilterChange("active", e.target.value)}
-                className="p-2 border rounded-md w-full text-sm"
+                className="w-full py-2.5 border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white"
               >
                 <option value="all">모든 상태</option>
-                <option value="true">활성 셀만</option>
-                <option value="false">비활성 셀만</option>
+                <option value="true">활성 셀</option>
+                <option value="false">비활성 셀</option>
               </select>
             </div>
           </div>
         </div>
 
-        <div className="flex justify-end mb-4">
-          <button
-            onClick={() => navigate("/admin/cells/add")}
-            className="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700"
-          >
-            + 새 셀 추가
-          </button>
-        </div>
-
-        {loading && (
-          <div className="text-center py-10 text-gray-500">
-            데이터를 불러오는 중...
+        {/* List / Table */}
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
           </div>
-        )}
-
-        {!loading && cellPage && (
+        ) : !cellPage || sortedCells.length === 0 ? (
+          <div className="py-20 text-center bg-white rounded-2xl border border-dashed border-gray-200 text-gray-400 text-sm">
+            조건에 맞는 셀이 없습니다.
+          </div>
+        ) : (
           <>
-            {/* 📱 모바일 카드 뷰 */}
+            {/* Mobile Cards */}
             <div className="space-y-3 md:hidden mb-4">
-              {sortedCells.length === 0 ? (
-                <div className="p-4 bg-white text-center text-gray-500 text-sm">
-                  데이터가 없습니다.
-                </div>
-              ) : (
-                sortedCells.map((cell) => {
-                  const leaderName = cell.leader
-                    ? formatDisplayName(
-                        {
-                          name: cell.leader.name,
-                          birthDate: cell.leader.birthDate,
-                        },
-                        allMembersForNameCheck
-                      )
-                    : "미정";
+              {sortedCells.map((cell) => {
+                const leaderName = cell.leader
+                  ? formatDisplayName(
+                      {
+                        name: cell.leader.name,
+                        birthDate: cell.leader.birthDate,
+                      },
+                      allMembersForNameCheck
+                    )
+                  : "미정";
+                const rateText =
+                  cell.attendanceRate !== undefined
+                    ? `${Math.round(cell.attendanceRate)}%`
+                    : "-";
 
-                  const rateText =
-                    cell.attendanceRate !== undefined
-                      ? `${Math.round(cell.attendanceRate)}%`
-                      : "-";
-
-                  return (
-                    <div
-                      key={cell.id}
-                      onClick={() => navigate(`/admin/cells/${cell.id}`)}
-                      className="bg-white rounded-lg shadow p-4 space-y-2 cursor-pointer border border-gray-100"
-                    >
-                      <div className="flex justify-between">
-                        <span className="font-bold text-indigo-600">
+                return (
+                  <div
+                    key={cell.id}
+                    onClick={() => navigate(`/admin/cells/${cell.id}`)}
+                    className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 active:scale-[0.99] transition-all"
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-1.5">
                           {cell.name}
-                        </span>
-                        <span
-                          className={`px-2 py-0.5 text-xs rounded-full ${
-                            cell.active
-                              ? "bg-green-100 text-green-800"
-                              : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {cell.active ? "활성" : "비활성"}
-                        </span>
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                              cell.active
+                                ? "bg-green-50 text-green-700"
+                                : "bg-gray-100 text-gray-500"
+                            }`}
+                          >
+                            {cell.active ? "활성" : "비활성"}
+                          </span>
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          셀장: {leaderName}
+                        </p>
                       </div>
-                      <div className="text-xs text-gray-500">
-                        셀장: {leaderName}
+                      {user?.role === "EXECUTIVE" && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/admin/cells/${cell.id}/edit`);
+                            }}
+                            className="bg-gray-50 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-100 hover:bg-indigo-50"
+                          >
+                            수정
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(cell);
+                            }}
+                            className="bg-gray-50 text-red-500 px-3 py-1.5 rounded-lg text-xs font-bold border border-red-100 hover:bg-red-50"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="bg-gray-50 p-2 rounded-xl">
+                        <div className="text-gray-400 mb-0.5 flex justify-center">
+                          <UsersIcon className="h-3 w-3" />
+                        </div>
+                        <div className="font-bold text-gray-700">
+                          {cell.memberCount}명
+                        </div>
                       </div>
-                      <div className="grid grid-cols-3 gap-2 text-center text-xs mt-2 bg-gray-50 p-2 rounded">
-                        <div>
-                          <div className="text-gray-400">인원</div>
-                          <div>{cell.memberCount}</div>
+                      <div className="bg-gray-50 p-2 rounded-xl">
+                        <div className="text-gray-400 mb-0.5 flex justify-center">
+                          <UserGroupIcon className="h-3 w-3" />
                         </div>
-                        <div>
-                          <div className="text-gray-400">남/여</div>
-                          <div>
-                            {cell.maleCount}/{cell.femaleCount}
-                          </div>
+                        <div className="font-bold text-gray-700">
+                          {cell.maleCount}/{cell.femaleCount}
                         </div>
-                        <div>
-                          <div className="text-gray-400">출석률</div>
-                          <div className="font-semibold text-blue-600">
-                            {rateText}
-                          </div>
+                      </div>
+                      <div className="bg-indigo-50 p-2 rounded-xl border border-indigo-100">
+                        <div className="text-indigo-400 mb-0.5 flex justify-center">
+                          <ChartBarIcon className="h-3 w-3" />
+                        </div>
+                        <div className="font-bold text-indigo-700">
+                          {rateText}
                         </div>
                       </div>
                     </div>
-                  );
-                })
-              )}
+                  </div>
+                );
+              })}
             </div>
 
-            <div className="hidden md:block bg-white shadow-md rounded-lg overflow-x-auto">
+            {/* Desktop Table */}
+            <div className="hidden md:block bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50">
+                <thead className="bg-gray-50/50">
                   <tr>
-                    <th
-                      onClick={() => requestSort("name")}
-                      className="px-6 py-3 text-left font-medium text-gray-500 cursor-pointer"
-                    >
-                      이름{getSortIndicator("name")}
+                    {[
+                      { k: "name", l: "이름" },
+                      { k: "leaderName", l: "셀장" },
+                      { k: "active", l: "상태" },
+                      { k: "memberCount", l: "인원" },
+                      { k: "maleCount", l: "남성" },
+                      { k: "femaleCount", l: "여성" },
+                      { k: "attendanceRate", l: "출석률" },
+                    ].map((col) => (
+                      <th
+                        key={col.k}
+                        onClick={() => requestSort(col.k as SortKey)}
+                        className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600 transition-colors"
+                      >
+                        {col.l} {getSortIndicator(col.k as SortKey)}
+                      </th>
+                    ))}
+                    <th className="px-6 py-3">
+                      <span className="sr-only">Actions</span>
                     </th>
-                    <th
-                      onClick={() => requestSort("leaderName")}
-                      className="px-6 py-3 text-left font-medium text-gray-500 cursor-pointer"
-                    >
-                      셀장{getSortIndicator("leaderName")}
-                    </th>
-                    <th
-                      onClick={() => requestSort("active")}
-                      className="px-6 py-3 text-left font-medium text-gray-500 cursor-pointer"
-                    >
-                      활성{getSortIndicator("active")}
-                    </th>
-                    <th
-                      onClick={() => requestSort("memberCount")}
-                      className="px-6 py-3 text-left font-medium text-gray-500 cursor-pointer"
-                    >
-                      인원{getSortIndicator("memberCount")}
-                    </th>
-                    <th
-                      onClick={() => requestSort("maleCount")}
-                      className="px-6 py-3 text-left font-medium text-gray-500 cursor-pointer"
-                    >
-                      남성{getSortIndicator("maleCount")}
-                    </th>
-                    <th
-                      onClick={() => requestSort("femaleCount")}
-                      className="px-6 py-3 text-left font-medium text-gray-500 cursor-pointer"
-                    >
-                      여성{getSortIndicator("femaleCount")}
-                    </th>
-                    <th
-                      onClick={() => requestSort("attendanceRate")}
-                      className="px-6 py-3 text-left font-medium text-gray-500 cursor-pointer"
-                    >
-                      출석률{getSortIndicator("attendanceRate")}
-                    </th>
-                    <th className="px-6 py-3"></th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {sortedCells.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={8}
-                        className="px-6 py-4 text-center text-gray-500"
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {sortedCells.map((cell) => {
+                    const leaderName = cell.leader
+                      ? formatDisplayName(
+                          {
+                            name: cell.leader.name,
+                            birthDate: cell.leader.birthDate,
+                          },
+                          allMembersForNameCheck
+                        )
+                      : "미정";
+                    const rateText =
+                      cell.attendanceRate !== undefined
+                        ? `${Math.round(cell.attendanceRate)}%`
+                        : "-";
+                    return (
+                      <tr
+                        key={cell.id}
+                        onClick={() => navigate(`/admin/cells/${cell.id}`)}
+                        className="hover:bg-gray-50 cursor-pointer transition-colors group"
                       >
-                        데이터가 없습니다.
-                      </td>
-                    </tr>
-                  ) : (
-                    sortedCells.map((cell) => {
-                      const leaderName = cell.leader
-                        ? formatDisplayName(
-                            {
-                              name: cell.leader.name,
-                              birthDate: cell.leader.birthDate,
-                            },
-                            allMembersForNameCheck
-                          )
-                        : "미정";
-
-                      const rateText =
-                        cell.attendanceRate !== undefined
-                          ? `${Math.round(cell.attendanceRate)}%`
-                          : "-";
-
-                      return (
-                        <tr
-                          key={cell.id}
-                          onClick={() => navigate(`/admin/cells/${cell.id}`)}
-                          className="hover:bg-indigo-50 cursor-pointer transition-colors"
-                        >
-                          <td className="px-6 py-4 font-medium text-indigo-600">
-                            {cell.name}
-                          </td>
-                          <td className="px-6 py-4">{leaderName}</td>
-                          <td className="px-6 py-4">
-                            <span
-                              className={`px-2 py-1 text-xs rounded-full ${
-                                cell.active
-                                  ? "bg-green-100 text-green-800"
-                                  : "bg-red-100 text-red-800"
-                              }`}
-                            >
-                              {cell.active ? "활성" : "비활성"}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">{cell.memberCount}명</td>
-                          <td className="px-6 py-4">{cell.maleCount}명</td>
-                          <td className="px-6 py-4">{cell.femaleCount}명</td>
-                          <td className="px-6 py-4 font-semibold text-blue-600">
-                            {rateText}
-                          </td>
-                          <td className="px-6 py-4 text-right">
+                        <td className="px-6 py-4 font-bold text-indigo-600">
+                          {cell.name}
+                        </td>
+                        <td className="px-6 py-4 text-gray-900">
+                          {leaderName}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                              cell.active
+                                ? "bg-green-50 text-green-700"
+                                : "bg-gray-100 text-gray-500"
+                            }`}
+                          >
+                            {cell.active ? "활성" : "비활성"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 font-medium">
+                          {cell.memberCount}
+                        </td>
+                        <td className="px-6 py-4 text-gray-500">
+                          {cell.maleCount}
+                        </td>
+                        <td className="px-6 py-4 text-gray-500">
+                          {cell.femaleCount}
+                        </td>
+                        <td className="px-6 py-4 font-bold text-indigo-600">
+                          {rateText}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            {/* ✅ 데스크탑 버튼: 텍스트 스타일 (테두리 없음) */}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 navigate(`/admin/cells/${cell.id}/edit`);
                               }}
-                              className="text-indigo-600 hover:text-indigo-900 mr-4"
+                              className="text-gray-400 hover:text-indigo-600 font-bold text-xs"
                             >
                               수정
                             </button>
@@ -953,57 +888,61 @@ const AdminCellsPage: React.FC = () => {
                                 e.stopPropagation();
                                 handleDelete(cell);
                               }}
-                              className="text-red-600 hover:text-red-900"
+                              className="text-gray-400 hover:text-red-500 font-bold text-xs"
                             >
                               삭제
                             </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
-            <Pagination
-              currentPage={cellPage.number}
-              totalPages={cellPage.totalPages}
-              totalElements={cellPage.totalElements}
-              onPageChange={handlePageChange}
-              itemLabel="개 셀"
-            />
+            <div className="mt-6">
+              <Pagination
+                currentPage={cellPage.number}
+                totalPages={cellPage.totalPages}
+                totalElements={cellPage.totalElements}
+                onPageChange={handlePageChange}
+                itemLabel="개 셀"
+              />
+            </div>
           </>
         )}
 
+        {/* Delete Modal */}
         {showDeleteConfirmModal && (
-          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-            <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl max-w-sm w-full">
-              <h2 className="text-lg sm:text-xl font-bold mb-4">
-                셀 삭제 확인
-              </h2>
-              <p className="text-gray-700 mb-2 text-sm">
-                정말로 &quot;{cellToDelete?.name}&quot; 셀을 삭제하시겠습니까?
+          <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-sm">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">셀 삭제</h3>
+              <p className="text-sm text-gray-600 mb-6 break-keep">
+                정말로{" "}
+                <span className="font-bold text-gray-900">
+                  "{cellToDelete?.name}"
+                </span>{" "}
+                셀을 삭제하시겠습니까? 소속된 멤버들의 정보에 영향을 줄 수
+                있습니다.
               </p>
-
               {deleteError && (
-                <div className="mt-2 p-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded">
+                <div className="mb-4 p-3 bg-red-50 text-red-600 text-xs rounded-lg">
                   {deleteError}
                 </div>
               )}
-
-              <div className="flex justify-end gap-2 mt-4">
+              <div className="flex justify-end gap-3">
                 <button
                   onClick={handleCloseDeleteModal}
-                  className="bg-gray-300 px-4 py-2 rounded text-sm hover:bg-gray-400"
+                  className="px-4 py-2 rounded-xl text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200"
                 >
                   취소
                 </button>
                 <button
                   onClick={handleConfirmDelete}
-                  className="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700"
+                  className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700"
                 >
-                  삭제
+                  삭제하기
                 </button>
               </div>
             </div>

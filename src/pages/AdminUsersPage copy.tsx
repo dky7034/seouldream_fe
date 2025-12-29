@@ -16,13 +16,7 @@ type SortConfig = {
   direction: "ascending" | "descending";
 };
 
-const initialFilters = {
-  name: "",
-  year: "all",
-  gender: "all",
-  role: "all",
-  cellId: null as number | null,
-};
+// ❌ initialFilters 상수 제거 (컴포넌트 내부 useState 초기값으로 통합)
 
 const AdminUsersPage: React.FC = () => {
   const { user } = useAuth();
@@ -43,7 +37,7 @@ const AdminUsersPage: React.FC = () => {
     const cellIdParam = searchParams.get("cellId");
     return {
       name: searchParams.get("name") ?? "",
-      year: searchParams.get("year") ?? "all",
+      year: searchParams.get("year") ?? "all", // "all" 또는 "2024" 문자열
       gender: searchParams.get("gender") ?? "all",
       role: searchParams.get("role") ?? "all",
       cellId: cellIdParam ? Number(cellIdParam) : null,
@@ -114,7 +108,10 @@ const AdminUsersPage: React.FC = () => {
       };
 
       if (debouncedNameFilter) params.name = debouncedNameFilter;
+
+      // ✅ [수정] year가 "all"이면 joinYear 파라미터를 아예 보내지 않음 (undefined)
       if (filters.year !== "all") params.joinYear = Number(filters.year);
+
       if (filters.gender !== "all")
         params.gender = filters.gender as "MALE" | "FEMALE";
       if (filters.role !== "all")
@@ -253,7 +250,14 @@ const AdminUsersPage: React.FC = () => {
   };
 
   const resetFilters = () => {
-    const nextFilters = { ...initialFilters };
+    // ✅ [수정] 초기값을 직접 지정 (상수 대신 리터럴 사용)
+    const nextFilters = {
+      name: "",
+      year: "all",
+      gender: "all",
+      role: "all",
+      cellId: null as number | null,
+    };
     const nextPage = 0;
     setFilters(nextFilters);
     setCurrentPage(nextPage);
@@ -485,18 +489,18 @@ const AdminUsersPage: React.FC = () => {
                       </div>
 
                       {/* 하단: 액션 버튼 */}
-                      <div className="pt-2 flex justify-end gap-2">
+                      <div className="pt-2 flex justify-end gap-6">
                         <button
                           onClick={() =>
                             navigate(`/admin/users/${member.id}/edit`)
                           }
-                          className="text-[11px] font-medium text-indigo-600 hover:text-indigo-900"
+                          className="text-[11px] font-medium text-indigo-600 hover:text-indigo-900 px-2 py-1"
                         >
                           수정
                         </button>
                         <button
                           onClick={() => handleDelete(member)}
-                          className="text-[11px] font-medium text-red-600 hover:text-red-800"
+                          className="text-[11px] font-medium text-red-600 hover:text-red-800 px-2 py-1"
                         >
                           삭제
                         </button>

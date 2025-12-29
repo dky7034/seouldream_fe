@@ -429,23 +429,15 @@ const AddUserPage: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700">
                 생년월일 <span className="text-red-500">*</span>
               </label>
-
-              {/* ✅ input들과 동일한 간격: mt-1 */}
-              <div className="mt-1">
-                <KoreanCalendarPicker
-                  value={formData.birthDate}
-                  onChange={(next) => {
-                    setFormData((prev) => ({ ...prev, birthDate: next }));
-                    setFormErrors((prev) => ({
-                      ...prev,
-                      birthDate: undefined,
-                    }));
-                  }}
-                  monthCols={3}
-                  yearCols={4}
-                />
-              </div>
-
+              <KoreanCalendarPicker
+                value={formData.birthDate}
+                onChange={(next) => {
+                  setFormData((prev) => ({ ...prev, birthDate: next }));
+                  setFormErrors((prev) => ({ ...prev, birthDate: undefined }));
+                }}
+                monthCols={3}
+                yearCols={4}
+              />
               {formErrors.birthDate && (
                 <p className="mt-1 text-xs sm:text-sm text-red-600">
                   {formErrors.birthDate}

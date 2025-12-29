@@ -11,6 +11,14 @@ import type {
   SemesterDto,
   GetAttendanceAlertsParams,
 } from "../types";
+import {
+  ExclamationCircleIcon,
+  FunnelIcon,
+  CalendarDaysIcon,
+  UserGroupIcon,
+  MagnifyingGlassIcon,
+  ChevronRightIcon,
+} from "@heroicons/react/24/solid";
 
 type UnitType = "semester" | "year";
 
@@ -22,32 +30,20 @@ const AttendanceAlertsPage: React.FC = () => {
   const [alerts, setAlerts] = useState<MemberAlertDto[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-
-  // 동명이인 판별용 멤버 리스트
   const [allMembersForNameCheck, setAllMembersForNameCheck] = useState<
     { id: number; name: string; birthDate?: string }[]
   >([]);
-
-  // 연속 결석 횟수 (기본값 3)
   const [consecutiveAbsences, setConsecutiveAbsences] = useState<string>("3");
-
-  // 필터 상태
   const [unitType, setUnitType] = useState<UnitType>("semester");
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
-
-  // ✅ [추가] 서버에서 받아올 '데이터가 존재하는 연도' 목록
   const [availableYears, setAvailableYears] = useState<number[]>([]);
-
-  // 선택된 연도 / 학기 ID
   const [selectedYear, setSelectedYear] = useState<number>(
     new Date().getFullYear()
   );
   const [selectedSemesterId, setSelectedSemesterId] = useState<number | "">("");
-
-  // 학기 자동 선택 완료 여부 플래그
   const [hasAutoSelectedSemester, setHasAutoSelectedSemester] = useState(false);
 
-  // --- 날짜 포맷팅 함수 ---
+  // 날짜 포맷터
   const safeFormatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return "-";
     const targetStr =
@@ -59,26 +55,20 @@ const AttendanceAlertsPage: React.FC = () => {
     return `${year}.${month}.${day}`;
   };
 
-  // --- 데이터 로딩 (학기, 연도, 멤버) ---
-
-  // 1. 학기 목록
+  // 데이터 로딩
   const fetchSemesters = useCallback(async () => {
     try {
-      const data = await semesterService.getAllSemesters(true);
-      setSemesters(data);
+      setSemesters(await semesterService.getAllSemesters(true));
     } catch (err) {
-      console.error("학기 목록 로딩 실패:", err);
+      console.error(err);
     }
   }, []);
 
-  // ✅ 2. [추가] 연도 목록 (데이터가 있는 연도만)
   const fetchAvailableYears = useCallback(async () => {
     try {
-      const years = await attendanceService.getAvailableYears();
-      setAvailableYears(years);
+      setAvailableYears(await attendanceService.getAvailableYears());
     } catch (err) {
-      console.error("연도 목록 로딩 실패:", err);
-      // 실패 시 현재 연도라도 넣어둠
+      console.error(err);
       setAvailableYears([new Date().getFullYear()]);
     }
   }, []);
@@ -86,94 +76,64 @@ const AttendanceAlertsPage: React.FC = () => {
   useEffect(() => {
     if (user && ["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
       fetchSemesters();
-      fetchAvailableYears(); // 연도 로딩 호출
-
+      fetchAvailableYears();
       memberService
         .getAllMembers({ page: 0, size: 2000, sort: "id,asc" })
-        .then((page) => {
-          setAllMembersForNameCheck(
-            page.content.map((m) => ({
-              id: m.id,
-              name: m.name,
-              birthDate: m.birthDate,
-            }))
-          );
-        })
-        .catch((e) => console.error("멤버 목록 로딩 실패:", e));
+        .then((p) => setAllMembersForNameCheck(p.content))
+        .catch(console.error);
     }
   }, [user, fetchSemesters, fetchAvailableYears]);
 
-  // --- 스마트 학기 자동 선택 로직 ---
+  // 스마트 자동 선택
   useEffect(() => {
     if (semesters.length > 0 && !hasAutoSelectedSemester) {
       const now = new Date();
-      const currentYearMonth = `${now.getFullYear()}-${String(
-        now.getMonth() + 1
-      ).padStart(2, "0")}`;
-
-      let targetSemester = semesters.find((s) => {
-        const start = s.startDate.substring(0, 7);
-        const end = s.endDate.substring(0, 7);
-        return currentYearMonth >= start && currentYearMonth <= end;
-      });
-
-      if (!targetSemester) {
-        const sorted = [...semesters].sort((a, b) => b.id - a.id);
-        targetSemester = sorted[0];
-      }
-
-      if (targetSemester) {
+      const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
+        2,
+        "0"
+      )}`;
+      let target = semesters.find(
+        (s) =>
+          s.startDate.substring(0, 7) <= ym && s.endDate.substring(0, 7) >= ym
+      );
+      if (!target) target = [...semesters].sort((a, b) => b.id - a.id)[0];
+      if (target) {
         setUnitType("semester");
-        setSelectedSemesterId(targetSemester.id);
+        setSelectedSemesterId(target.id);
       } else {
         setUnitType("year");
         setSelectedYear(now.getFullYear());
       }
       setHasAutoSelectedSemester(true);
-    } else if (
-      semesters.length === 0 &&
-      !hasAutoSelectedSemester &&
-      selectedYear
-    ) {
-      // 학기가 없을 경우 연도 모드로 fallback
     }
   }, [semesters, hasAutoSelectedSemester, selectedYear]);
 
-  // --- 출석 경고 목록 조회 (API 호출) ---
+  // 조회 로직
   const fetchAlerts = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     setError(null);
-
     const threshold = Math.max(1, Number(consecutiveAbsences) || 1);
-
     try {
       const params: GetAttendanceAlertsParams = {
         consecutiveAbsences: threshold,
       };
-
-      if (unitType === "year") {
-        params.year = selectedYear;
-      } else if (unitType === "semester" && selectedSemesterId) {
+      if (unitType === "year") params.year = selectedYear;
+      else if (unitType === "semester" && selectedSemesterId)
         params.semesterId = selectedSemesterId;
-      }
-
-      const data = await attendanceService.getAttendanceAlerts(params);
-      setAlerts(data);
+      setAlerts(await attendanceService.getAttendanceAlerts(params));
     } catch (err) {
-      console.error("출석 경고 목록 로딩 실패:", err);
-      setError("출석 경고 목록을 불러오는 데 실패했습니다.");
+      console.error(err);
+      setError("데이터 로드 실패");
     } finally {
       setLoading(false);
     }
   }, [user, consecutiveAbsences, unitType, selectedYear, selectedSemesterId]);
 
-  // --- 조회 실행 트리거 ---
   useEffect(() => {
     const isReady =
       hasAutoSelectedSemester ||
       (semesters.length === 0 && unitType === "year");
-
     if (isReady) {
       if (unitType === "semester" && !selectedSemesterId) return;
       void fetchAlerts();
@@ -187,103 +147,84 @@ const AttendanceAlertsPage: React.FC = () => {
     selectedYear,
   ]);
 
-  // --- 핸들러 ---
+  // 핸들러
   const handleUnitTypeClick = (type: UnitType) => {
     setUnitType(type);
-    if (type === "year") {
-      // 연도 모드 진입 시, 선택된 연도가 없거나 목록에 없으면 가장 최신 연도 선택
-      if (!selectedYear) {
-        const latest =
-          availableYears.length > 0
-            ? availableYears[0]
-            : new Date().getFullYear();
-        setSelectedYear(latest);
-      }
-    }
+    if (type === "year" && !selectedYear)
+      setSelectedYear(
+        availableYears.length > 0 ? availableYears[0] : new Date().getFullYear()
+      );
   };
-
-  const handleSearchClick = () => {
-    void fetchAlerts();
-  };
-
+  const handleSearchClick = () => void fetchAlerts();
   const handleBlur = () => {
-    const value = Number(consecutiveAbsences);
-    if (Number.isNaN(value) || value < 1) {
-      setConsecutiveAbsences("3");
-    }
+    if (Number(consecutiveAbsences) < 1) setConsecutiveAbsences("3");
   };
 
-  // ✅ [수정] 연도 옵션 생성: 서버 데이터 기반
-  const yearOptions = useMemo(() => {
-    // 데이터가 아직 안 왔거나 비어있으면 현재 연도라도 하나 보여줌
-    if (availableYears.length === 0) {
-      const curr = new Date().getFullYear();
-      return [{ value: curr, label: `${curr}년` }];
-    }
-    // 받아온 연도 목록 매핑
-    return availableYears.map((y) => ({
-      value: y,
-      label: `${y}년`,
-    }));
-  }, [availableYears]);
+  const yearOptions = useMemo(
+    () =>
+      availableYears.length === 0
+        ? [
+            {
+              value: new Date().getFullYear(),
+              label: `${new Date().getFullYear()}년`,
+            },
+          ]
+        : availableYears.map((y) => ({ value: y, label: `${y}년` })),
+    [availableYears]
+  );
 
-  // --- UI 렌더링 ---
-  if (!user || !["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
+  if (!user || !["EXECUTIVE", "CELL_LEADER"].includes(user.role))
     return (
-      <div className="bg-gray-50 min-h-screen flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-sm p-6 text-center">
-          <p className="text-red-600 text-sm sm:text-base">
-            페이지 접근 권한이 없습니다.
-          </p>
-        </div>
-      </div>
+      <div className="p-10 text-center text-red-500">권한이 없습니다.</div>
     );
-  }
 
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <div className="container mx-auto max-w-5xl px-3 sm:px-4 py-6 sm:py-8">
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-            결석 관리
-          </h1>
-          <p className="mt-2 text-sm text-gray-600">
-            설정한 기간 동안 특정 횟수 이상 연속으로 결석한 멤버를 확인하고
-            관리합니다.
-          </p>
+    <div className="bg-gray-50 min-h-screen pb-20">
+      <div className="container mx-auto max-w-5xl px-4 py-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <ExclamationCircleIcon className="h-7 w-7 text-red-500" />
+              결석 관리
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              장기 결석자를 파악하고 관리합니다.
+            </p>
+          </div>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-200 text-sm text-red-700">
-            {error}
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm font-bold text-red-700 flex items-center gap-2">
+            <ExclamationCircleIcon className="h-5 w-5" /> {error}
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-5 mb-6 space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-start gap-6">
-            <div className="flex-shrink-0">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                조회 단위
+        {/* Filter Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6 space-y-5">
+          <div className="flex flex-col sm:flex-row gap-5">
+            {/* Unit Toggle */}
+            <div className="sm:w-1/3">
+              <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 flex items-center gap-1">
+                <FunnelIcon className="h-4 w-4" /> 조회 기준
               </label>
-              <div className="inline-flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
+              <div className="flex bg-gray-100 p-1 rounded-xl">
                 <button
-                  type="button"
                   onClick={() => handleUnitTypeClick("semester")}
-                  className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all ${
+                  className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
                     unitType === "semester"
                       ? "bg-white text-indigo-600 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
+                      : "text-gray-500"
                   }`}
                 >
                   학기별
                 </button>
                 <button
-                  type="button"
                   onClick={() => handleUnitTypeClick("year")}
-                  className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all ${
+                  className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
                     unitType === "year"
                       ? "bg-white text-indigo-600 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
+                      : "text-gray-500"
                   }`}
                 >
                   연도별
@@ -291,26 +232,27 @@ const AttendanceAlertsPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex-grow">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            {/* Selection Area */}
+            <div className="flex-1">
+              <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 flex items-center gap-1">
+                <CalendarDaysIcon className="h-4 w-4" />{" "}
                 {unitType === "semester" ? "학기 선택" : "연도 선택"}
               </label>
-
               {unitType === "semester" ? (
                 <div className="flex flex-wrap gap-2">
                   {semesters.length === 0 ? (
                     <span className="text-sm text-gray-400 py-2">
-                      등록된 학기가 없습니다.
+                      학기 없음
                     </span>
                   ) : (
                     semesters.map((s) => (
                       <button
                         key={s.id}
                         onClick={() => setSelectedSemesterId(s.id)}
-                        className={`px-3 py-1.5 rounded-full text-xs sm:text-sm border transition-colors ${
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
                           selectedSemesterId === s.id
-                            ? "bg-indigo-600 text-white border-indigo-600"
-                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                            ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
+                            : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                         }`}
                       >
                         {s.name}
@@ -322,11 +264,11 @@ const AttendanceAlertsPage: React.FC = () => {
                 <select
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="block w-full sm:w-48 pl-3 pr-10 py-2 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md"
+                  className="w-full border-gray-200 rounded-xl bg-gray-50 text-sm font-medium focus:ring-indigo-500 focus:border-indigo-500"
                 >
-                  {yearOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
+                  {yearOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
                     </option>
                   ))}
                 </select>
@@ -334,97 +276,101 @@ const AttendanceAlertsPage: React.FC = () => {
             </div>
           </div>
 
-          <hr className="border-gray-100" />
-
-          <div>
-            <label
-              htmlFor="consecutiveAbsences"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              연속 결석 기준 (회)
-            </label>
-            <div className="flex items-center gap-2">
+          <div className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row items-end gap-4">
+            <div className="w-full sm:flex-1">
+              <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 block">
+                연속 결석 기준 (회)
+              </label>
               <input
-                id="consecutiveAbsences"
                 type="number"
                 min={1}
                 value={consecutiveAbsences}
                 onChange={(e) => setConsecutiveAbsences(e.target.value)}
                 onBlur={handleBlur}
-                className="block w-24 sm:w-32 px-3 py-2 border border-gray-300 rounded-md text-sm shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full border-gray-200 rounded-xl bg-gray-50 text-sm focus:ring-indigo-500 focus:border-indigo-500"
               />
-              <button
-                type="button"
-                onClick={handleSearchClick}
-                disabled={loading}
-                className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${
-                  loading
-                    ? "bg-indigo-400 cursor-not-allowed"
-                    : "bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                }`}
-              >
-                {loading ? "조회 중..." : "조회하기"}
-              </button>
             </div>
-            <p className="mt-1.5 text-xs text-gray-500">
-              선택한 기간 내에 해당 횟수 이상 연속으로 결석한 기록이 있는 멤버를
-              조회합니다.
-            </p>
+            <button
+              onClick={handleSearchClick}
+              disabled={loading}
+              className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50 shadow-sm flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+              ) : (
+                <MagnifyingGlassIcon className="h-4 w-4" />
+              )}
+              조회하기
+            </button>
           </div>
         </div>
 
+        {/* Results */}
         {!loading && (
           <>
-            <div className="mb-3 flex items-center justify-between">
-              <div className="text-xs sm:text-sm text-gray-700 font-medium">
-                총 {alerts.length}명 발견됨
-              </div>
+            <div className="flex items-center gap-2 mb-4 px-1">
+              <UserGroupIcon className="h-5 w-5 text-gray-400" />
+              <span className="font-bold text-gray-700">
+                검색 결과{" "}
+                <span className="text-indigo-600">{alerts.length}</span>명
+              </span>
             </div>
 
             <div className="space-y-3 md:hidden">
               {alerts.length === 0 ? (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-                  <p className="text-gray-500 text-sm">
-                    조건에 해당하는 결석자가 없습니다.
-                  </p>
+                <div className="py-12 text-center bg-white rounded-2xl border border-dashed border-gray-200 text-gray-400 text-sm">
+                  해당하는 멤버가 없습니다.
                 </div>
               ) : (
                 alerts.map((alert) => {
-                  const foundMember = allMembersForNameCheck.find(
+                  const displayName = allMembersForNameCheck.find(
                     (m) => m.id === alert.memberId
-                  );
-                  const displayName = foundMember
-                    ? formatDisplayName(foundMember, allMembersForNameCheck)
+                  )
+                    ? formatDisplayName(
+                        allMembersForNameCheck.find(
+                          (m) => m.id === alert.memberId
+                        )!,
+                        allMembersForNameCheck
+                      )
                     : alert.memberName;
-
                   return (
                     <div
                       key={alert.memberId}
-                      className="bg-white rounded-lg shadow-sm border border-gray-200 p-4"
+                      className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group hover:border-red-200 transition-all"
                     >
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <button
-                            onClick={() =>
-                              navigate(`/admin/users/${alert.memberId}`)
-                            }
-                            className="text-sm font-bold text-indigo-600 hover:text-indigo-800"
-                          >
-                            {displayName}
-                          </button>
-                          <div className="text-xs text-gray-500 mt-0.5">
-                            {alert.cellName || "소속 셀 없음"}
-                          </div>
-                        </div>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                      <div className="absolute top-0 right-0 p-3">
+                        <span className="bg-red-50 text-red-600 text-xs font-extrabold px-2 py-1 rounded-lg border border-red-100">
                           {alert.consecutiveAbsences}회 연속
                         </span>
                       </div>
-                      <div className="text-xs text-gray-500 flex justify-between items-center border-t border-gray-100 pt-2 mt-2">
-                        <span>마지막 출석일</span>
-                        <span className="font-medium text-gray-700">
-                          {safeFormatDate(alert.lastAttendanceDate)}
-                        </span>
+                      <div className="flex items-start gap-3">
+                        <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 text-lg">
+                          {displayName.charAt(0)}
+                        </div>
+                        <div>
+                          <h3 className="text-base font-bold text-gray-900">
+                            {displayName}
+                          </h3>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {alert.cellName || "소속 셀 없음"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between text-xs">
+                        <div className="text-gray-500">
+                          마지막 출석:{" "}
+                          <span className="font-medium text-gray-900">
+                            {safeFormatDate(alert.lastAttendanceDate)}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() =>
+                            navigate(`/admin/users/${alert.memberId}`)
+                          }
+                          className="text-indigo-600 font-bold flex items-center gap-0.5"
+                        >
+                          상세보기 <ChevronRightIcon className="h-3 w-3" />
+                        </button>
                       </div>
                     </div>
                   );
@@ -432,66 +378,75 @@ const AttendanceAlertsPage: React.FC = () => {
               )}
             </div>
 
-            <div className="hidden md:block bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-200">
+            {/* Desktop Table */}
+            <div className="hidden md:block bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">
                       이름
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">
                       소속 셀
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      마지막 출석일
+                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">
+                      마지막 출석
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      연속 결석 횟수
+                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">
+                      연속 결석
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right font-bold text-gray-500 uppercase text-xs">
                       관리
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="divide-y divide-gray-200 bg-white">
                   {alerts.length === 0 ? (
                     <tr>
                       <td
                         colSpan={5}
-                        className="px-6 py-10 text-center text-sm text-gray-500"
+                        className="px-6 py-12 text-center text-gray-400"
                       >
-                        조건에 해당하는 결석자가 없습니다.
+                        결과가 없습니다.
                       </td>
                     </tr>
                   ) : (
                     alerts.map((alert) => {
-                      const foundMember = allMembersForNameCheck.find(
+                      const displayName = allMembersForNameCheck.find(
                         (m) => m.id === alert.memberId
-                      );
-                      const displayName = foundMember
-                        ? formatDisplayName(foundMember, allMembersForNameCheck)
+                      )
+                        ? formatDisplayName(
+                            allMembersForNameCheck.find(
+                              (m) => m.id === alert.memberId
+                            )!,
+                            allMembersForNameCheck
+                          )
                         : alert.memberName;
-
                       return (
-                        <tr key={alert.memberId} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        <tr
+                          key={alert.memberId}
+                          className="hover:bg-gray-50 transition-colors"
+                        >
+                          <td className="px-6 py-4 font-bold text-gray-900">
                             {displayName}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className="px-6 py-4 text-gray-500">
                             {alert.cellName || "-"}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className="px-6 py-4 text-gray-500">
                             {safeFormatDate(alert.lastAttendanceDate)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-semibold">
-                            {alert.consecutiveAbsences}회
+                          <td className="px-6 py-4">
+                            <span className="bg-red-50 text-red-700 px-2 py-1 rounded font-bold text-xs">
+                              {alert.consecutiveAbsences}회
+                            </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <td className="px-6 py-4 text-right">
                             <button
                               onClick={() =>
                                 navigate(`/admin/users/${alert.memberId}`)
                               }
-                              className="text-indigo-600 hover:text-indigo-900"
+                              className="text-indigo-600 hover:text-indigo-900 font-bold text-xs"
                             >
                               상세보기
                             </button>

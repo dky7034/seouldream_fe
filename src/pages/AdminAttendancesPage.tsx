@@ -32,7 +32,10 @@ import {
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
   MinusIcon,
-} from "@heroicons/react/24/outline";
+  CalendarDaysIcon,
+  FunnelIcon,
+  MagnifyingGlassIcon,
+} from "@heroicons/react/24/solid"; // Solid icons for UI
 import { FaTh } from "react-icons/fa";
 
 // ─────────────────────────────────────────────────────────────
@@ -82,9 +85,9 @@ const AttendanceStats = memo(
     if (loading) {
       return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 animate-pulse">
-          <div className="bg-white p-4 h-32 rounded-lg shadow-sm border border-gray-100" />
-          <div className="bg-white p-4 h-32 rounded-lg shadow-sm border border-gray-100" />
-          <div className="bg-white p-4 h-32 rounded-lg shadow-sm border border-gray-100" />
+          <div className="bg-white p-4 h-32 rounded-2xl shadow-sm border border-gray-100" />
+          <div className="bg-white p-4 h-32 rounded-2xl shadow-sm border border-gray-100" />
+          <div className="bg-white p-4 h-32 rounded-2xl shadow-sm border border-gray-100" />
         </div>
       );
     }
@@ -113,10 +116,10 @@ const AttendanceStats = memo(
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {/* 1. 주간 평균 출석 */}
-        <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-100 flex flex-col justify-between">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                 주간 평균 출석
               </p>
               <div className="mt-2 flex items-baseline gap-1">
@@ -126,29 +129,29 @@ const AttendanceStats = memo(
                 <span className="text-sm font-medium text-gray-500">명/주</span>
               </div>
             </div>
-            <div className="bg-indigo-50 p-2 rounded-lg">
+            <div className="bg-indigo-50 p-2 rounded-xl">
               <UsersIcon className="h-6 w-6 text-indigo-600" />
             </div>
           </div>
 
           <div className="mt-4 flex items-center">
             <div
-              className={`flex items-center px-2 py-0.5 rounded text-sm font-medium ${bgTrendColor} ${trendColor}`}
+              className={`flex items-center px-2 py-0.5 rounded text-xs font-bold ${bgTrendColor} ${trendColor}`}
             >
-              <TrendIcon className="h-4 w-4 mr-1" />
+              <TrendIcon className="h-3 w-3 mr-1" />
               {Math.abs(attendanceTrend)}%
             </div>
-            <span className="text-gray-400 ml-2 text-xs">
+            <span className="text-gray-400 ml-2 text-xs font-medium">
               지난 기간 대비 {trendText}
             </span>
           </div>
         </div>
 
         {/* 2. 평균 출석률 */}
-        <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-100 flex flex-col justify-between">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                 평균 출석률
               </p>
               <div className="mt-2 flex items-baseline gap-1">
@@ -158,20 +161,20 @@ const AttendanceStats = memo(
                 <span className="text-sm font-medium text-gray-500">%</span>
               </div>
             </div>
-            <div className="bg-blue-50 p-2 rounded-lg">
+            <div className="bg-blue-50 p-2 rounded-xl">
               <ChartBarIcon className="h-6 w-6 text-blue-600" />
             </div>
           </div>
-          <div className="mt-4 text-xs text-gray-400 leading-relaxed">
-            전체 재적 인원 대비 실제 출석한 비율의 평균입니다.
+          <div className="mt-4 text-xs text-gray-400 font-medium leading-relaxed">
+            전체 재적 인원 대비 실제 출석 비율 평균
           </div>
         </div>
 
         {/* 3. 장기 결석자 */}
-        <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-100 flex flex-col justify-between">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-red-600">
+              <p className="text-xs font-bold uppercase tracking-wider text-red-600">
                 장기 결석 (0회)
               </p>
               <div className="mt-2 flex items-baseline gap-1">
@@ -181,12 +184,12 @@ const AttendanceStats = memo(
                 <span className="text-sm font-medium text-gray-500">명</span>
               </div>
             </div>
-            <div className="bg-red-50 p-2 rounded-lg">
+            <div className="bg-red-50 p-2 rounded-xl">
               <UsersIcon className="h-6 w-6 text-red-500" />
             </div>
           </div>
-          <div className="mt-4 text-xs text-gray-400 leading-relaxed">
-            조회 기간 동안 출석 기록이 한 번도 없는 멤버 수입니다.
+          <div className="mt-4 text-xs text-gray-400 font-medium leading-relaxed">
+            조회 기간 동안 출석 기록이 없는 멤버
           </div>
         </div>
       </div>
@@ -195,7 +198,7 @@ const AttendanceStats = memo(
 );
 
 // ─────────────────────────────────────────────────────────────
-// Sub Component 2: AttendanceMatrixView (매트릭스 + 상단 요약)
+// Sub Component 2: AttendanceMatrixView
 // ─────────────────────────────────────────────────────────────
 
 const AttendanceMatrixView = memo(
@@ -214,7 +217,7 @@ const AttendanceMatrixView = memo(
     unitType: UnitType;
     isLoading: boolean;
   }) => {
-    // ✅ [수정] 미체크 카운트 로직 강화 (가입일/배정일 고려)
+    // 로직은 기존 유지
     const uncheckedCount = useMemo(() => {
       if (!startDate || !endDate || members.length === 0) return 0;
 
@@ -257,20 +260,15 @@ const AttendanceMatrixView = memo(
 
       let missingCount = 0;
       members.forEach((member) => {
-        // 멤버별 유효 시작일 계산 (배정일 > 가입일 > 가입연도)
         let joinDateStr = "2000-01-01";
         if (member.cellAssignmentDate) joinDateStr = member.cellAssignmentDate;
         else if (member.createdAt) joinDateStr = member.createdAt;
         else if (member.joinYear) joinDateStr = `${member.joinYear}-01-01`;
 
-        // 문자열 비교를 위해 YYYY-MM-DD 포맷 통일 (Date 객체 변환 후 다시 toDateKey)
-        // (단순 문자열 비교도 가능하나, T00:00:00 등 포맷 안전성을 위해 변환 권장)
         const safeJoinDateStr = toDateKey(new Date(joinDateStr));
 
         targetSundayKeys.forEach((sundayKey) => {
-          // 유효 시작일 이전 날짜는 카운트에서 제외
           if (sundayKey < safeJoinDateStr) return;
-
           const key = `${member.id}-${sundayKey}`;
           if (!attendanceMap.has(key)) {
             missingCount++;
@@ -283,24 +281,15 @@ const AttendanceMatrixView = memo(
 
     const summary = useMemo(() => {
       const present = attendances.filter((a) => a.status === "PRESENT").length;
-
-      // [수정 전] 기록된 것(출석+결석)만 분모로 잡음 -> 89% 나옴
-      // const absent = attendances.filter((a) => a.status === "ABSENT").length;
-      // const totalRecorded = present + absent;
-      // const rate = totalRecorded > 0 ? (present / totalRecorded) * 100 : 0;
-
-      // ✅ [수정 후] 미체크(uncheckedCount)까지 분모에 포함 -> 1~2% 나옴 (엄격한 기준)
       const recordedTotal =
         present + attendances.filter((a) => a.status === "ABSENT").length;
       const realTotalPossible = recordedTotal + uncheckedCount;
-
       const rate =
         realTotalPossible > 0 ? (present / realTotalPossible) * 100 : 0;
 
       return { rate, unchecked: uncheckedCount };
     }, [attendances, uncheckedCount]);
 
-    // ✅ [수정] matrixMembers 생성 시 날짜 정보 전달 (회색 점 표시용)
     const matrixMembers = useMemo(
       () =>
         members
@@ -322,35 +311,33 @@ const AttendanceMatrixView = memo(
 
     return (
       <div className="space-y-6 animate-fadeIn">
-        {/* 통계 카드 (출석률, 미체크) */}
+        {/* 통계 요약 카드 (작은 사이즈) */}
         <div className="grid grid-cols-2 gap-4 text-center">
-          <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
-            <p className="text-sm font-medium text-indigo-600 break-keep">
-              출석률
-            </p>
-            <p className="mt-2 text-3xl font-bold text-indigo-700">
+          <div className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm">
+            <p className="text-xs font-bold text-gray-500 uppercase">출석률</p>
+            <p className="mt-1 text-2xl font-bold text-indigo-600">
               {summary.rate.toFixed(0)}
-              <span className="text-lg ml-0.5">%</span>
+              <span className="text-base ml-0.5">%</span>
             </p>
           </div>
 
           <div
-            className={`p-4 rounded-xl border ${
+            className={`p-4 rounded-2xl border shadow-sm ${
               summary.unchecked > 0
                 ? "bg-red-50 border-red-100"
-                : "bg-gray-50 border-gray-200"
+                : "bg-white border-gray-100"
             }`}
           >
             <p
-              className={`text-sm font-medium break-keep ${
+              className={`text-xs font-bold uppercase ${
                 summary.unchecked > 0 ? "text-red-600" : "text-gray-500"
               }`}
             >
               미체크 (건)
             </p>
             <p
-              className={`mt-2 text-3xl font-bold ${
-                summary.unchecked > 0 ? "text-red-700" : "text-gray-600"
+              className={`mt-1 text-2xl font-bold ${
+                summary.unchecked > 0 ? "text-red-700" : "text-gray-900"
               }`}
             >
               {summary.unchecked}
@@ -359,10 +346,10 @@ const AttendanceMatrixView = memo(
         </div>
 
         {/* 매트릭스 컨테이너 */}
-        <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
-            <h4 className="text-sm font-bold text-gray-700 flex items-center">
-              <FaTh className="mr-2 text-indigo-500" />
+        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-5">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+            <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+              <FaTh className="text-indigo-500" />
               {unitType === "year"
                 ? `${targetYear}년 전체 현황`
                 : unitType === "semester"
@@ -412,7 +399,7 @@ const AdminAttendancesPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Filter Data
+  // Filter Data & Options
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const hasActiveSemesters = semesters.length > 0;
@@ -629,6 +616,7 @@ const AdminAttendancesPage: React.FC = () => {
     }
   }, [user]);
 
+  // Filter Handlers
   const handleFilterChange = (key: keyof Filters, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
@@ -701,6 +689,7 @@ const AdminAttendancesPage: React.FC = () => {
     });
   };
 
+  // Options Helpers
   const statusOptions = useMemo(
     () => [
       { value: "", label: "모든 상태" },
@@ -752,285 +741,330 @@ const AdminAttendancesPage: React.FC = () => {
 
   if (!user || !["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
     return (
-      <p className="mt-4 text-center text-sm text-red-600">
-        접근 권한이 없습니다.
-      </p>
+      <div className="bg-gray-50 min-h-screen flex items-center justify-center p-4">
+        <div className="bg-white p-6 rounded-lg shadow-sm text-center max-w-sm w-full">
+          <p className="text-red-600 text-sm font-bold">
+            접근 권한이 없습니다.
+          </p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-            출석 관리
-          </h1>
-          <p className="mt-1 text-sm text-gray-600">
-            기간·셀·멤버별 출석 기록을 매트릭스 형태로 확인합니다.
-          </p>
-        </div>
-      </div>
-
-      <AttendanceStats stats={overallStats} loading={statsLoading} />
-
-      <div className="p-4 bg-gray-50 rounded-lg mb-6 shadow-sm space-y-4">
-        {/* 필터 영역 */}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="text-base sm:text-lg font-semibold">조회 기간 설정</h3>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setFilterType("unit")}
-              className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
-                filterType === "unit"
-                  ? "bg-blue-500 text-white"
-                  : "bg-white border"
-              }`}
-            >
-              단위로 조회
-            </button>
-            <button
-              onClick={() => setFilterType("range")}
-              className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
-                filterType === "range"
-                  ? "bg-blue-500 text-white"
-                  : "bg-white border"
-              }`}
-            >
-              기간으로 조회
-            </button>
+    <div className="bg-gray-50 min-h-screen pb-20">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <CalendarDaysIcon className="h-7 w-7 text-indigo-500" />
+              출석 관리
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              기간·셀·멤버별 출석 기록을 매트릭스로 확인하고 관리합니다.
+            </p>
           </div>
         </div>
 
-        {filterType === "range" ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                기간 시작
-              </label>
-              <KoreanCalendarPicker
-                value={filters.startDate}
-                onChange={(date) => handleFilterChange("startDate", date)}
-              />
+        {/* 종합 통계 (Stats) */}
+        <AttendanceStats stats={overallStats} loading={statsLoading} />
+
+        {/* Filter Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6">
+          <div className="flex items-center justify-between mb-4 border-b border-gray-50 pb-2">
+            <div className="flex items-center gap-2">
+              <FunnelIcon className="h-5 w-5 text-gray-400" />
+              <h3 className="font-bold text-gray-700">검색 및 필터</h3>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                기간 종료
-              </label>
-              <KoreanCalendarPicker
-                value={filters.endDate}
-                onChange={(date) => handleFilterChange("endDate", date)}
-              />
+            {/* Toggle: Unit vs Range */}
+            <div className="bg-gray-100 p-1 rounded-xl flex text-xs font-bold">
+              <button
+                onClick={() => setFilterType("unit")}
+                className={`px-3 py-1.5 rounded-lg transition-all ${
+                  filterType === "unit"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                단위별 조회
+              </button>
+              <button
+                onClick={() => setFilterType("range")}
+                className={`px-3 py-1.5 rounded-lg transition-all ${
+                  filterType === "range"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                기간 직접설정
+              </button>
             </div>
           </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+          <div className="space-y-5">
+            {/* Top Row: Date Settings */}
+            {filterType === "range" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 mb-1 block">
+                    시작일
+                  </label>
+                  <KoreanCalendarPicker
+                    value={filters.startDate}
+                    onChange={(date) => handleFilterChange("startDate", date)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 mb-1 block">
+                    종료일
+                  </label>
+                  <KoreanCalendarPicker
+                    value={filters.endDate}
+                    onChange={(date) => handleFilterChange("endDate", date)}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                  <div className="w-full sm:w-auto">
+                    <label className="text-xs font-bold text-gray-500 mb-1 block">
+                      기준 연도
+                    </label>
+                    <select
+                      value={filters.year}
+                      onChange={(e) =>
+                        handleFilterChange(
+                          "year",
+                          e.target.value ? Number(e.target.value) : ""
+                        )
+                      }
+                      className="w-full sm:w-32 py-2 border-gray-200 rounded-lg text-sm focus:bg-white bg-white"
+                      disabled={unitType === "semester"}
+                    >
+                      {yearOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    {unitType === "semester" && (
+                      <p className="mt-1 text-[10px] text-gray-400">
+                        * 학기는 연도 무관
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex-1">
+                    <label className="text-xs font-bold text-gray-500 mb-1 block">
+                      조회 단위
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => handleUnitTypeClick("month")}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                          unitType === "month"
+                            ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        월간
+                      </button>
+                      <button
+                        onClick={() =>
+                          hasActiveSemesters && handleUnitTypeClick("semester")
+                        }
+                        disabled={!hasActiveSemesters}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                          hasActiveSemesters
+                            ? unitType === "semester"
+                              ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                            : "bg-gray-50 text-gray-400 border-gray-100 border-dashed cursor-not-allowed"
+                        }`}
+                      >
+                        학기
+                      </button>
+                      <button
+                        onClick={() => handleUnitTypeClick("year")}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                          unitType === "year"
+                            ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        연간
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {unitType === "month" && (
+                  <div className="pt-2 border-t border-gray-200/50">
+                    <label className="text-xs font-bold text-gray-500 mb-2 block">
+                      월 선택
+                    </label>
+                    <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5">
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => handleUnitValueClick(m)}
+                          className={`py-1.5 rounded-md text-xs font-bold transition-colors ${
+                            filters.month === m
+                              ? "bg-indigo-600 text-white shadow-sm"
+                              : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                          }`}
+                        >
+                          {m}월
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {unitType === "semester" && semesters.length > 0 && (
+                  <div className="pt-2 border-t border-gray-200/50">
+                    <label className="text-xs font-bold text-gray-500 mb-2 block">
+                      학기 선택
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {semesters.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() =>
+                            setFilters((prev) => ({
+                              ...prev,
+                              semesterId: s.id,
+                              year: "",
+                              month: "",
+                            }))
+                          }
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${
+                            filters.semesterId === s.id
+                              ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                          }`}
+                        >
+                          {s.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Bottom Row: Cell/Member/Status */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  연도
+                <label className="text-xs font-bold text-gray-500 mb-1 block">
+                  소속 셀
                 </label>
-                <select
-                  value={filters.year}
-                  onChange={(e) =>
-                    handleFilterChange(
-                      "year",
-                      e.target.value ? Number(e.target.value) : ""
-                    )
-                  }
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
-                  disabled={unitType === "semester"}
-                >
-                  {yearOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                {unitType === "semester" && (
-                  <p className="mt-1 text-[11px] text-gray-500">
-                    학기 단위 조회 시 연도를 선택할 수 없습니다.
-                  </p>
+                {isExecutive ? (
+                  <div className="h-[46px]">
+                    <SimpleSearchableSelect
+                      options={cellOptions}
+                      value={filters.cell?.value ?? null}
+                      onChange={(value) =>
+                        handleFilterChange(
+                          "cell",
+                          cellOptions.find((o) => o.value === value) || null
+                        )
+                      }
+                      placeholder="전체 셀"
+                      isClearable
+                    />
+                  </div>
+                ) : (
+                  <div className="h-[46px] px-3 flex items-center w-full bg-gray-50 border border-gray-200 rounded-xl text-gray-500 text-sm">
+                    {user?.cellName || "내 셀"}
+                  </div>
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  조회 단위
+                <label className="text-xs font-bold text-gray-500 mb-1 block">
+                  멤버 검색
                 </label>
-                <div className="flex flex-wrap items-center gap-2 mt-1">
-                  <button
-                    onClick={() => handleUnitTypeClick("month")}
-                    className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
-                      unitType === "month"
-                        ? "bg-blue-500 text-white"
-                        : "bg-white border"
-                    }`}
-                  >
-                    월간
-                  </button>
-                  <button
-                    onClick={() =>
-                      hasActiveSemesters && handleUnitTypeClick("semester")
+                <div className="h-[46px]">
+                  <SimpleSearchableSelect
+                    options={memberOptions}
+                    value={filters.member?.value ?? null}
+                    onChange={(value) =>
+                      handleFilterChange(
+                        "member",
+                        memberOptions.find((o) => o.value === value) || null
+                      )
                     }
-                    disabled={!hasActiveSemesters}
-                    className={`px-3 py-1 text-xs sm:text-sm rounded-full border ${
-                      hasActiveSemesters
-                        ? unitType === "semester"
-                          ? "bg-blue-500 text-white border-blue-500"
-                          : "bg-white"
-                        : "bg-gray-100 text-gray-400 border-dashed cursor-not-allowed"
-                    }`}
-                  >
-                    학기
-                  </button>
-                  <button
-                    onClick={() => handleUnitTypeClick("year")}
-                    className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
-                      unitType === "year"
-                        ? "bg-blue-500 text-white"
-                        : "bg-white border"
-                    }`}
-                  >
-                    연간
-                  </button>
+                    placeholder={
+                      isCellLeader ? "내 셀 멤버 검색" : "전체 멤버 검색"
+                    }
+                    isClearable
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 mb-1 block">
+                  출석 상태
+                </label>
+                <div className="h-[46px]">
+                  <SimpleSearchableSelect
+                    options={statusOptions}
+                    value={filters.status}
+                    onChange={(value) =>
+                      handleFilterChange("status", value || "")
+                    }
+                    placeholder="모든 상태"
+                    isClearable={false}
+                  />
                 </div>
               </div>
             </div>
 
-            {unitType === "month" && (
-              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => handleUnitValueClick(m)}
-                    className={`px-2 py-1 border rounded-full text-xs ${
-                      filters.month === m
-                        ? "bg-blue-500 text-white"
-                        : "bg-white"
-                    }`}
-                  >
-                    {m}월
-                  </button>
-                ))}
-              </div>
-            )}
-            {unitType === "semester" && semesters.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                {semesters.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        semesterId: s.id,
-                        year: "",
-                        month: "",
-                      }))
-                    }
-                    className={`px-2 py-1 border rounded-full text-xs sm:text-sm ${
-                      filters.semesterId === s.id
-                        ? "bg-blue-500 text-white"
-                        : "bg-white"
-                    }`}
-                  >
-                    {s.name}
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between pt-2">
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="text-xs font-bold text-gray-500 hover:text-gray-800 underline decoration-gray-300 underline-offset-2"
+              >
+                필터 초기화
+              </button>
+              <button
+                type="button"
+                onClick={handleSearch}
+                disabled={loading}
+                className="flex items-center justify-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed transition-all"
+              >
+                <MagnifyingGlassIcon className="h-4 w-4" />
+                {loading ? "조회 중..." : "조회하기"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-sm font-bold text-red-700 text-center">
+            {error}
           </div>
         )}
 
-        <hr />
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              셀
-            </label>
-            {isExecutive ? (
-              <SimpleSearchableSelect
-                options={cellOptions}
-                value={filters.cell?.value ?? null}
-                onChange={(value) =>
-                  handleFilterChange(
-                    "cell",
-                    cellOptions.find((o) => o.value === value) || null
-                  )
-                }
-                placeholder="전체 셀"
-                isClearable
-              />
-            ) : (
-              <div className="mt-1 flex items-center h-[42px] px-3 w-full bg-gray-100 border border-gray-300 rounded-md">
-                <span className="text-sm font-medium text-gray-700 truncate">
-                  {user?.cellName || "내 셀"}
-                </span>
-              </div>
-            )}
+        {/* Matrix View */}
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              멤버
-            </label>
-            <SimpleSearchableSelect
-              options={memberOptions}
-              value={filters.member?.value ?? null}
-              onChange={(value) =>
-                handleFilterChange(
-                  "member",
-                  memberOptions.find((o) => o.value === value) || null
-                )
-              }
-              placeholder={isCellLeader ? "내 셀 멤버 검색" : "전체 멤버 검색"}
-              isClearable
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              출석 상태
-            </label>
-            <SimpleSearchableSelect
-              options={statusOptions}
-              value={filters.status}
-              onChange={(value) => handleFilterChange("status", value || "")}
-              placeholder="모든 상태"
-              isClearable={false}
-            />
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <button
-            type="button"
-            onClick={resetFilters}
-            className="text-sm text-gray-600 hover:text-gray-900 text-left"
-          >
-            필터 초기화
-          </button>
-          <button
-            type="button"
-            onClick={handleSearch}
-            disabled={loading}
-            className="w-full sm:w-auto bg-blue-600 text-white px-4 sm:px-6 py-2 rounded-md text-sm font-semibold hover:bg-blue-700 disabled:bg-blue-300"
-          >
-            {loading ? "조회 중..." : "조회"}
-          </button>
-        </div>
+        ) : (
+          <AttendanceMatrixView
+            members={targetMembers}
+            attendances={matrixAttendances}
+            startDate={effectiveDateRange?.startDate || ""}
+            endDate={effectiveDateRange?.endDate || ""}
+            unitType={unitType}
+            isLoading={loading}
+          />
+        )}
       </div>
-
-      {error && (
-        <p className="mb-4 text-center text-sm text-red-600">{error}</p>
-      )}
-
-      <AttendanceMatrixView
-        members={targetMembers}
-        attendances={matrixAttendances}
-        startDate={effectiveDateRange?.startDate || ""}
-        endDate={effectiveDateRange?.endDate || ""}
-        unitType={unitType}
-        isLoading={loading}
-      />
     </div>
   );
 };
