@@ -487,7 +487,7 @@ const AttendanceSummaryCard: React.FC<{
                   uncheckedCount > 0 ? "text-red-600" : "text-gray-500"
                 }`}
               >
-                미체크 (건)
+                미체크
               </p>
               <p
                 className={`mt-2 text-3xl font-bold ${

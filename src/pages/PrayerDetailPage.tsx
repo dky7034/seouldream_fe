@@ -241,7 +241,7 @@ const PrayerDetailPage: React.FC = () => {
                 <span className="text-gray-300">|</span>
 
                 <div className="flex items-center gap-1.5">
-                  <span className="font-medium text-gray-700">생성일</span>
+                  <span className="font-medium text-gray-700">작성일</span>
                   <span>{createdLabel}</span>
                 </div>
 

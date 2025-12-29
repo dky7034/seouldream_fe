@@ -5,6 +5,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
+import { useNavigate } from "react-router-dom"; // ✅ [추가] 페이지 이동을 위한 훅
 import { useAuth } from "../hooks/useAuth";
 import { cellService } from "../services/cellService";
 import { attendanceService } from "../services/attendanceService";
@@ -228,6 +229,9 @@ const CellMemberList: React.FC<{
   displayNameMap: Map<number, string>;
 }> = React.memo(
   ({ members, attendances, startDate, endDate, displayNameMap }) => {
+    // ✅ [추가] 상세 페이지 이동을 위한 네비게이션 훅
+    const navigate = useNavigate();
+
     const sortedMembers = useMemo(
       () =>
         members && members.length > 0
@@ -267,6 +271,11 @@ const CellMemberList: React.FC<{
       return statsMap;
     }, [sortedMembers, attendanceMap, startDate, endDate]);
 
+    // ✅ [추가] 멤버 클릭 핸들러
+    const handleMemberClick = (memberId: number) => {
+      navigate(`/admin/users/${memberId}`);
+    };
+
     if (!sortedMembers || sortedMembers.length === 0) {
       return (
         <div className="bg-gray-50 text-gray-500 text-sm sm:text-base text-center p-4 rounded-xl border border-gray-200">
@@ -293,7 +302,11 @@ const CellMemberList: React.FC<{
       };
 
       return (
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-3">
+        <div
+          // ✅ [수정] 클릭 이벤트 및 커서 추가
+          onClick={() => handleMemberClick(member.memberId)}
+          className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-3 cursor-pointer hover:bg-gray-50 transition-colors"
+        >
           {/* 상단: 이름 및 기본 정보 */}
           <div className="flex justify-between items-start">
             <div>
@@ -414,7 +427,9 @@ const CellMemberList: React.FC<{
                   return (
                     <tr
                       key={m.memberId}
-                      className="hover:bg-gray-50/80 transition-colors"
+                      // ✅ [수정] 클릭 이벤트 및 커서 추가
+                      onClick={() => handleMemberClick(m.memberId)}
+                      className="hover:bg-gray-50/80 transition-colors cursor-pointer"
                     >
                       <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
                         {displayName}
@@ -1064,7 +1079,6 @@ const CellLeaderDashboard: React.FC = () => {
                   loading={matrixLoading}
                   limitStartDate={activeSemester.startDate}
                   limitEndDate={activeSemester.endDate}
-                  // ✅ [핵심 수정] 임원일 때만 보이게 설정 (셀장은 안 보임)
                   showAttendanceRate={user?.role === "EXECUTIVE"}
                 />
               ) : (
