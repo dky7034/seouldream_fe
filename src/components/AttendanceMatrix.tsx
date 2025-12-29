@@ -241,7 +241,10 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                 // 🔹 3) 출석률 계산
                 const attendanceRate =
                   validWeeksCount > 0
-                    ? Math.round((presentCount / validWeeksCount) * 100)
+                    ? Math.min(
+                        100,
+                        Math.round((presentCount / validWeeksCount) * 100)
+                      ) // 100을 넘지 않도록 캡(Cap) 적용
                     : 0;
 
                 return (
