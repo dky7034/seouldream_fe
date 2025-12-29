@@ -90,19 +90,18 @@ const KoreanCalendarPicker: React.FC<Props> = ({
 
         /* ─── [수정됨] 오늘 날짜 강조 ─── */
         .react-datepicker__day--today {
-          font-weight: 900 !important;         /* 폰트 아주 굵게 */
-          border: 2px solid #6366f1 !important; /* 진한 인디고 테두리 */
-          background-color: #eef2ff !important; /* 연한 인디고 배경 */
-          color: #4338ca !important;            /* 진한 인디고 글자 */
-          border-radius: 0.3rem !important;     /* 약간 둥글게 */
+          font-weight: 900 !important;
+          border: 2px solid #6366f1 !important;
+          background-color: #eef2ff !important;
+          color: #4338ca !important;
+          border-radius: 0.3rem !important;
         }
 
-        /* 오늘 날짜인데 '선택'까지 된 경우 (선택 스타일 우선) */
         .react-datepicker__day--today.react-datepicker__day--selected,
         .react-datepicker__day--today.react-datepicker__day--keyboard-selected {
-          background-color: #216ba5 !important; /* 선택된 배경색 */
-          color: #ffffff !important;            /* 선택된 글자색 */
-          border: 2px solid #216ba5 !important; /* 테두리도 배경색과 동일하게 */
+          background-color: #216ba5 !important;
+          color: #ffffff !important;
+          border: 2px solid #216ba5 !important;
         }
 
         /* ─── 크기 조절 (Desktop 기본) ─── */
@@ -156,6 +155,9 @@ const KoreanCalendarPicker: React.FC<Props> = ({
       `}</style>
 
       <DatePicker
+        readOnly={true}
+        // @ts-expect-error: 라이브러리 타입 정의 누락 무시
+        inputMode="none"
         open={open}
         onInputClick={() => {
           setViewDate(selectedDate ?? new Date());
@@ -173,7 +175,8 @@ const KoreanCalendarPicker: React.FC<Props> = ({
         maxDate={maxDate}
         showPopperArrow={false}
         placeholderText="YYYY-MM-DD"
-        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer caret-transparent"
+        // cursor-pointer 클래스로 인해 readOnly여도 클릭 가능하다는 힌트 제공
+        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer caret-transparent bg-white"
         dayClassName={getDayClassName}
         showYearPicker={mode === "year"}
         showMonthYearPicker={mode === "month"}
@@ -232,27 +235,26 @@ const KoreanCalendarPicker: React.FC<Props> = ({
           };
 
           const btnClass =
-            "w-7 h-7 flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 active:bg-gray-100 transition-colors";
+            "w-8 h-8 flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 active:bg-gray-100 transition-colors"; // 버튼 크기 살짝 키움 (w-7 -> w-8)
           const titleClass =
-            "text-sm font-bold text-gray-800 px-2 py-1 rounded-md hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition-colors";
+            "text-sm font-bold text-gray-800 px-3 py-1 rounded-md hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition-colors";
 
           return (
-            <div className="flex items-center justify-between px-2 pb-2 mt-1">
-              <div className="flex items-center">
-                <button type="button" onClick={goPrev} className={btnClass}>
-                  ‹
-                </button>
-              </div>
+            // [수정 2] 내비게이션 레이아웃 개선
+            // justify-between -> justify-center & gap-4
+            // 버튼과 제목을 중앙에 모아서 배치하여 모바일 터치 동선 최적화
+            <div className="flex items-center justify-center gap-2 px-2 pb-2 mt-1">
+              <button type="button" onClick={goPrev} className={btnClass}>
+                ‹
+              </button>
 
               <button type="button" onClick={toggleMode} className={titleClass}>
                 {title}
               </button>
 
-              <div className="flex items-center">
-                <button type="button" onClick={goNext} className={btnClass}>
-                  ›
-                </button>
-              </div>
+              <button type="button" onClick={goNext} className={btnClass}>
+                ›
+              </button>
             </div>
           );
         }}
