@@ -88,7 +88,7 @@ const KoreanCalendarPicker: React.FC<Props> = ({
           color: #ffffff !important;
         }
 
-        /* ─── [수정됨] 오늘 날짜 강조 ─── */
+        /* ─── 오늘 날짜 강조 ─── */
         .react-datepicker__day--today {
           font-weight: 900 !important;
           border: 2px solid #6366f1 !important;
@@ -155,8 +155,9 @@ const KoreanCalendarPicker: React.FC<Props> = ({
       `}</style>
 
       <DatePicker
-        readOnly={true}
-        // @ts-expect-error: 라이브러리 타입 정의 누락 무시
+        /* [수정] readOnly 제거하고 onKeyDown으로 입력 방지 */
+        onKeyDown={(e) => e.preventDefault()}
+        // @ts-expect-error: 라이브러리 타입 정의 누락 무시 (모바일 키보드 방지)
         inputMode="none"
         open={open}
         onInputClick={() => {
@@ -175,7 +176,6 @@ const KoreanCalendarPicker: React.FC<Props> = ({
         maxDate={maxDate}
         showPopperArrow={false}
         placeholderText="YYYY-MM-DD"
-        // cursor-pointer 클래스로 인해 readOnly여도 클릭 가능하다는 힌트 제공
         className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer caret-transparent bg-white"
         dayClassName={getDayClassName}
         showYearPicker={mode === "year"}
@@ -235,14 +235,11 @@ const KoreanCalendarPicker: React.FC<Props> = ({
           };
 
           const btnClass =
-            "w-8 h-8 flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 active:bg-gray-100 transition-colors"; // 버튼 크기 살짝 키움 (w-7 -> w-8)
+            "w-8 h-8 flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 active:bg-gray-100 transition-colors";
           const titleClass =
             "text-sm font-bold text-gray-800 px-3 py-1 rounded-md hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition-colors";
 
           return (
-            // [수정 2] 내비게이션 레이아웃 개선
-            // justify-between -> justify-center & gap-4
-            // 버튼과 제목을 중앙에 모아서 배치하여 모바일 터치 동선 최적화
             <div className="flex items-center justify-center gap-2 px-2 pb-2 mt-1">
               <button type="button" onClick={goPrev} className={btnClass}>
                 ‹

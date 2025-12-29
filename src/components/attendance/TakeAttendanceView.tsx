@@ -460,7 +460,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                       <span className="font-bold text-gray-700">
                         {semesterForSelectedDate.name}
                       </span>{" "}
-                      기간 ({semesterForSelectedDate.startDate} ~{" "}
+                      ({semesterForSelectedDate.startDate} ~{" "}
                       {semesterForSelectedDate.endDate})
                     </span>
                   </p>
