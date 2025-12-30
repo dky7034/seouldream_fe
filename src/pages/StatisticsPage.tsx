@@ -1,3 +1,4 @@
+// src/pages/StatisticsPage.tsx
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -113,7 +114,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                     : "text-gray-500"
                 }`}
               >
-                {/* ✅ [수정] 소수점 제거하여 정수로 표시 */}
+                {/* 소수점 제거하여 정수로 표시 */}
                 {Number(growthData.value).toFixed(0)}%
               </span>
             </div>
@@ -391,15 +392,38 @@ const StatisticsPage: React.FC = () => {
       try {
         const semester = semesters.find((s) => s.id === selectedSemesterId);
         if (!semester) return;
+
+        // 🔹 [수정] 미래 날짜 제한 로직 (Today Cap)
+        // 그래프가 미래 날짜(빈 데이터)까지 그려져서 증감률이 -100%로 곤두박질치는 것을 방지
         const { startDate, endDate } = semester;
+        const today = new Date();
+        const endObj = new Date(endDate);
+
+        today.setHours(23, 59, 59, 999);
+        endObj.setHours(23, 59, 59, 999);
+
+        // 오늘보다 미래라면, 오늘 날짜로 잘라서 API 요청
+        const effectiveEndDate =
+          endObj > today
+            ? `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(
+                2,
+                "0"
+              )}-${String(today.getDate()).padStart(2, "0")}`
+            : endDate;
 
         const [newcomers, summary, dashboardData, unassigned] =
           await Promise.all([
-            statisticsService.getNewcomerStats("MONTH", startDate, endDate),
+            // ✅ 수정된 effectiveEndDate 사용
+            statisticsService.getNewcomerStats(
+              "MONTH",
+              startDate,
+              effectiveEndDate
+            ),
             statisticsService.getSemesterSummary(selectedSemesterId),
+            // ✅ 수정된 effectiveEndDate 사용
             dashboardService.getDashboardData("SEMESTER", {
               startDate,
-              endDate,
+              endDate: effectiveEndDate,
             }),
             statisticsService.getUnassignedMembers(),
           ]);
@@ -412,7 +436,7 @@ const StatisticsPage: React.FC = () => {
           setDetailDemographics(dashboardData.demographics);
         }
 
-        // ✅ [수정] 임원(EXECUTIVE) 제외 필터링 적용
+        // 임원(EXECUTIVE) 제외 필터링
         const filteredUnassigned = (unassigned as any[]).filter(
           (m) => m.role !== "EXECUTIVE"
         );
@@ -543,7 +567,6 @@ const StatisticsPage: React.FC = () => {
                           ) : (
                             <FaMinus className="mr-2 text-gray-300" />
                           )}
-                          {/* ✅ [수정] 증감률 소수점 제거 */}
                           {Math.abs(lastNewcomerStat.growthRate).toFixed(0)}%
                           {lastNewcomerStat.growthRate > 0
                             ? " 증가"

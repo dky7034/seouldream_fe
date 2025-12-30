@@ -153,7 +153,23 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
     }
 
     if (!start || !end || start > end) return 0;
-    return countSundays(start, end);
+
+    // 🔹 [추가] 미래 날짜 제한 (Today Cap)
+    // 통계의 분모(총 주수)를 계산할 때, 오늘 이후의 미래 날짜는 포함하지 않음
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    // end 객체 복사 및 시간 설정
+    const endObj = new Date(end);
+    endObj.setHours(23, 59, 59, 999);
+
+    // 종료일이 오늘보다 미래라면, 오늘까지만 카운트 (Effective End)
+    const effectiveEnd = endObj > today ? today : endObj;
+
+    // 시작일조차 미래라면 총 주수는 0
+    if (start > effectiveEnd) return 0;
+
+    return countSundays(start, effectiveEnd);
   }, [effectiveFilterMode, unitType, filters, currentSemester]);
 
   // -------------------------------------------------

@@ -224,14 +224,25 @@ const AttendanceMatrixView = memo(
       const toDateKey = (d: Date) => {
         const y = d.getFullYear();
         const m = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        return `${y}-${m}-${day}`;
+        // const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
       };
 
       const start = new Date(startDate);
       const end = new Date(endDate);
+
+      // 🔹 [추가] 오늘 날짜 기준 설정 (미래 미체크 방지)
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+
       start.setHours(0, 0, 0, 0);
-      end.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+
+      // 🔹 [수정] 종료일이 오늘보다 미래라면 오늘까지만 계산
+      const effectiveEnd = end > today ? today : end;
+
+      // 시작일조차 미래라면 미체크는 0
+      if (start > effectiveEnd) return 0;
 
       const targetSundayKeys: string[] = [];
       const current = new Date(start);
@@ -240,7 +251,8 @@ const AttendanceMatrixView = memo(
         current.setDate(current.getDate() + (7 - current.getDay()));
       }
 
-      while (current <= end) {
+      // 🔹 [수정] end -> effectiveEnd
+      while (current <= effectiveEnd) {
         targetSundayKeys.push(toDateKey(current));
         current.setDate(current.getDate() + 7);
       }

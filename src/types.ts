@@ -45,6 +45,7 @@ export interface MemberDto {
   note: string;
   createdAt: string; // LocalDateTime
   updatedAt: string; // LocalDateTime
+  attendanceRate?: number;
 }
 
 // Assuming JWT payload structure from Spring Security JWT

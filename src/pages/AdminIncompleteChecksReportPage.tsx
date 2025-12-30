@@ -296,6 +296,25 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
         }
       }
 
+      // ✅ [추가] 미래 날짜 제한 (Today Cap)
+      // 조회 종료일이 오늘보다 미래라면, 오늘까지만 조회하도록 강제 조정
+      if (params.endDate) {
+        const today = new Date();
+        // 시간 비교 정규화 (오늘의 끝)
+        today.setHours(23, 59, 59, 999);
+
+        const reqEnd = new Date(params.endDate);
+        reqEnd.setHours(23, 59, 59, 999);
+
+        if (reqEnd > today) {
+          // YYYY-MM-DD 포맷으로 변환
+          const y = today.getFullYear();
+          const m = String(today.getMonth() + 1).padStart(2, "0");
+          const d = String(today.getDate()).padStart(2, "0");
+          params.endDate = `${y}-${m}-${d}`;
+        }
+      }
+
       const cleanedParams = Object.fromEntries(
         Object.entries(params).filter(
           ([, v]) => v !== null && v !== "" && v !== undefined

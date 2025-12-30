@@ -66,6 +66,8 @@ const safeFormatDate = (dateStr: string | null | undefined) => {
 };
 
 // --- Helper Functions ---
+
+// ✅ [수정됨] 차트/통계용 날짜 계산 (미래 날짜 제한 적용)
 const computeTrendRange = (
   isExecutive: boolean,
   summaryMode: SummaryMode,
@@ -73,28 +75,47 @@ const computeTrendRange = (
   semesters: SemesterDto[],
   selectedSemesterId: number | null
 ) => {
-  if (!isExecutive) return getPeriodDates(period);
+  let range = { startDate: "", endDate: "" };
 
-  const currentYear = new Date().getFullYear();
-  let range = {
-    startDate: `${currentYear}-01-01`,
-    endDate: `${currentYear}-12-31`,
-  };
-
-  if (summaryMode === "YEAR") {
-    range = {
-      startDate: `${currentYear}-01-01`,
-      endDate: `${currentYear}-12-31`,
-    };
-  } else if (summaryMode === "SEMESTER") {
-    const semester = semesters.find((s) => s.id === selectedSemesterId);
-    if (semester) {
-      range = { startDate: semester.startDate, endDate: semester.endDate };
+  if (!isExecutive) {
+    range = getPeriodDates(period);
+  } else {
+    const currentYear = new Date().getFullYear();
+    if (summaryMode === "YEAR") {
+      range = {
+        startDate: `${currentYear}-01-01`,
+        endDate: `${currentYear}-12-31`,
+      };
+    } else if (summaryMode === "SEMESTER") {
+      const semester = semesters.find((s) => s.id === selectedSemesterId);
+      if (semester) {
+        range = { startDate: semester.startDate, endDate: semester.endDate };
+      } else {
+        // Fallback
+        range = {
+          startDate: `${currentYear}-01-01`,
+          endDate: `${currentYear}-12-31`,
+        };
+      }
     }
   }
+
+  // 🔹 [추가] Future Cap: 종료일이 오늘보다 미래면 오늘로 제한
+  // (그래프가 미래까지 그려지는 것을 방지)
+  const today = new Date();
+  const rangeEnd = new Date(range.endDate);
+
+  today.setHours(23, 59, 59, 999);
+  rangeEnd.setHours(23, 59, 59, 999);
+
+  if (rangeEnd > today) {
+    range.endDate = toISODateString(new Date());
+  }
+
   return range;
 };
 
+// ✅ [수정됨] 누락 리포트용 날짜 계산 (미래 날짜 제한 적용)
 const computeIncompleteRange = (
   filter: IncompleteFilter,
   semesters: SemesterDto[],
@@ -113,35 +134,60 @@ const computeIncompleteRange = (
       endDate: toISODateString(last),
     };
   } else {
+    // 학기 전체
     const semester =
       semesters.find((s) => s.id === selectedSemesterId) ??
       semesters.find((s) => s.isActive) ??
       semesters[0];
     if (semester) {
-      return { startDate: semester.startDate, endDate: semester.endDate };
+      requestedRange = {
+        startDate: semester.startDate,
+        endDate: semester.endDate,
+      };
+    } else {
+      requestedRange = getThisWeekRange();
     }
-    return getThisWeekRange();
   }
 
-  const semester = semesters.find((s) => s.id === selectedSemesterId);
-  if (!semester) return requestedRange;
+  // 학기 범위 내 교집합 체크 (학기 선택 시)
+  if (filter === "SEMESTER") {
+    const semester = semesters.find((s) => s.id === selectedSemesterId);
+    if (semester) {
+      const reqStart = new Date(requestedRange.startDate);
+      const semStart = new Date(semester.startDate);
+      const finalStart = reqStart > semStart ? reqStart : semStart;
 
-  const reqStart = new Date(requestedRange.startDate);
-  const semStart = new Date(semester.startDate);
-  const finalStart = reqStart > semStart ? reqStart : semStart;
+      const reqEnd = new Date(requestedRange.endDate);
+      const semEnd = new Date(semester.endDate);
+      const finalEnd = reqEnd < semEnd ? reqEnd : semEnd;
 
+      if (finalStart <= finalEnd) {
+        requestedRange = {
+          startDate: toISODateString(finalStart),
+          endDate: toISODateString(finalEnd),
+        };
+      } else {
+        requestedRange = {
+          startDate: semester.startDate,
+          endDate: semester.endDate,
+        };
+      }
+    }
+  }
+
+  // 🔹 [추가] Future Cap: 종료일이 오늘보다 미래면 오늘로 제한
+  // (미래 주차를 누락으로 오판하는 것 방지)
+  const today = new Date();
   const reqEnd = new Date(requestedRange.endDate);
-  const semEnd = new Date(semester.endDate);
-  const finalEnd = reqEnd < semEnd ? reqEnd : semEnd;
 
-  if (finalStart > finalEnd) {
-    return { startDate: semester.startDate, endDate: semester.endDate };
+  today.setHours(23, 59, 59, 999);
+  reqEnd.setHours(23, 59, 59, 999);
+
+  if (reqEnd > today) {
+    requestedRange.endDate = toISODateString(new Date());
   }
 
-  return {
-    startDate: toISODateString(finalStart),
-    endDate: toISODateString(finalEnd),
-  };
+  return requestedRange;
 };
 
 const formatDateGroupLabel = (
@@ -309,7 +355,6 @@ const TopSummaryChips: React.FC<{ data: DashboardDto }> = ({ data }) => {
   );
 };
 
-// ✅ [수정] 출석 인원 상세 표기 및 툴팁 추가
 const OverallAttendanceSummaryCard: React.FC<{
   summary: OverallAttendanceSummaryDto | OverallAttendanceStatDto | null;
   label?: string;
@@ -326,13 +371,11 @@ const OverallAttendanceSummaryCard: React.FC<{
     present = summary.totalSummary.totalPresent;
     possible = summary.totalSummary.totalPossible;
   } else if ("attendanceRate" in summary) {
-    // OverallAttendanceStatDto (통계 서비스 사용 시)
     rate = summary.attendanceRate;
     present = (summary as any).totalPresent;
     possible = (summary as any).totalPossible ?? summary.totalRecords;
   }
 
-  // 출석률이 너무 낮으면 색상 변경 등 시각적 강조 가능
   const rateColor = (rate || 0) < 10 ? "text-red-500" : "text-indigo-600";
 
   return (
@@ -342,7 +385,6 @@ const OverallAttendanceSummaryCard: React.FC<{
           <p className="text-xs sm:text-sm font-medium text-indigo-500">
             {label}
           </p>
-          {/* 툴팁 */}
           <div className="relative group/tooltip cursor-help">
             <span className="text-xs text-indigo-400">ⓘ</span>
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-800 text-white text-[10px] rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity pointer-events-none z-10 shadow-lg">
@@ -353,12 +395,11 @@ const OverallAttendanceSummaryCard: React.FC<{
           </div>
         </div>
 
-        {/* 🔴 [수정 완료] toFixed(1) -> toFixed(0) 으로 변경하여 정수 표현 */}
+        {/* 정수 표현 (.toFixed(0)) */}
         <p className={`mt-1 text-2xl sm:text-3xl font-semibold ${rateColor}`}>
           {typeof rate === "number" ? `${rate.toFixed(0)}%` : "-"}
         </p>
 
-        {/* 상세 수치 (출석/대상) */}
         {typeof present === "number" && typeof possible === "number" && (
           <p className="text-xs text-gray-500 mt-1">
             ({present}명 출석 / 총 {possible}명 대상)
@@ -369,7 +410,6 @@ const OverallAttendanceSummaryCard: React.FC<{
   );
 };
 
-// ✅ [수정] 소수점 제거 (.toFixed(0))
 const AttendanceTrend: React.FC<{
   data?: AggregatedTrendDto[] | null;
   selectedGroupBy: AttendanceSummaryGroupBy;
@@ -637,6 +677,7 @@ const DashboardPage: React.FC = () => {
 
     setError(null);
 
+    // ✅ computeTrendRange가 오늘 날짜 이후를 잘라주므로 안전함
     const { startDate, endDate } = computeTrendRange(
       isExecutive,
       summaryMode,

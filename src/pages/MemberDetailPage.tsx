@@ -38,9 +38,9 @@ import {
   ChatBubbleBottomCenterTextIcon,
 } from "@heroicons/react/24/solid";
 
-// -------------------------------------------------------------------------
-// [Helpers] 날짜 및 나이 계산
-// -------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────
+// [Helpers]
+// ─────────────────────────────────────────────────────────────
 
 const toISODate = (d: Date) => {
   const year = d.getFullYear();
@@ -66,7 +66,7 @@ const safeFormatDate = (dateStr: string | null | undefined) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return `${year}.${month}.${day}`;
 };
 
 const displayValue = (val: string | number | null | undefined) => {
@@ -75,9 +75,17 @@ const displayValue = (val: string | number | null | undefined) => {
   return val;
 };
 
-// -------------------------------------------------------------------------
-// [Components] UI 카드 컴포넌트들
-// -------------------------------------------------------------------------
+// ✅ 출석률 색상 헬퍼 (AdminUsersPage와 통일)
+const getRateColorClass = (rate: number | undefined | null) => {
+  if (rate === undefined || rate === null) return "bg-gray-100 text-gray-500";
+  if (rate >= 80) return "bg-green-100 text-green-700 border-green-200";
+  if (rate >= 50) return "bg-indigo-100 text-indigo-700 border-indigo-200";
+  return "bg-red-100 text-red-700 border-red-200";
+};
+
+// ─────────────────────────────────────────────────────────────
+// [Components] UI Cards
+// ─────────────────────────────────────────────────────────────
 
 const InfoRow: React.FC<{
   icon: React.ReactNode;
@@ -369,15 +377,21 @@ const AttendanceSummaryCard: React.FC<{
     return months;
   }, [activeSemester]);
 
-  // ✅ [로직 유지] 미체크 계산
+  // ✅ [수정] 미체크 계산 (미래 날짜 제외)
   const uncheckedCount = useMemo(() => {
     if (!startDate || !endDate) return 0;
     if (!cellAssignmentDate) return 0;
 
     const filterStart = new Date(startDate);
     const filterEnd = new Date(endDate);
+
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
     filterStart.setHours(0, 0, 0, 0);
     filterEnd.setHours(23, 59, 59, 999);
+
+    const effectiveEnd = filterEnd > today ? today : filterEnd;
 
     const getSafeDateObj = (dateStr: string) => {
       const safeStr = dateStr.includes("T") ? dateStr : `${dateStr}T00:00:00`;
@@ -389,7 +403,7 @@ const AttendanceSummaryCard: React.FC<{
     const baseDate = getSafeDateObj(cellAssignmentDate);
     const effectiveStart = filterStart < baseDate ? baseDate : filterStart;
 
-    if (effectiveStart > filterEnd) return 0;
+    if (effectiveStart > effectiveEnd) return 0;
 
     const targetSundays = new Set<string>();
     const current = new Date(effectiveStart);
@@ -398,7 +412,7 @@ const AttendanceSummaryCard: React.FC<{
       current.setDate(current.getDate() + (7 - current.getDay()));
     }
 
-    while (current <= filterEnd) {
+    while (current <= effectiveEnd) {
       targetSundays.add(toISODate(current));
       current.setDate(current.getDate() + 7);
     }
@@ -572,6 +586,7 @@ const AttendanceSummaryCard: React.FC<{
   );
 };
 
+// ... (AdminActionsCard, TeamManagementModal, TempPasswordModal 생략 - 기존과 동일) ...
 const AdminActionsCard: React.FC<{
   onResetPassword: () => void;
   isResetting: boolean;
@@ -700,8 +715,10 @@ const TempPasswordModal: React.FC<{
   );
 };
 
+// ─────────────────────────────────────────────────────────────
+// [Main Page Component]
+// ─────────────────────────────────────────────────────────────
 const MemberDetailPage: React.FC = () => {
-  // ... (기존 로직 유지)
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -999,18 +1016,33 @@ const MemberDetailPage: React.FC = () => {
 
   const isExecutive = user?.role === "EXECUTIVE";
 
+  // ✅ [Header] 출석률 표시 준비
+  const hasAttendanceRate =
+    member.attendanceRate !== undefined && member.attendanceRate !== null;
+  const rateColorClass = getRateColorClass(member.attendanceRate);
+
   return (
     <div className="bg-gray-50 min-h-screen pb-20">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-              {member.name}{" "}
-              <span className="text-lg font-normal text-gray-400">
-                상세 정보
-              </span>
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                {member.name}{" "}
+                <span className="text-lg font-normal text-gray-400">
+                  상세 정보
+                </span>
+              </h1>
+              {/* ✅ [추가] 임원에게만 보이는 출석률 뱃지 (데이터가 null이면 안 보임) */}
+              {hasAttendanceRate && (
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${rateColorClass}`}
+                >
+                  출석률 {member.attendanceRate!.toFixed(0)}%
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex gap-2 w-full sm:w-auto">
             {isExecutive && (
@@ -1083,6 +1115,7 @@ const MemberDetailPage: React.FC = () => {
           </div>
         </div>
 
+        {/* ... (Modals) ... */}
         <TeamManagementModal
           key={isTeamModalOpen ? "modal-open" : "modal-closed"}
           isOpen={isTeamModalOpen}

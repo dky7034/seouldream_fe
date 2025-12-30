@@ -102,14 +102,25 @@ const AttendanceMatrixView: React.FC<{
     const endStr = safeFormatDate(endDate, "-");
     const start = new Date(startStr);
     const end = new Date(endStr);
+
+    // 🔹 [추가] 오늘 날짜 기준 설정 (미래 미체크 방지)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     start.setHours(0, 0, 0, 0);
     end.setHours(0, 0, 0, 0);
 
-    if (start > end) return 0;
+    // 🔹 [수정] 종료일이 오늘보다 미래라면 오늘까지만 계산
+    const effectiveEnd = end > today ? today : end;
+
+    // 시작일조차 미래라면 미체크는 0
+    if (start > effectiveEnd) return 0;
 
     const targetSundays: string[] = [];
     const cur = new Date(start);
-    while (cur <= end) {
+
+    // 🔹 [수정] end -> effectiveEnd
+    while (cur <= effectiveEnd) {
       if (cur.getDay() === 0) {
         targetSundays.push(safeFormatDate(cur.toISOString(), "-"));
       }

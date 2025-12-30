@@ -540,10 +540,25 @@ const CellAttendanceMatrixCard: React.FC<{
     }
     const filterStart = new Date(startDate);
     const filterEnd = new Date(endDate);
+
+    // 🔸 [추가] 오늘 날짜 기준 설정 (미래 미체크 방지)
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
     filterStart.setHours(0, 0, 0, 0);
     filterEnd.setHours(23, 59, 59, 999);
 
+    // 🔸 [수정] 종료일이 오늘보다 미래면 오늘까지만 계산
+    const effectiveEnd = filterEnd > today ? today : filterEnd;
+
+    // 시작일조차 미래라면 미체크는 0
+    if (filterStart > effectiveEnd) {
+      // rate는 백엔드 값 그대로 사용 (백엔드는 이미 0이나 100으로 처리됨)
+      return { unchecked: 0, rate: periodSummary?.attendanceRate ?? 0 };
+    }
+
     let totalPossibleChecks = 0;
+
     sortedMembers.forEach((member) => {
       const joinDate = member.cellAssignmentDate
         ? new Date(member.cellAssignmentDate)
@@ -551,11 +566,17 @@ const CellAttendanceMatrixCard: React.FC<{
         ? new Date(member.createdAt)
         : new Date("2000-01-01");
       joinDate.setHours(0, 0, 0, 0);
+
       const effectiveStart = filterStart < joinDate ? joinDate : filterStart;
-      if (effectiveStart > filterEnd) return;
+
+      // 🔸 [수정] filterEnd -> effectiveEnd
+      if (effectiveStart > effectiveEnd) return;
+
       const current = new Date(effectiveStart);
       current.setHours(0, 0, 0, 0);
-      while (current <= filterEnd) {
+
+      // 🔸 [수정] filterEnd -> effectiveEnd
+      while (current <= effectiveEnd) {
         if (current.getDay() === 0) totalPossibleChecks++;
         current.setDate(current.getDate() + 1);
       }
@@ -563,8 +584,11 @@ const CellAttendanceMatrixCard: React.FC<{
 
     const totalPresent = periodSummary?.totalPresent || 0;
     const totalRecorded = totalPresent + (periodSummary?.totalAbsent || 0);
+
+    // 미체크 개수 계산 (음수 방지)
     const unchecked = Math.max(0, totalPossibleChecks - totalRecorded);
     const rate = periodSummary?.attendanceRate ?? 0;
+
     return { unchecked, rate };
   }, [startDate, endDate, sortedMembers, periodSummary]);
 

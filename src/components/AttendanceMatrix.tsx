@@ -59,6 +59,10 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
     return v.slice(0, 10);
   };
 
+  // 🔸 [추가] 오늘 날짜 구하기 (미래 날짜 필터링용)
+  const today = new Date();
+  const todayStr = toDateKey(today);
+
   // 1. 테이블 헤더에 표시할 날짜 배열 계산
   const targetDays = useMemo(() => {
     const days: Date[] = [];
@@ -135,7 +139,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
     const map = new Map<string, MatrixStatus>();
     for (const att of attendances) {
       // DTO 구조: att.member.id
-      const memberId = att.member?.id; // DTO 확인 결과 member 객체 안에 id가 있음
+      const memberId = att.member?.id;
       const dateKey = normalizeISODate(att.date);
 
       if (!memberId || !dateKey) continue;
@@ -219,6 +223,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                 } else if (member.joinYear) {
                   joinDateStr = `${member.joinYear}-01-01`;
                 }
+
                 let presentCount = 0;
                 let validWeeksCount = 0; // 💡 분모: 유효한 주일 수
 
@@ -228,8 +233,12 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                     `${member.memberId}-${currentDayStr}`
                   );
 
+                  // 🔸 [수정] 미래 날짜 필터링 로직 (오늘보다 미래면 통계 제외)
+                  if (currentDayStr > todayStr) {
+                    return; // 분모에 포함하지 않고 건너뜀
+                  }
+
                   // 🔹 2) 핵심 로직: (날짜 >= 기준일) 또는 (기록이 있음)
-                  // 문자열 비교를 사용해 타임존 오류 원천 차단
                   if (currentDayStr >= joinDateStr || status) {
                     validWeeksCount++; // 분모 증가
                     if (status === "PRESENT") {

@@ -863,21 +863,35 @@ const CellLeaderDashboard: React.FC = () => {
     return months;
   }, [activeSemester]);
 
+  // ✅ [수정] 실제 출석 체크 누락 횟수 계산 (미래 날짜 제외 적용)
   const realIncompleteCheckCount = useMemo(() => {
     if (!periodRange.startDate || !periodRange.endDate) return 0;
     if (!members || members.length === 0) return 0;
+
     const start = parseLocal(periodRange.startDate);
     const end = parseLocal(periodRange.endDate);
     if (!start || !end || start > end) return 0;
 
-    const sundays: string[] = [];
+    // 🔸 [추가] 오늘 날짜 기준 (시간 초기화)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const cur = new Date(start);
     cur.setHours(0, 0, 0, 0);
+
     const endCopy = new Date(end);
     endCopy.setHours(0, 0, 0, 0);
 
-    // 1. 일요일 날짜 목록 생성
-    while (cur <= endCopy) {
+    // 🔸 [수정] 종료일이 오늘보다 미래라면 오늘까지만 검사
+    const effectiveEnd = endCopy > today ? today : endCopy;
+
+    // 시작일조차 미래라면 누락 0
+    if (cur > effectiveEnd) return 0;
+
+    const sundays: string[] = [];
+
+    // 🔸 [수정] endCopy -> effectiveEnd
+    while (cur <= effectiveEnd) {
       if (cur.getDay() === 0) sundays.push(toLocalISODate(cur));
       cur.setDate(cur.getDate() + 1);
     }
