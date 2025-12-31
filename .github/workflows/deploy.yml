@@ -1,4 +1,4 @@
-name: Frontend CD (Self-hosted)
+name: Frontend CD (SSH & Safe Deploy)
 
 on:
   push:
@@ -10,15 +10,20 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
+
       - name: Install dependencies
         run: npm ci
+
       - name: Build project
         run: npm run build
+
+      # 빌드 결과물(dist 폴더)을 deploy job으로 넘겨줌
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -26,7 +31,7 @@ jobs:
           path: dist
 
   deploy:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest # 이제 GitHub 서버에서 실행!
     needs: build
     steps:
       - name: Download artifacts
@@ -34,9 +39,36 @@ jobs:
         with:
           name: dist-files
           path: dist
-      - name: Deploy to Nginx Directory
-        run: |
-          mkdir -p /home/ubuntu/seouldream_be/frontend_build
-          rm -rf /home/ubuntu/seouldream_be/frontend_build/*
-          cp -r dist/* /home/ubuntu/seouldream_be/frontend_build/
-          echo "Frontend deployed successfully!"
+
+      # 1. 빌드된 파일을 서버의 임시 폴더로 전송
+      - name: Transfer Files to Server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_KEY }}
+          source: "dist/*"
+          target: "/home/ubuntu/seouldream_be/frontend_temp"
+          strip_components: 1 # dist 폴더 껍데기는 벗기고 내용물만 전송
+
+      # 2. 서버에 접속해서 파일 교체 (끊김 최소화)
+      - name: Move Files & Cleanup
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            # 타겟 폴더가 없으면 생성
+            mkdir -p /home/ubuntu/seouldream_be/frontend_build
+
+            # 기존 파일 싹 비우기 (깨끗한 배포를 위해)
+            rm -rf /home/ubuntu/seouldream_be/frontend_build/*
+
+            # 임시 폴더에 있던 새 파일을 실제 폴더로 이동
+            cp -r /home/ubuntu/seouldream_be/frontend_temp/* /home/ubuntu/seouldream_be/frontend_build/
+
+            # 임시 폴더 삭제
+            rm -rf /home/ubuntu/seouldream_be/frontend_temp
+
+            echo "Frontend deployed successfully via SSH!"
