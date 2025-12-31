@@ -1,31 +1,46 @@
 // src/components/AttendanceMatrix.tsx
+
 import React, { useMemo } from "react";
+
 import type { AttendanceDto, SemesterDto } from "../types";
 
 // ✅ [확인] CellDetailPage 등에서 넘겨줄 멤버 객체 타입
+
 export interface MatrixMember {
   memberId: number;
+
   memberName: string;
+
   cellAssignmentDate?: string;
+
   createdAt?: string;
+
   joinYear?: number;
 }
 
 interface AttendanceMatrixProps {
   mode?: "semester" | "month" | "year";
+
   startDate?: string;
+
   endDate?: string;
 
   year: number;
+
   month: number;
+
   members: MatrixMember[];
+
   attendances: AttendanceDto[];
 
   loading?: boolean;
+
   limitStartDate?: string;
+
   limitEndDate?: string;
 
   semesters?: SemesterDto[];
+
   showAttendanceRate?: boolean;
 }
 
@@ -33,64 +48,90 @@ type MatrixStatus = "PRESENT" | "ABSENT";
 
 const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
   mode = "month",
+
   startDate,
+
   endDate,
+
   year,
+
   month,
+
   members,
+
   attendances,
+
   loading = false,
+
   limitStartDate,
+
   limitEndDate,
+
   semesters,
+
   showAttendanceRate = true,
 }) => {
   // 🔹 날짜 객체를 YYYY-MM-DD 문자열로 변환 (타임존 이슈 방지)
+
   const toDateKey = (date: Date) => {
     const y = date.getFullYear();
+
     const m = String(date.getMonth() + 1).padStart(2, "0");
+
     const d = String(date.getDate()).padStart(2, "0");
+
     return `${y}-${m}-${d}`;
   };
 
   // 🔹 ISO 문자열(2025-01-01T00:00:00)을 YYYY-MM-DD로 자르기
+
   const normalizeISODate = (v: string | undefined | null) => {
     if (!v) return "";
+
     return v.slice(0, 10);
   };
 
-  // 🔸 [중요] 오늘 날짜 구하기 (미래 날짜 필터링용)
+  // 🔸 [추가] 오늘 날짜 구하기 (미래 날짜 필터링용)
+
   const today = new Date();
+
   const todayStr = toDateKey(today);
 
   // 1. 테이블 헤더에 표시할 날짜 배열 계산
+
   const targetDays = useMemo(() => {
     const days: Date[] = [];
 
     if ((mode === "semester" || mode === "year") && startDate && endDate) {
       const start = new Date(startDate);
+
       const end = new Date(endDate);
 
       start.setHours(0, 0, 0, 0);
+
       end.setHours(0, 0, 0, 0);
 
       const current = new Date(start);
 
       // 시작일이 일요일이 아니면 다음 일요일로 이동
+
       if (current.getDay() !== 0) {
         current.setDate(current.getDate() + (7 - current.getDay()));
       }
 
       while (current <= end) {
         const currentDateStr = toDateKey(current);
+
         let isValid = true;
 
         // 연간 모드일 때 학기 기간 외 제외
+
         if (mode === "year" && semesters && semesters.length > 0) {
           const isInAnySemester = semesters.some(
             (sem) =>
               currentDateStr >= sem.startDate && currentDateStr <= sem.endDate
           );
+
           if (!isInAnySemester) {
             isValid = false;
           }
@@ -102,51 +143,71 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
 
         current.setDate(current.getDate() + 7);
       }
+
       return days;
     }
 
     // 월간 모드
+
     const date = new Date(year, month - 1, 1);
+
     while (date.getMonth() === month - 1) {
       if (date.getDay() === 0) {
         const dateString = toDateKey(date);
+
         let isWithinRange = true;
+
         if (limitStartDate && dateString < limitStartDate)
           isWithinRange = false;
+
         if (limitEndDate && dateString > limitEndDate) isWithinRange = false;
 
         if (isWithinRange) {
           days.push(new Date(date));
         }
       }
+
       date.setDate(date.getDate() + 1);
     }
 
     return days;
   }, [
     mode,
+
     startDate,
+
     endDate,
+
     year,
+
     month,
+
     limitStartDate,
+
     limitEndDate,
+
     semesters,
   ]);
 
   // 2. 출석 데이터 맵핑 (Key: "memberId-YYYY-MM-DD")
+
   const attendanceMap = useMemo(() => {
     const map = new Map<string, MatrixStatus>();
+
     for (const att of attendances) {
       // DTO 구조: att.member.id
+
       const memberId = att.member?.id;
+
       const dateKey = normalizeISODate(att.date);
 
       if (!memberId || !dateKey) continue;
+
       if (att.status === "PRESENT" || att.status === "ABSENT") {
         map.set(`${memberId}-${dateKey}`, att.status);
       }
     }
+
     return map;
   }, [attendances]);
 
@@ -156,6 +217,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
   return (
     <div className="bg-white rounded-2xl">
       {/* 헤더 */}
+
       <div className="flex items-center justify-between mb-4 px-2">
         {mode === "year" ? (
           <h3 className="text-lg sm:text-xl font-bold text-gray-800">
@@ -187,6 +249,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                 <th className="sticky left-0 z-20 bg-gray-50 p-2 min-w-[80px] text-left font-medium text-gray-500 border-b border-r border-gray-200 shadow-[1px_0_3px_rgba(0,0,0,0.05)]">
                   이름
                 </th>
+
                 {targetDays.length > 0 ? (
                   targetDays.map((day) => (
                     <th
@@ -196,6 +259,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                       <div className="text-xs font-semibold">
                         {formatDateShort(day)}
                       </div>
+
                       <div className="text-[10px] opacity-75">(일)</div>
                     </th>
                   ))
@@ -204,6 +268,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                     일정 없음
                   </th>
                 )}
+
                 {showAttendanceRate && (
                   <th className="sticky right-0 z-20 bg-gray-50 p-2 min-w-[60px] text-center font-medium text-gray-500 border-b border-l border-gray-200 shadow-[-1px_0_3px_rgba(0,0,0,0.05)]">
                     출석률
@@ -211,9 +276,11 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                 )}
               </tr>
             </thead>
+
             <tbody>
               {members.map((member) => {
                 // 🔹 1) 멤버별 기준일(배정일/가입일)을 문자열(YYYY-MM-DD)로 확정
+
                 let joinDateStr = "2000-01-01";
 
                 if (member.cellAssignmentDate) {
@@ -225,22 +292,27 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                 }
 
                 let presentCount = 0;
+
                 let validWeeksCount = 0; // 💡 분모: 유효한 주일 수
 
                 targetDays.forEach((day) => {
                   const currentDayStr = toDateKey(day); // 현재 컬럼 날짜
+
                   const status = attendanceMap.get(
                     `${member.memberId}-${currentDayStr}`
                   );
 
-                  // 🔸 [중요] 미래 날짜 필터링 로직 (오늘보다 미래면 통계 제외)
+                  // 🔸 [수정] 미래 날짜 필터링 로직 (오늘보다 미래면 통계 제외)
+
                   if (currentDayStr > todayStr) {
                     return; // 분모에 포함하지 않고 건너뜀
                   }
 
                   // 🔹 2) 핵심 로직: (날짜 >= 기준일) 또는 (기록이 있음)
+
                   if (currentDayStr >= joinDateStr || status) {
                     validWeeksCount++; // 분모 증가
+
                     if (status === "PRESENT") {
                       presentCount++; // 분자 증가
                     }
@@ -248,10 +320,12 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                 });
 
                 // 🔹 3) 출석률 계산
+
                 const attendanceRate =
                   validWeeksCount > 0
                     ? Math.min(
                         100,
+
                         Math.round((presentCount / validWeeksCount) * 100)
                       ) // 100을 넘지 않도록 캡(Cap) 적용
                     : 0;
@@ -268,24 +342,29 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                     {targetDays.length > 0 ? (
                       targetDays.map((day) => {
                         const currentDayStr = toDateKey(day);
+
                         const status = attendanceMap.get(
                           `${member.memberId}-${currentDayStr}`
                         );
 
                         // 🔹 4) 렌더링 로직 (시각적 처리)
+
                         const isBeforeJoin =
                           currentDayStr < joinDateStr && !status;
-                        const isFuture = currentDayStr > todayStr; // ✅ 미래 날짜 확인
+
+                        const isFuture = currentDayStr > todayStr; // ✅ [추가] 미래 날짜인지 확인
 
                         let content: React.ReactNode;
 
                         if (isFuture) {
-                          // ✅ 미래 날짜는 '-' 처리
+                          // ✅ [수정] 미래 날짜는 '미체크(회색점)'가 아니라 '-' 처리
+
                           content = (
                             <span className="text-gray-300 text-xs">-</span>
                           );
                         } else if (isBeforeJoin) {
-                          // 배정일 이전
+                          // 배정일 이전 (통계 제외)
+
                           content = (
                             <div
                               className="mx-auto w-2 h-2 rounded-full bg-gray-200"
@@ -305,7 +384,8 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                             </div>
                           );
                         } else {
-                          // 미체크
+                          // 배정일 이후인데 기록 없음 (미체크 - 결석 간주)
+
                           content = (
                             <div
                               className="mx-auto w-3 h-3 rounded-full bg-gray-300 border border-gray-400"
@@ -313,6 +393,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                             />
                           );
                         }
+
                         return (
                           <td
                             key={currentDayStr}

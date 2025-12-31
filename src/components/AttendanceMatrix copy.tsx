@@ -59,7 +59,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
     return v.slice(0, 10);
   };
 
-  // 🔸 [중요] 오늘 날짜 구하기 (미래 날짜 필터링용)
+  // 🔸 [추가] 오늘 날짜 구하기 (미래 날짜 필터링용)
   const today = new Date();
   const todayStr = toDateKey(today);
 
@@ -233,7 +233,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                     `${member.memberId}-${currentDayStr}`
                   );
 
-                  // 🔸 [중요] 미래 날짜 필터링 로직 (오늘보다 미래면 통계 제외)
+                  // 🔸 [수정] 미래 날짜 필터링 로직 (오늘보다 미래면 통계 제외)
                   if (currentDayStr > todayStr) {
                     return; // 분모에 포함하지 않고 건너뜀
                   }
@@ -272,20 +272,14 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                           `${member.memberId}-${currentDayStr}`
                         );
 
-                        // 🔹 4) 렌더링 로직 (시각적 처리)
+                        // 🔹 4) 렌더링 로직: 기준일 이전이고 기록도 없으면 '회색 점(무효)'
                         const isBeforeJoin =
                           currentDayStr < joinDateStr && !status;
-                        const isFuture = currentDayStr > todayStr; // ✅ 미래 날짜 확인
 
                         let content: React.ReactNode;
 
-                        if (isFuture) {
-                          // ✅ 미래 날짜는 '-' 처리
-                          content = (
-                            <span className="text-gray-300 text-xs">-</span>
-                          );
-                        } else if (isBeforeJoin) {
-                          // 배정일 이전
+                        if (isBeforeJoin) {
+                          // 배정일 이전 (통계 제외)
                           content = (
                             <div
                               className="mx-auto w-2 h-2 rounded-full bg-gray-200"
@@ -305,7 +299,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                             </div>
                           );
                         } else {
-                          // 미체크
+                          // 배정일 이후인데 기록 없음 (미체크 - 결석 간주)
                           content = (
                             <div
                               className="mx-auto w-3 h-3 rounded-full bg-gray-300 border border-gray-400"

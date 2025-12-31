@@ -244,7 +244,7 @@ const AdminSemestersPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
               <div>
-                <label className="text-xs font-bold text-gray-500 mb-2 block">
+                <label className="text-xs font-bold text-gray-500 mb-1 block">
                   학기명 <span className="text-red-500">*</span>
                 </label>
 
@@ -412,7 +412,7 @@ const AdminSemestersPage: React.FC = () => {
                       상태
                     </th>
                     <th className="px-6 py-3 text-right font-bold text-gray-500 uppercase text-xs">
-                      관리
+                      {/* 관리 */}
                     </th>
                   </tr>
                 </thead>

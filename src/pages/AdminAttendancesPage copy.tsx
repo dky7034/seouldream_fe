@@ -53,7 +53,6 @@ type Filters = {
   year: number | "";
   month: number | "";
   semesterId: number | "";
-  includeExecutive: boolean; // 🔹 [추가] 임원 포함 여부
 };
 
 const pad = (n: number) => n.toString().padStart(2, "0");
@@ -72,7 +71,7 @@ const translateAttendanceStatus = (status: string) => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// Sub Component 1: AttendanceStats (상단 종합 통계 카드 - 서버 데이터)
+// Sub Component 1: AttendanceStats (상단 종합 통계 카드)
 // ─────────────────────────────────────────────────────────────
 
 const AttendanceStats = memo(
@@ -199,7 +198,7 @@ const AttendanceStats = memo(
 );
 
 // ─────────────────────────────────────────────────────────────
-// Sub Component 2: AttendanceMatrixView (✅ 로직 대폭 수정 & 필터 적용)
+// Sub Component 2: AttendanceMatrixView (✅ 로직 대폭 수정)
 // ─────────────────────────────────────────────────────────────
 
 const AttendanceMatrixView = memo(
@@ -210,7 +209,6 @@ const AttendanceMatrixView = memo(
     endDate,
     unitType,
     isLoading,
-    includeExecutive, // 🔹 [추가] 부모로부터 받는 옵션
   }: {
     members: MemberDto[];
     attendances: AttendanceDto[];
@@ -218,9 +216,9 @@ const AttendanceMatrixView = memo(
     endDate: string;
     unitType: UnitType;
     isLoading: boolean;
-    includeExecutive: boolean;
   }) => {
-    // 1. 출석 데이터 Map 변환 (조회 속도 향상)
+    // 1. 임원이 아닌 멤버 ID 집합 (참고용, 실제 로직은 forEach에서 처리)
+    // 2. 출석 데이터 Map 변환 (조회 속도 향상)
     const attendanceMap = useMemo(() => {
       const map = new Map<string, string>();
       attendances.forEach((att) => {
@@ -233,7 +231,7 @@ const AttendanceMatrixView = memo(
       return map;
     }, [attendances]);
 
-    // 2. ⭐️ 통계 계산 (옵션에 따라 임원 포함/제외 분기 처리)
+    // 3. ⭐️ 통계 계산 (기존의 단순 합산 방식 폐기 -> 매트릭스와 동일한 주일 순회 방식 적용)
     const stats = useMemo(() => {
       if (!startDate || !endDate || members.length === 0) {
         return { rate: 0, unchecked: 0 };
@@ -281,8 +279,8 @@ const AttendanceMatrixView = memo(
       let totalUnchecked = 0; // 총 미체크 개수
 
       members.forEach((member) => {
-        // 🔹 [수정] 옵션이 false(미포함)이고, 역할이 임원이면 계산 건너뜀
-        if (!includeExecutive && member.role === "EXECUTIVE") return;
+        // 임원 제외
+        if (member.role === "EXECUTIVE") return;
 
         // 배정일/가입일 기준 설정
         let joinDateStr = "2000-01-01";
@@ -300,6 +298,7 @@ const AttendanceMatrixView = memo(
           const status = attendanceMap.get(key);
 
           // ⭐️ 핵심: (배정일 이후) OR (기록이 있음) 인 경우만 유효 주차로 인정
+          // 기록이 있다는 건 배정일 전이라도 출석/결석 처리를 했다는 뜻이므로 분모에 포함
           if (sundayKey >= joinDateStr || status) {
             totalPossible++;
 
@@ -309,6 +308,7 @@ const AttendanceMatrixView = memo(
               // 유효한 주차인데 기록이 없으면 -> 미체크
               totalUnchecked++;
             }
+            // status === "ABSENT" 인 경우는 totalPossible만 올라가고 분자에는 추가 안 함 (결석)
           }
         });
       });
@@ -316,13 +316,11 @@ const AttendanceMatrixView = memo(
       const rate = totalPossible > 0 ? (totalPresent / totalPossible) * 100 : 0;
 
       return { rate, unchecked: totalUnchecked };
-    }, [startDate, endDate, members, attendanceMap, includeExecutive]);
+    }, [startDate, endDate, members, attendanceMap]);
 
     const matrixMembers = useMemo(
       () =>
         members
-          // 🔹 [추가] 임원 포함 옵션이 꺼져있으면 리스트에서도 숨김
-          .filter((m) => includeExecutive || m.role !== "EXECUTIVE")
           .sort((a, b) => a.name.localeCompare(b.name))
           .map((m) => ({
             memberId: m.id,
@@ -331,7 +329,7 @@ const AttendanceMatrixView = memo(
             createdAt: m.createdAt,
             joinYear: m.joinYear,
           })),
-      [members, includeExecutive]
+      [members]
     );
 
     const matrixMode = unitType === "month" ? "month" : "semester";
@@ -344,14 +342,16 @@ const AttendanceMatrixView = memo(
         {/* 통계 요약 카드 */}
         <div className="grid grid-cols-2 gap-4 text-center">
           <div className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm">
-            <p className="text-xs font-bold text-gray-500 uppercase">출석률</p>
+            <p className="text-xs font-bold text-gray-500 uppercase">
+              출석률 (임원 제외, 셀 배정일 이후)
+            </p>
             <p className="mt-1 text-2xl font-bold text-indigo-600">
               {stats.rate.toFixed(0)}
               <span className="text-base ml-0.5">%</span>
             </p>
-            <p className="text-[10px] text-gray-400 mt-1">
-              * {includeExecutive ? "임원 포함" : "임원 제외"}, 셀 배정일 이후
-            </p>
+            {/* <p className="text-[10px] text-gray-400 mt-1">
+              * 임원 제외, 배정일 이후
+            </p> */}
           </div>
 
           <div
@@ -452,7 +452,6 @@ const AdminAttendancesPage: React.FC = () => {
     year: currentYear,
     month: "" as number | "",
     semesterId: "" as number | "",
-    includeExecutive: false, // 🔹 [추가] 기본값: 임원 제외
   });
 
   const [filterType, setFilterType] = useState<"unit" | "range">("unit");
@@ -674,7 +673,6 @@ const AdminAttendancesPage: React.FC = () => {
       year: currentYear,
       month: "" as number | "",
       semesterId: "" as number | "",
-      includeExecutive: false, // 🔹 [추가] 초기화 시에도 false
     });
     setUnitType("year");
   };
@@ -1068,27 +1066,7 @@ const AdminAttendancesPage: React.FC = () => {
               </div>
             </div>
 
-            {/* 🔹 [추가] 임원 포함 체크박스 영역 */}
-            <div className="flex items-center justify-end py-2">
-              <label className="flex items-center gap-2 cursor-pointer select-none group">
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={filters.includeExecutive}
-                    onChange={(e) =>
-                      handleFilterChange("includeExecutive", e.target.checked)
-                    }
-                  />
-                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
-                </div>
-                <span className="text-sm font-bold text-gray-500 group-hover:text-gray-800 transition-colors">
-                  임원단 포함하여 보기
-                </span>
-              </label>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between pt-2 border-t border-gray-50">
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between pt-2">
               <button
                 type="button"
                 onClick={resetFilters}
@@ -1128,7 +1106,6 @@ const AdminAttendancesPage: React.FC = () => {
             endDate={effectiveDateRange?.endDate || ""}
             unitType={unitType}
             isLoading={loading}
-            includeExecutive={filters.includeExecutive} // 🔹 [추가] props 전달
           />
         )}
       </div>
