@@ -230,8 +230,6 @@ const EditMemberPage: React.FC = () => {
           : {}),
       };
 
-      console.log("UPDATE MEMBER PAYLOAD:", payload);
-
       // 1. 멤버 정보 + (필요 시) 셀 정보까지 한 번에 업데이트
       await memberService.updateMember(memberIdNum, payload);
 
