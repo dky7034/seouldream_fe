@@ -109,18 +109,63 @@ const AttendanceAlertsPage: React.FC = () => {
   }, [semesters, hasAutoSelectedSemester, selectedYear]);
 
   // 조회 로직
+  // 조회 로직 수정
   const fetchAlerts = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     setError(null);
     const threshold = Math.max(1, Number(consecutiveAbsences) || 1);
+
     try {
       const params: GetAttendanceAlertsParams = {
         consecutiveAbsences: threshold,
       };
-      if (unitType === "year") params.year = selectedYear;
-      else if (unitType === "semester" && selectedSemesterId)
-        params.semesterId = selectedSemesterId;
+
+      // 🛑 [수정 전] 단순히 year나 semesterId만 보냄
+      // if (unitType === "year") params.year = selectedYear;
+      // else if (unitType === "semester" && selectedSemesterId)
+      //   params.semesterId = selectedSemesterId;
+
+      // 🟢 [수정 후] 명시적 날짜 계산 및 Future Cap(미래 차단) 적용
+      let calculatedStartDate = "";
+      let calculatedEndDate = "";
+
+      if (unitType === "year") {
+        calculatedStartDate = `${selectedYear}-01-01`;
+        calculatedEndDate = `${selectedYear}-12-31`;
+      } else if (unitType === "semester" && selectedSemesterId) {
+        const semester = semesters.find((s) => s.id === selectedSemesterId);
+        if (semester) {
+          calculatedStartDate = semester.startDate;
+          calculatedEndDate = semester.endDate;
+        }
+      }
+
+      if (calculatedStartDate && calculatedEndDate) {
+        const today = new Date();
+        const reqEnd = new Date(calculatedEndDate);
+
+        // 시간 비교를 위한 초기화
+        today.setHours(23, 59, 59, 999);
+        reqEnd.setHours(23, 59, 59, 999);
+
+        // ✅ 핵심: 조회 종료일이 오늘보다 미래면, 오늘 날짜로 강제 변경
+        if (reqEnd > today) {
+          const y = today.getFullYear();
+          const m = String(today.getMonth() + 1).padStart(2, "0");
+          const d = String(today.getDate()).padStart(2, "0");
+          calculatedEndDate = `${y}-${m}-${d}`;
+        }
+
+        // 변환된 날짜를 파라미터에 담음 (API가 startDate, endDate를 지원해야 함)
+        params.startDate = calculatedStartDate;
+        params.endDate = calculatedEndDate;
+      } else {
+        // 날짜 계산 실패 시 기존 방식 Fallback
+        if (unitType === "year") params.year = selectedYear;
+        else if (selectedSemesterId) params.semesterId = selectedSemesterId;
+      }
+
       setAlerts(await attendanceService.getAttendanceAlerts(params));
     } catch (err) {
       console.error(err);
@@ -128,7 +173,14 @@ const AttendanceAlertsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, consecutiveAbsences, unitType, selectedYear, selectedSemesterId]);
+  }, [
+    user,
+    consecutiveAbsences,
+    unitType,
+    selectedYear,
+    selectedSemesterId,
+    semesters,
+  ]);
 
   useEffect(() => {
     const isReady =

@@ -738,6 +738,8 @@ export interface GetAllMembersParams {
   sort?: string;
   active?: boolean;
   month?: number;
+  // ✅ [추가] 통계/출석률 계산 기준 연도 (백엔드 요청 파라미터)
+  statYear?: number;
 }
 
 export interface GetAllTeamsParams {

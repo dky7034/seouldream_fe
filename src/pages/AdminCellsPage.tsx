@@ -242,8 +242,15 @@ const AdminCellsPage: React.FC = () => {
       if (semester)
         return { startDate: semester.startDate, endDate: semester.endDate };
     }
-    const year = typeof filters.year === "number" ? filters.year : undefined;
-    if (!year) return null;
+
+    // 🔴 [수정 전] 타입이 number가 아니면 undefined 처리되어 날짜 계산 안 됨
+    // const year = typeof filters.year === "number" ? filters.year : undefined;
+
+    // 🟢 [수정 후] 값이 있으면 Number로 변환하여 사용 (안전장치)
+    const year = filters.year ? Number(filters.year) : undefined;
+
+    if (!year) return null; // 연도가 없으면 null 반환 -> 백엔드가 기본값(학기) 처리함
+
     const { month } = filters;
     if (month) {
       const m = month as number;
@@ -432,7 +439,11 @@ const AdminCellsPage: React.FC = () => {
       filterType: "unit",
     };
     if (type === "year") {
-      updates.year = filters.year || "";
+      // 🔴 [수정 전] filters.year가 없으면 빈 문자열("")이 들어감 -> 위 함수에서 null 반환됨
+      // updates.year = filters.year || "";
+
+      // 🟢 [수정 후] 선택된 연도가 없으면 '올해'를 기본값으로 설정
+      updates.year = filters.year || now.getFullYear();
       updates.month = "";
       updates.semesterId = "";
     } else if (type === "month") {
@@ -601,9 +612,9 @@ const AdminCellsPage: React.FC = () => {
                     <select
                       value={filters.year}
                       onChange={(e) =>
-                        handleFilterChange("year", e.target.value)
+                        // 🟢 [수정] e.target.value를 Number()로 감싸서 전달
+                        handleFilterChange("year", Number(e.target.value))
                       }
-                      // ✅ 스타일 개선: border-gray-300, shadow-sm, px-3, py-2
                       className="w-full py-2 px-1 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-100 shadow-sm disabled:bg-gray-50 disabled:text-gray-400"
                       disabled={unitType === "semester"}
                     >

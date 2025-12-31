@@ -255,10 +255,9 @@ const ProcessAttendancePage: React.FC = () => {
     }
   }, [user]);
 
-  // 2. 멤버 + 기존 출석 내역 로딩
+  // 2. 멤버 + 기존 출석 내역 로딩 useEffect 수정
   useEffect(() => {
     const dateString = format(selectedDate, "yyyy-MM-dd");
-    // Hook 내부에서 조건 처리
     if (selectedCellId === undefined || !dateString || !user) {
       setMembers([]);
       setMemberAttendances([]);
@@ -269,6 +268,7 @@ const ProcessAttendancePage: React.FC = () => {
       setLoading(true);
       setSubmitError(null);
       try {
+        // ... (API 호출 부분 동일)
         const [membersPage, existingAttendancesPage] = await Promise.all([
           memberService.getAllMembers({
             cellId: selectedCellId,
@@ -288,6 +288,11 @@ const ProcessAttendancePage: React.FC = () => {
 
         const existingAttendances = existingAttendancesPage.content;
 
+        // ✅ [수정] 셀 나눔(Cell Share) 데이터 로딩 (첫 번째 기록에서 가져오거나 별도 API 필요)
+        // 참고: 보통 getAttendances에는 cellShare가 없을 수 있습니다.
+        // 만약 cellShare가 필요하다면 'getCellReport' 같은 API를 여기서 한 번 더 호출해야 할 수도 있습니다.
+        // 현재 코드엔 없으므로 일단 패스하지만, 수정 모드일 때 '셀 나눔' 텍스트도 불러와야 한다면 확인 필요합니다.
+
         const initialAttendances: MemberAttendanceForm[] = relevantMembers.map(
           (member) => {
             const existing = existingAttendances.find(
@@ -298,9 +303,9 @@ const ProcessAttendancePage: React.FC = () => {
               memberId: member.id,
               date: dateString,
               status: existing?.status || "ABSENT",
-              // [수정] memo 필드 초기화 제거
               createdById: user.id,
-              prayerContent: "", // 기도제목은 별도 API라 여기서 바로 매핑 안됨
+              // ✅ [수정 완료] 기존 기도제목이 있으면 불러오고, 없으면 빈 값
+              prayerContent: existing?.prayerContent || "",
             };
           }
         );

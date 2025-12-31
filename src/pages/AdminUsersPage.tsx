@@ -87,6 +87,8 @@ const AdminUsersPage: React.FC = () => {
   );
 
   // --- 멤버 목록 조회 ---
+  // 🔹 fetchMembers 함수 수정
+  // 🔹 fetchMembers 함수 업데이트
   const fetchMembers = useCallback(async () => {
     if (!user || user.role !== "EXECUTIVE") {
       setLoading(false);
@@ -106,15 +108,21 @@ const AdminUsersPage: React.FC = () => {
       const backendSortKey =
         sortKeyMap[sortConfig.key as string] || (sortConfig.key as string);
 
+      // ✅ [계산] 현재 조회 시점의 연도 (예: 2025)
+      const currentYear = new Date().getFullYear();
+
       const params: GetAllMembersParams = {
         page: currentPage,
         size: 10,
         sort: `${backendSortKey},${
           sortConfig.direction === "ascending" ? "asc" : "desc"
         }`,
+        // ✅ [추가] 백엔드에 "올해(1월~12월) 기준 출석률을 달라"고 명시
+        statYear: currentYear,
       };
 
       if (debouncedNameFilter) params.name = debouncedNameFilter;
+      // 주의: filters.year는 '가입 연도(joinYear)' 필터입니다. 출석률 기준과는 별개입니다.
       if (filters.year !== "all") params.joinYear = Number(filters.year);
       if (filters.gender !== "all")
         params.gender = filters.gender as "MALE" | "FEMALE";
