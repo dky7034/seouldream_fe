@@ -229,7 +229,11 @@ const AdminTeamsPage: React.FC = () => {
                   placeholder="검색..."
                   value={filters.name}
                   onChange={(e) => handleFilterChange("name", e.target.value)}
-                  className="w-full pl-10 py-3 border-gray-200 rounded-xl text-base bg-gray-50 focus:bg-white transition-all"
+                  // ✅ 수정됨:
+                  // py-3 -> py-2 (높이 줄임)
+                  // text-base -> text-sm (글자 크기 줄임)
+                  // rounded-xl -> rounded-lg (비율 맞춤)
+                  className="w-full pl-10 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white transition-all shadow-sm"
                 />
               </div>
             </div>
@@ -240,7 +244,8 @@ const AdminTeamsPage: React.FC = () => {
               <select
                 value={filters.active}
                 onChange={(e) => handleFilterChange("active", e.target.value)}
-                className="w-full py-3 border-gray-200 rounded-xl text-base bg-gray-50 focus:bg-white"
+                // ✅ 수정됨: py-2, text-sm, rounded-lg
+                className="w-full py-2 px-2 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white shadow-sm"
               >
                 <option value="all">모든 상태</option>
                 <option value="true">활성 팀</option>

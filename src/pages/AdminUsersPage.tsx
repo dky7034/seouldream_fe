@@ -10,6 +10,13 @@ import { formatDisplayName } from "../utils/memberUtils";
 import Pagination from "../components/Pagination";
 import SimpleSearchableSelect from "../components/SimpleSearchableSelect";
 import { useDebounce } from "../hooks/useDebounce";
+import {
+  UsersIcon,
+  MagnifyingGlassIcon,
+  PencilIcon,
+  TrashIcon,
+  PlusIcon,
+} from "@heroicons/react/24/solid";
 
 // ✅ 정렬 키에 attendanceRate 추가
 type SortConfig = {
@@ -91,10 +98,9 @@ const AdminUsersPage: React.FC = () => {
     setError(null);
 
     try {
-      // ✅ 백엔드 정렬 파라미터 매핑
       const sortKeyMap: Record<string, string> = {
         cellName: "cell.name",
-        attendanceRate: "attendanceRate", // 백엔드 지원 완료
+        attendanceRate: "attendanceRate",
       };
 
       const backendSortKey =
@@ -255,11 +261,13 @@ const AdminUsersPage: React.FC = () => {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
+    <div className="bg-gray-50 min-h-screen pb-20">
+      <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 max-w-6xl">
+        {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
+              <UsersIcon className="h-8 w-8 text-indigo-500" />
               사용자 관리
             </h1>
             <p className="mt-1 text-sm text-gray-600">
@@ -267,6 +275,13 @@ const AdminUsersPage: React.FC = () => {
               수정·삭제할 수 있는 페이지입니다.
             </p>
           </div>
+          <button
+            onClick={() => navigate("/admin/users/add")}
+            className="flex items-center justify-center gap-1 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 shadow-sm transition-all"
+            disabled={loading}
+          >
+            <PlusIcon className="h-4 w-4" /> 새 멤버 추가
+          </button>
         </div>
 
         {error && user?.role === "EXECUTIVE" && (
@@ -275,40 +290,45 @@ const AdminUsersPage: React.FC = () => {
           </div>
         )}
 
-        {/* 필터 영역 */}
-        <div className="mb-4 p-4 bg-gray-50 rounded-lg shadow-sm">
+        {/* 필터 영역 (디자인 통일: border-gray-300, shadow-sm, rounded-lg) */}
+        <div className="mb-6 p-5 bg-white rounded-2xl shadow-sm border border-gray-100">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-bold text-gray-500 mb-1">
                 이름 검색
               </label>
-              <input
-                type="text"
-                placeholder="이름으로 검색..."
-                value={filters.name}
-                onChange={(e) => handleFilterChange("name", e.target.value)}
-                className="p-2 border rounded-md w-full text-sm"
-              />
+              <div className="relative">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="이름으로 검색..."
+                  value={filters.name}
+                  onChange={(e) => handleFilterChange("name", e.target.value)}
+                  className="w-full pl-9 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white shadow-sm transition-all"
+                />
+              </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-bold text-gray-500 mb-1">
                 셀
               </label>
-              <SimpleSearchableSelect
-                options={cellOptions}
-                value={filters.cellId}
-                onChange={(val) => handleFilterChange("cellId", val)}
-                placeholder="전체 셀"
-              />
+              <div className="h-[38px]">
+                <SimpleSearchableSelect
+                  options={cellOptions}
+                  value={filters.cellId}
+                  onChange={(val) => handleFilterChange("cellId", val)}
+                  placeholder="전체 셀"
+                />
+              </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-bold text-gray-500 mb-1">
                 성별
               </label>
               <select
                 value={filters.gender}
                 onChange={(e) => handleFilterChange("gender", e.target.value)}
-                className="p-2 border rounded-md w-full text-sm"
+                className="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white shadow-sm"
               >
                 <option value="all">모든 성별</option>
                 <option value="MALE">남성</option>
@@ -316,13 +336,13 @@ const AdminUsersPage: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-bold text-gray-500 mb-1">
                 등록 연도
               </label>
               <select
                 value={filters.year}
                 onChange={(e) => handleFilterChange("year", e.target.value)}
-                className="p-2 border rounded-md w-full text-sm"
+                className="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white shadow-sm"
               >
                 <option value="all">모든 연도</option>
                 {yearOptions.map((year) => (
@@ -333,13 +353,13 @@ const AdminUsersPage: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-bold text-gray-500 mb-1">
                 역할
               </label>
               <select
                 value={filters.role}
                 onChange={(e) => handleFilterChange("role", e.target.value)}
-                className="p-2 border rounded-md w-full text-sm"
+                className="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white shadow-sm"
               >
                 <option value="all">모든 역할</option>
                 <option value="EXECUTIVE">임원</option>
@@ -351,21 +371,11 @@ const AdminUsersPage: React.FC = () => {
           <div className="mt-4 flex justify-end">
             <button
               onClick={resetFilters}
-              className="px-3 py-1 border border-gray-300 rounded-md bg-white hover:bg-gray-50 text-xs sm:text-sm text-gray-700 font-medium shadow-sm"
+              className="px-4 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-xs font-bold text-gray-600 shadow-sm transition-all"
             >
               필터 초기화
             </button>
           </div>
-        </div>
-
-        <div className="flex justify-end mb-4">
-          <button
-            onClick={() => navigate("/admin/users/add")}
-            className="rounded-md bg-indigo-600 px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-            disabled={loading}
-          >
-            + 새 멤버 추가
-          </button>
         </div>
 
         {loading && (
@@ -379,7 +389,7 @@ const AdminUsersPage: React.FC = () => {
             {/* 🔹 모바일: 카드 리스트 */}
             <div className="space-y-3 md:hidden mb-4">
               {memberPage.content.length === 0 ? (
-                <div className="bg-white rounded-lg shadow border border-gray-100 p-4 text-center text-xs sm:text-sm text-gray-500">
+                <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-8 text-center text-sm text-gray-400">
                   조건에 맞는 멤버가 없습니다.
                 </div>
               ) : (
@@ -402,8 +412,8 @@ const AdminUsersPage: React.FC = () => {
                   return (
                     <div
                       key={member.id}
-                      className={`bg-white rounded-lg shadow border border-gray-100 p-4 text-xs space-y-2 ${
-                        !member.active ? "bg-gray-100 text-gray-500" : ""
+                      className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-4 text-xs space-y-2 ${
+                        !member.active ? "bg-gray-50 opacity-80" : ""
                       }`}
                     >
                       <div className="flex justify-between items-start gap-2">
@@ -412,35 +422,35 @@ const AdminUsersPage: React.FC = () => {
                             onClick={() =>
                               navigate(`/admin/users/${member.id}`)
                             }
-                            className={`text-sm font-semibold ${
+                            className={`text-base font-bold ${
                               !member.active
-                                ? "text-gray-600"
+                                ? "text-gray-500"
                                 : "text-indigo-600 hover:text-indigo-800"
                             }`}
                           >
                             {displayName}
                           </button>
-                          <p className="mt-1 text-[11px] text-gray-500">
-                            등록 연도: {member.joinYear}
+                          <p className="mt-0.5 text-xs text-gray-500">
+                            등록: {member.joinYear}년
                           </p>
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           <span
-                            className={`px-2 inline-flex text-[11px] leading-5 font-semibold rounded-full ${
+                            className={`px-2 py-0.5 inline-flex text-[10px] font-bold rounded-full ${
                               member.role === "EXECUTIVE"
-                                ? "bg-red-100 text-red-800"
+                                ? "bg-red-100 text-red-700"
                                 : member.role === "CELL_LEADER"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-green-100 text-green-800"
+                                ? "bg-yellow-100 text-yellow-700"
+                                : "bg-green-100 text-green-700"
                             }`}
                           >
                             {translateRole(member.role)}
                           </span>
                           <span
-                            className={`px-2 inline-flex text-[11px] leading-5 font-semibold rounded-full ${
+                            className={`px-2 py-0.5 inline-flex text-[10px] font-bold rounded-full ${
                               member.active
-                                ? "bg-green-100 text-green-800"
-                                : "bg-gray-200 text-gray-800"
+                                ? "bg-green-50 text-green-700"
+                                : "bg-gray-100 text-gray-500"
                             }`}
                           >
                             {member.active ? "활성" : "비활성"}
@@ -448,33 +458,31 @@ const AdminUsersPage: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-50">
-                        <span className="text-[11px] text-gray-500">
-                          셀:{" "}
-                          <span className="font-medium text-gray-700">
-                            {cellName}
-                          </span>
+                      <div className="flex justify-between items-center mt-2 pt-3 border-t border-gray-50">
+                        <span className="text-gray-500 font-medium">
+                          <span className="text-gray-400 mr-1">셀:</span>
+                          {cellName}
                         </span>
-                        {/* ✅ 모바일 출석률 (색상 제거, 기본 폰트) */}
-                        <span className="text-xs font-bold text-gray-900">
-                          출석률: {rateText}
+                        <span className="text-gray-900 font-bold">
+                          출석률 {rateText}
                         </span>
                       </div>
 
-                      <div className="pt-2 flex justify-end gap-6">
+                      {/* ✅ 모바일 버튼 스타일 통일 (배경 있는 버튼) */}
+                      <div className="pt-3 mt-1 border-t border-gray-50 flex justify-end gap-2">
                         <button
                           onClick={() =>
                             navigate(`/admin/users/${member.id}/edit`)
                           }
-                          className="text-[11px] font-medium text-indigo-600 hover:text-indigo-900 px-2 py-1"
+                          className="flex items-center gap-1 bg-gray-50 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-100 hover:bg-indigo-50"
                         >
-                          수정
+                          <PencilIcon className="h-3 w-3" /> 수정
                         </button>
                         <button
                           onClick={() => handleDelete(member)}
-                          className="text-[11px] font-medium text-red-600 hover:text-red-800 px-2 py-1"
+                          className="flex items-center gap-1 bg-gray-50 text-red-500 px-3 py-1.5 rounded-lg text-xs font-bold border border-red-100 hover:bg-red-50"
                         >
-                          삭제
+                          <TrashIcon className="h-3 w-3" /> 삭제
                         </button>
                       </div>
                     </div>
@@ -484,46 +492,46 @@ const AdminUsersPage: React.FC = () => {
             </div>
 
             {/* 🔹 데스크탑: 테이블 */}
-            <div className="hidden md:block bg-white shadow-md rounded-lg overflow-x-auto mb-4">
-              <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
-                <thead className="bg-gray-50">
+            <div className="hidden md:block bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden mb-6">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50/50">
                   <tr>
                     <th
                       onClick={() => requestSort("name")}
-                      className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-indigo-600"
+                      className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
                     >
                       이름{getSortIndicator("name")}
                     </th>
                     <th
                       onClick={() => requestSort("role")}
-                      className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-indigo-600"
+                      className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
                     >
                       역할{getSortIndicator("role")}
                     </th>
                     <th
                       onClick={() => requestSort("cellName")}
-                      className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-indigo-600"
+                      className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
                     >
                       셀{getSortIndicator("cellName")}
                     </th>
-                    {/* ✅ 출석률 컬럼 추가 */}
                     <th
                       onClick={() => requestSort("attendanceRate")}
-                      className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-indigo-600"
+                      className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
                     >
                       출석률{getSortIndicator("attendanceRate")}
                     </th>
                     <th
                       onClick={() => requestSort("joinYear")}
-                      className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-indigo-600"
+                      className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
                     >
                       등록연도{getSortIndicator("joinYear")}
                     </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">
                       상태
                     </th>
-                    <th className="relative px-4 sm:px-6 py-3">
-                      <span className="sr-only">Actions</span>
+                    {/* ✅ 우측 정렬된 관리 헤더 */}
+                    <th className="relative px-6 py-3 text-right font-bold text-gray-500 uppercase text-xs">
+                      {/* 관리 */}
                     </th>
                   </tr>
                 </thead>
@@ -532,7 +540,7 @@ const AdminUsersPage: React.FC = () => {
                     <tr>
                       <td
                         colSpan={7}
-                        className="px-4 sm:px-6 py-4 text-center text-xs sm:text-sm text-gray-500"
+                        className="px-6 py-12 text-center text-gray-400"
                       >
                         조건에 맞는 멤버가 없습니다.
                       </td>
@@ -546,77 +554,76 @@ const AdminUsersPage: React.FC = () => {
                       return (
                         <tr
                           key={member.id}
-                          className={
-                            !member.active ? "bg-gray-100 text-gray-500" : ""
-                          }
+                          className={`hover:bg-gray-50 transition-colors ${
+                            !member.active ? "bg-gray-50" : ""
+                          }`}
                         >
-                          <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm font-medium">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-indigo-600">
                             <button
                               onClick={() =>
                                 navigate(`/admin/users/${member.id}`)
                               }
-                              className={`font-semibold ${
-                                !member.active
-                                  ? "text-gray-500"
-                                  : "text-indigo-600 hover:text-indigo-900"
-                              }`}
+                              className="hover:underline"
                             >
                               {formatDisplayName(member, memberPage.content)}
                             </button>
                           </td>
-                          <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm">
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <span
-                              className={`px-2 inline-flex text-[11px] sm:text-xs leading-5 font-semibold rounded-full ${
+                              className={`px-2.5 py-0.5 inline-flex text-xs font-bold rounded-full ${
                                 member.role === "EXECUTIVE"
-                                  ? "bg-red-100 text-red-800"
+                                  ? "bg-red-100 text-red-700"
                                   : member.role === "CELL_LEADER"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-green-100 text-green-800"
+                                  ? "bg-yellow-100 text-yellow-700"
+                                  : "bg-green-100 text-green-700"
                               }`}
                             >
                               {translateRole(member.role)}
                             </span>
                           </td>
-                          <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm">
+                          <td className="px-6 py-4 whitespace-nowrap text-gray-700 font-medium">
                             {member.role === "CELL_LEADER"
                               ? leaderCellMap.get(member.id) ||
                                 member.cell?.name ||
-                                "N/A"
-                              : member.cell?.name || "*소속 셀 없음"}
+                                "-"
+                              : member.cell?.name || "-"}
                           </td>
-                          {/* ✅ 출석률 데이터 (색상 제거, 기본 폰트) */}
-                          <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm font-bold text-gray-900">
+                          {/* ✅ 출석률: 검정 텍스트 유지 */}
+                          <td className="px-6 py-4 whitespace-nowrap font-bold text-gray-900">
                             {rateText}
                           </td>
-                          <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm">
+                          <td className="px-6 py-4 whitespace-nowrap text-gray-500">
                             {member.joinYear}
                           </td>
-                          <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm">
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <span
-                              className={`px-2 inline-flex text-[11px] sm:text-xs leading-5 font-semibold rounded-full ${
+                              className={`px-2.5 py-0.5 inline-flex text-xs font-bold rounded-full ${
                                 member.active
-                                  ? "bg-green-100 text-green-800"
-                                  : "bg-gray-200 text-gray-800"
+                                  ? "bg-green-50 text-green-700"
+                                  : "bg-gray-100 text-gray-500"
                               }`}
                             >
                               {member.active ? "활성" : "비활성"}
                             </span>
                           </td>
-                          <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
-                            <button
-                              onClick={() =>
-                                navigate(`/admin/users/${member.id}/edit`)
-                              }
-                              className="text-indigo-600 hover:text-indigo-900 mr-3"
-                            >
-                              수정
-                            </button>
-                            <button
-                              onClick={() => handleDelete(member)}
-                              className="text-red-600 hover:text-red-900"
-                            >
-                              삭제
-                            </button>
+                          {/* ✅ 데스크탑 버튼 스타일 (텍스트형 + 우측 정렬) */}
+                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() =>
+                                  navigate(`/admin/users/${member.id}/edit`)
+                                }
+                                className="text-gray-400 hover:text-indigo-600 font-bold text-xs transition-colors"
+                              >
+                                수정
+                              </button>
+                              <button
+                                onClick={() => handleDelete(member)}
+                                className="text-gray-400 hover:text-red-500 font-bold text-xs transition-colors"
+                              >
+                                삭제
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -640,37 +647,41 @@ const AdminUsersPage: React.FC = () => {
         )}
 
         {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-            <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl max-w-sm w-full">
-              <h2 className="text-lg sm:text-xl font-bold mb-4">
+          <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full">
+              <h2 className="text-lg font-bold text-gray-900 mb-2">
                 멤버 삭제 확인
               </h2>
-              <p className="text-sm text-gray-700 mb-2">
+              <p className="text-sm text-gray-600 mb-4 break-keep">
                 정말로 &quot;
-                {memberToDelete && memberPage
-                  ? formatDisplayName(memberToDelete, memberPage.content)
-                  : memberToDelete?.name ?? ""}
+                <span className="font-bold text-gray-900">
+                  {memberToDelete && memberPage
+                    ? formatDisplayName(memberToDelete, memberPage.content)
+                    : memberToDelete?.name ?? ""}
+                </span>
                 &quot; 멤버를 삭제하시겠습니까?
               </p>
-              <p className="text-[11px] sm:text-xs text-gray-500 mb-4">
-                삭제 후에는 해당 멤버와 연결된 출석, 기도제목, 셀 정보 등에
-                영향을 줄 수 있으니 신중하게 진행해 주세요.
-              </p>
+              <div className="p-3 bg-red-50 rounded-lg mb-6">
+                <p className="text-xs text-red-600 font-medium">
+                  ⚠️ 삭제 후에는 해당 멤버와 연결된 출석, 기도제목, 셀 정보 등에
+                  영향을 줄 수 있습니다.
+                </p>
+              </div>
               {deleteError && (
-                <div className="p-3 text-xs sm:text-sm font-medium text-red-700 bg-red-100 border border-red-400 rounded-md mb-4">
+                <div className="p-3 text-xs font-bold text-red-700 bg-red-100 border border-red-200 rounded-lg mb-4">
                   {deleteError}
                 </div>
               )}
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-3">
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="bg-gray-300 text-gray-800 px-3 sm:px-4 py-2 rounded-md mr-2 text-xs sm:text-sm"
+                  className="px-4 py-2 rounded-xl text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200"
                 >
                   취소
                 </button>
                 <button
                   onClick={handleConfirmDelete}
-                  className="bg-red-600 text-white px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm"
+                  className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700"
                 >
                   삭제
                 </button>

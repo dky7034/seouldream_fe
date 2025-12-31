@@ -292,13 +292,6 @@ const AdminCellsPage: React.FC = () => {
 
     try {
       const response = await cellService.getAllCells(cleanedParams);
-
-      // 🔍 [로그 추가] 백엔드가 보낸 범죄 현장 포착
-      console.log("🔥 [AdminCellsPage] 전체 셀 목록 데이터:", response.content);
-      response.content.forEach((cell) => {
-        console.log(`➡️ ${cell.name}의 출석률:`, cell.attendanceRate);
-      });
-
       setCellPage(response);
     } catch {
       setError("셀 목록 로드 실패");
@@ -477,10 +470,10 @@ const AdminCellsPage: React.FC = () => {
               <button
                 key={m}
                 onClick={() => handleUnitValueClick(m)}
-                className={`py-1.5 rounded-md text-xs font-bold transition-colors ${
+                className={`py-1.5 rounded-md text-xs font-bold transition-all border ${
                   filters.month === m
-                    ? "bg-indigo-600 text-white shadow-sm"
-                    : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                    ? "bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105"
+                    : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 shadow-sm"
                 }`}
               >
                 {m}월
@@ -493,7 +486,7 @@ const AdminCellsPage: React.FC = () => {
     if (unitType === "semester") {
       if (semesters.length === 0)
         return (
-          <div className="text-xs text-yellow-800 bg-yellow-50 p-3 rounded-lg border border-yellow-100">
+          <div className="text-xs text-yellow-800 bg-yellow-50 p-3 rounded-lg border border-yellow-100 mt-2">
             활성화된 학기가 없습니다.
           </div>
         );
@@ -507,10 +500,10 @@ const AdminCellsPage: React.FC = () => {
               <button
                 key={s.id}
                 onClick={() => handleSemesterClick(s.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all shadow-sm ${
                   filters.semesterId === s.id
-                    ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                    : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                    ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
+                    : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
                 }`}
               >
                 {s.name}
@@ -597,35 +590,52 @@ const AdminCellsPage: React.FC = () => {
             </div>
           ) : (
             <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100">
-              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center mb-2">
-                <div className="w-full sm:w-auto">
+              {/* ✅ 레이아웃 개선: items-start 적용 */}
+              <div className="flex flex-col sm:flex-row items-start gap-4 mb-2">
+                {/* 1. 연도 선택 */}
+                <div className="w-full sm:w-32">
                   <label className="text-xs font-bold text-gray-500 mb-1 block">
                     연도
                   </label>
-                  <select
-                    value={filters.year}
-                    onChange={(e) => handleFilterChange("year", e.target.value)}
-                    className="w-full sm:w-32 py-2 border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-100"
-                  >
-                    <option value="">전체 연도</option>
-                    {yearOptions.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}년
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={filters.year}
+                      onChange={(e) =>
+                        handleFilterChange("year", e.target.value)
+                      }
+                      // ✅ 스타일 개선: border-gray-300, shadow-sm, px-3, py-2
+                      className="w-full py-2 px-1 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-100 shadow-sm disabled:bg-gray-50 disabled:text-gray-400"
+                      disabled={unitType === "semester"}
+                    >
+                      <option value="">전체 연도</option>
+                      {yearOptions.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}년
+                        </option>
+                      ))}
+                    </select>
+                    {/* ✅ 안내 문구 추가 */}
+                    {unitType === "semester" && (
+                      <p className="absolute left-0 top-full mt-1 text-[10px] text-gray-400 whitespace-nowrap">
+                        * 학기는 연도 무관
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div className="flex-1">
+
+                {/* 2. 조회 단위 */}
+                <div className="flex-1 w-full">
                   <label className="text-xs font-bold text-gray-500 mb-1 block">
                     조회 단위
                   </label>
+                  {/* ✅ 스타일 개선: 개별 버튼 + gap-2 */}
                   <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => handleUnitTypeClick("month")}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                      className={`px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
                         unitType === "month"
                           ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                          : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                          : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
                       }`}
                     >
                       월간
@@ -635,22 +645,22 @@ const AdminCellsPage: React.FC = () => {
                         hasActiveSemesters && handleUnitTypeClick("semester")
                       }
                       disabled={!hasActiveSemesters}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                      className={`px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
                         hasActiveSemesters
                           ? unitType === "semester"
                             ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                          : "bg-gray-50 text-gray-400 border-gray-100 border-dashed cursor-not-allowed"
+                            : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
+                          : "bg-gray-50 text-gray-400 border-gray-200 border-dashed cursor-not-allowed shadow-none"
                       }`}
                     >
                       학기
                     </button>
                     <button
                       onClick={() => handleUnitTypeClick("year")}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                      className={`px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
                         unitType === "year"
                           ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                          : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                          : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
                       }`}
                     >
                       연간
@@ -674,7 +684,8 @@ const AdminCellsPage: React.FC = () => {
                   placeholder="검색..."
                   value={localSearchName}
                   onChange={(e) => setLocalSearchName(e.target.value)}
-                  className="w-full pl-10 py-2.5 border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white transition-all"
+                  // ✅ 수정: py-2, border-gray-300, rounded-lg, shadow-sm
+                  className="w-full pl-10 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white transition-all shadow-sm"
                 />
               </div>
             </div>
@@ -685,7 +696,8 @@ const AdminCellsPage: React.FC = () => {
               <select
                 value={filters.active}
                 onChange={(e) => handleFilterChange("active", e.target.value)}
-                className="w-full py-2.5 border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white"
+                // ✅ 수정: py-2, border-gray-300, rounded-lg, shadow-sm, px-3
+                className="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white shadow-sm"
               >
                 <option value="all">모든 상태</option>
                 <option value="true">활성 셀</option>

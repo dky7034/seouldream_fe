@@ -11,12 +11,11 @@ import Pagination from "../components/Pagination";
 import SimpleSearchableSelect from "../components/SimpleSearchableSelect";
 import { useDebounce } from "../hooks/useDebounce";
 
+// ✅ 정렬 키에 attendanceRate 추가
 type SortConfig = {
-  key: keyof MemberDto | "cellName";
+  key: keyof MemberDto | "cellName" | "attendanceRate";
   direction: "ascending" | "descending";
 };
-
-// ❌ initialFilters 상수 제거 (컴포넌트 내부 useState 초기값으로 통합)
 
 const AdminUsersPage: React.FC = () => {
   const { user } = useAuth();
@@ -32,12 +31,12 @@ const AdminUsersPage: React.FC = () => {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [availableJoinYears, setAvailableJoinYears] = useState<number[]>([]);
 
-  // ───────────────── 필터/정렬/페이지 초기값을 URL에서 읽기 ─────────────────
+  // 필터 초기값 로드
   const [filters, setFilters] = useState(() => {
     const cellIdParam = searchParams.get("cellId");
     return {
       name: searchParams.get("name") ?? "",
-      year: searchParams.get("year") ?? "all", // "all" 또는 "2024" 문자열
+      year: searchParams.get("year") ?? "all",
       gender: searchParams.get("gender") ?? "all",
       role: searchParams.get("role") ?? "all",
       cellId: cellIdParam ? Number(cellIdParam) : null,
@@ -60,7 +59,7 @@ const AdminUsersPage: React.FC = () => {
 
   const debouncedNameFilter = useDebounce(filters.name, 500);
 
-  // ───────────────── URL 쿼리와 상태 동기화 함수 ─────────────────
+  // URL 동기화
   const syncSearchParams = useCallback(
     (nextFilters = filters, nextSort = sortConfig, nextPage = currentPage) => {
       const params: Record<string, string> = {};
@@ -92,8 +91,10 @@ const AdminUsersPage: React.FC = () => {
     setError(null);
 
     try {
+      // ✅ 백엔드 정렬 파라미터 매핑
       const sortKeyMap: Record<string, string> = {
         cellName: "cell.name",
+        attendanceRate: "attendanceRate", // 백엔드 지원 완료
       };
 
       const backendSortKey =
@@ -108,10 +109,7 @@ const AdminUsersPage: React.FC = () => {
       };
 
       if (debouncedNameFilter) params.name = debouncedNameFilter;
-
-      // ✅ [수정] year가 "all"이면 joinYear 파라미터를 아예 보내지 않음 (undefined)
       if (filters.year !== "all") params.joinYear = Number(filters.year);
-
       if (filters.gender !== "all")
         params.gender = filters.gender as "MALE" | "FEMALE";
       if (filters.role !== "all")
@@ -128,26 +126,19 @@ const AdminUsersPage: React.FC = () => {
     }
   }, [user, currentPage, sortConfig, debouncedNameFilter, filters]);
 
-  // --- 등록 연도 목록 조회 ---
+  // --- 메타 데이터 로딩 ---
   const fetchAvailableJoinYears = useCallback(async () => {
     if (!user || user.role !== "EXECUTIVE") return;
-
     try {
       const years = await memberService.getAvailableJoinYears();
       if (Array.isArray(years)) {
         setAvailableJoinYears(years);
-      } else {
-        console.error(
-          "getAvailableJoinYears 응답 형식이 배열이 아닙니다:",
-          years
-        );
       }
     } catch (err) {
       console.error("등록 연도 목록 조회 실패:", err);
     }
   }, [user]);
 
-  // --- 멤버 목록 로딩 ---
   useEffect(() => {
     if (user?.role === "EXECUTIVE") {
       fetchMembers();
@@ -159,47 +150,36 @@ const AdminUsersPage: React.FC = () => {
     }
   }, [user, fetchMembers]);
 
-  // --- 셀 목록 + 등록 연도 목록 로딩 ---
   useEffect(() => {
     if (user?.role !== "EXECUTIVE") return;
-
     cellService
       .getAllCells({ size: 1000, active: true })
       .then((page) => setCells(page.content))
-      .catch((err) => {
-        console.error("셀 목록 조회 실패:", err);
-      });
-
+      .catch((err) => console.error("셀 목록 조회 실패:", err));
     fetchAvailableJoinYears();
   }, [user, fetchAvailableJoinYears]);
 
-  // --- 셀장 ID -> 셀 이름 매핑 ---
   const leaderCellMap = useMemo(() => {
     const map = new Map<number, string>();
     if (cells.length > 0) {
       for (const cell of cells) {
-        if (cell.leader) {
-          map.set(cell.leader.id, cell.name);
-        }
+        if (cell.leader) map.set(cell.leader.id, cell.name);
       }
     }
     return map;
   }, [cells]);
 
-  // --- 등록 연도 옵션 ---
   const yearOptions = useMemo(() => {
-    if (!availableJoinYears || availableJoinYears.length === 0) {
-      return [];
-    }
+    if (!availableJoinYears || availableJoinYears.length === 0) return [];
     return [...availableJoinYears].sort((a, b) => b - a);
   }, [availableJoinYears]);
 
-  // --- 셀 드롭다운 옵션 ---
   const cellOptions = useMemo(
     () => cells.map((c) => ({ value: c.id, label: c.name })),
     [cells]
   );
 
+  // --- 핸들러 ---
   const requestSort = (key: SortConfig["key"]) => {
     let direction: SortConfig["direction"] = "ascending";
     if (sortConfig.key === key && sortConfig.direction === "ascending") {
@@ -207,7 +187,6 @@ const AdminUsersPage: React.FC = () => {
     }
     const nextSort: SortConfig = { key, direction };
     const nextPage = 0;
-
     setSortConfig(nextSort);
     setCurrentPage(nextPage);
     syncSearchParams(filters, nextSort, nextPage);
@@ -250,7 +229,6 @@ const AdminUsersPage: React.FC = () => {
   };
 
   const resetFilters = () => {
-    // ✅ [수정] 초기값을 직접 지정 (상수 대신 리터럴 사용)
     const nextFilters = {
       name: "",
       year: "all",
@@ -261,11 +239,9 @@ const AdminUsersPage: React.FC = () => {
     const nextPage = 0;
     setFilters(nextFilters);
     setCurrentPage(nextPage);
-    // 정렬은 유지한 채 필터/페이지만 초기화
     syncSearchParams(nextFilters, sortConfig, nextPage);
   };
 
-  // 권한 없는 경우 빠른 리턴 (레이아웃 포함)
   if (error && (!user || user.role !== "EXECUTIVE")) {
     return (
       <div className="bg-gray-50 min-h-screen">
@@ -281,7 +257,6 @@ const AdminUsersPage: React.FC = () => {
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
-        {/* 상단 제목 + 안내 */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
@@ -294,7 +269,6 @@ const AdminUsersPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 에러 메시지 (EXECUTIVE일 때만 표시) */}
         {error && user?.role === "EXECUTIVE" && (
           <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-xs sm:text-sm">
             {error}
@@ -316,7 +290,6 @@ const AdminUsersPage: React.FC = () => {
                 className="p-2 border rounded-md w-full text-sm"
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 셀
@@ -328,7 +301,6 @@ const AdminUsersPage: React.FC = () => {
                 placeholder="전체 셀"
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 성별
@@ -343,7 +315,6 @@ const AdminUsersPage: React.FC = () => {
                 <option value="FEMALE">여성</option>
               </select>
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 등록 연도
@@ -361,7 +332,6 @@ const AdminUsersPage: React.FC = () => {
                 ))}
               </select>
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 역할
@@ -388,7 +358,6 @@ const AdminUsersPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 새 멤버 추가 버튼 (필터 아래, 우측 정렬) */}
         <div className="flex justify-end mb-4">
           <button
             onClick={() => navigate("/admin/users/add")}
@@ -401,9 +370,7 @@ const AdminUsersPage: React.FC = () => {
 
         {loading && (
           <div className="flex items-center justify-center min-h-[30vh]">
-            <p className="text-sm text-gray-500">
-              멤버 목록을 불러오는 중입니다...
-            </p>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
           </div>
         )}
 
@@ -413,7 +380,7 @@ const AdminUsersPage: React.FC = () => {
             <div className="space-y-3 md:hidden mb-4">
               {memberPage.content.length === 0 ? (
                 <div className="bg-white rounded-lg shadow border border-gray-100 p-4 text-center text-xs sm:text-sm text-gray-500">
-                  조건에 맞는 멤버가 없습니다. 필터를 변경해 보세요.
+                  조건에 맞는 멤버가 없습니다.
                 </div>
               ) : (
                 memberPage.content.map((member) => {
@@ -428,6 +395,10 @@ const AdminUsersPage: React.FC = () => {
                         "N/A"
                       : member.cell?.name || "*소속 셀 없음";
 
+                  const rate = member.attendanceRate;
+                  const rateText =
+                    rate !== undefined ? `${rate.toFixed(0)}%` : "-";
+
                   return (
                     <div
                       key={member.id}
@@ -435,7 +406,6 @@ const AdminUsersPage: React.FC = () => {
                         !member.active ? "bg-gray-100 text-gray-500" : ""
                       }`}
                     >
-                      {/* 상단: 이름 + 역할 + 상태 */}
                       <div className="flex justify-between items-start gap-2">
                         <div>
                           <button
@@ -478,17 +448,19 @@ const AdminUsersPage: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* 중간: 셀 정보 */}
-                      <div className="flex justify-between items-center mt-1">
+                      <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-50">
                         <span className="text-[11px] text-gray-500">
                           셀:{" "}
                           <span className="font-medium text-gray-700">
                             {cellName}
                           </span>
                         </span>
+                        {/* ✅ 모바일 출석률 (색상 제거, 기본 폰트) */}
+                        <span className="text-xs font-bold text-gray-900">
+                          출석률: {rateText}
+                        </span>
                       </div>
 
-                      {/* 하단: 액션 버튼 */}
                       <div className="pt-2 flex justify-end gap-6">
                         <button
                           onClick={() =>
@@ -518,25 +490,32 @@ const AdminUsersPage: React.FC = () => {
                   <tr>
                     <th
                       onClick={() => requestSort("name")}
-                      className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                      className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-indigo-600"
                     >
                       이름{getSortIndicator("name")}
                     </th>
                     <th
                       onClick={() => requestSort("role")}
-                      className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                      className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-indigo-600"
                     >
                       역할{getSortIndicator("role")}
                     </th>
                     <th
                       onClick={() => requestSort("cellName")}
-                      className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                      className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-indigo-600"
                     >
                       셀{getSortIndicator("cellName")}
                     </th>
+                    {/* ✅ 출석률 컬럼 추가 */}
+                    <th
+                      onClick={() => requestSort("attendanceRate")}
+                      className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-indigo-600"
+                    >
+                      출석률{getSortIndicator("attendanceRate")}
+                    </th>
                     <th
                       onClick={() => requestSort("joinYear")}
-                      className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                      className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-indigo-600"
                     >
                       등록연도{getSortIndicator("joinYear")}
                     </th>
@@ -552,92 +531,101 @@ const AdminUsersPage: React.FC = () => {
                   {memberPage.content.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={7}
                         className="px-4 sm:px-6 py-4 text-center text-xs sm:text-sm text-gray-500"
                       >
-                        조건에 맞는 멤버가 없습니다. 필터를 변경해 보세요.
+                        조건에 맞는 멤버가 없습니다.
                       </td>
                     </tr>
                   ) : (
-                    memberPage.content.map((member) => (
-                      <tr
-                        key={member.id}
-                        className={
-                          !member.active ? "bg-gray-100 text-gray-500" : ""
-                        }
-                      >
-                        <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm font-medium">
-                          <button
-                            onClick={() =>
-                              navigate(`/admin/users/${member.id}`)
-                            }
-                            className={`font-semibold ${
-                              !member.active
-                                ? "text-gray-500"
-                                : "text-indigo-600 hover:text-indigo-900"
-                            }`}
-                          >
-                            {formatDisplayName(member, memberPage.content)}
-                          </button>
-                        </td>
-                        <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm">
-                          <span
-                            className={`px-2 inline-flex text-[11px] sm:text-xs leading-5 font-semibold rounded-full ${
-                              member.role === "EXECUTIVE"
-                                ? "bg-red-100 text-red-800"
-                                : member.role === "CELL_LEADER"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-green-100 text-green-800"
-                            }`}
-                          >
-                            {translateRole(member.role)}
-                          </span>
-                        </td>
-                        <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm">
-                          {member.role === "CELL_LEADER"
-                            ? leaderCellMap.get(member.id) ||
-                              member.cell?.name ||
-                              "N/A"
-                            : member.cell?.name || "*소속 셀 없음"}
-                        </td>
-                        <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm">
-                          {member.joinYear}
-                        </td>
-                        <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm">
-                          <span
-                            className={`px-2 inline-flex text-[11px] sm:text-xs leading-5 font-semibold rounded-full ${
-                              member.active
-                                ? "bg-green-100 text-green-800"
-                                : "bg-gray-200 text-gray-800"
-                            }`}
-                          >
-                            {member.active ? "활성" : "비활성"}
-                          </span>
-                        </td>
-                        <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
-                          <button
-                            onClick={() =>
-                              navigate(`/admin/users/${member.id}/edit`)
-                            }
-                            className="text-indigo-600 hover:text-indigo-900 mr-3"
-                          >
-                            수정
-                          </button>
-                          <button
-                            onClick={() => handleDelete(member)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            삭제
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                    memberPage.content.map((member) => {
+                      const rate = member.attendanceRate;
+                      const rateText =
+                        rate !== undefined ? `${rate.toFixed(0)}%` : "-";
+
+                      return (
+                        <tr
+                          key={member.id}
+                          className={
+                            !member.active ? "bg-gray-100 text-gray-500" : ""
+                          }
+                        >
+                          <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm font-medium">
+                            <button
+                              onClick={() =>
+                                navigate(`/admin/users/${member.id}`)
+                              }
+                              className={`font-semibold ${
+                                !member.active
+                                  ? "text-gray-500"
+                                  : "text-indigo-600 hover:text-indigo-900"
+                              }`}
+                            >
+                              {formatDisplayName(member, memberPage.content)}
+                            </button>
+                          </td>
+                          <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm">
+                            <span
+                              className={`px-2 inline-flex text-[11px] sm:text-xs leading-5 font-semibold rounded-full ${
+                                member.role === "EXECUTIVE"
+                                  ? "bg-red-100 text-red-800"
+                                  : member.role === "CELL_LEADER"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-green-100 text-green-800"
+                              }`}
+                            >
+                              {translateRole(member.role)}
+                            </span>
+                          </td>
+                          <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm">
+                            {member.role === "CELL_LEADER"
+                              ? leaderCellMap.get(member.id) ||
+                                member.cell?.name ||
+                                "N/A"
+                              : member.cell?.name || "*소속 셀 없음"}
+                          </td>
+                          {/* ✅ 출석률 데이터 (색상 제거, 기본 폰트) */}
+                          <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm font-bold text-gray-900">
+                            {rateText}
+                          </td>
+                          <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm">
+                            {member.joinYear}
+                          </td>
+                          <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-xs sm:text-sm">
+                            <span
+                              className={`px-2 inline-flex text-[11px] sm:text-xs leading-5 font-semibold rounded-full ${
+                                member.active
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-gray-200 text-gray-800"
+                              }`}
+                            >
+                              {member.active ? "활성" : "비활성"}
+                            </span>
+                          </td>
+                          <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
+                            <button
+                              onClick={() =>
+                                navigate(`/admin/users/${member.id}/edit`)
+                              }
+                              className="text-indigo-600 hover:text-indigo-900 mr-3"
+                            >
+                              수정
+                            </button>
+                            <button
+                              onClick={() => handleDelete(member)}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              삭제
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
             </div>
 
-            {/* 페이지네이션 */}
             <Pagination
               currentPage={memberPage.number}
               totalPages={memberPage.totalPages}
@@ -651,7 +639,6 @@ const AdminUsersPage: React.FC = () => {
           </>
         )}
 
-        {/* 삭제 확인 모달 */}
         {showDeleteConfirm && (
           <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
             <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl max-w-sm w-full">

@@ -202,29 +202,32 @@ const AttendanceAlertsPage: React.FC = () => {
 
         {/* Filter Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6 space-y-5">
-          <div className="flex flex-col sm:flex-row gap-5">
+          <div className="flex flex-col sm:flex-row items-start gap-5">
             {/* Unit Toggle */}
             <div className="sm:w-1/3">
               <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 flex items-center gap-1">
                 <FunnelIcon className="h-4 w-4" /> 조회 기준
               </label>
-              <div className="flex bg-gray-100 p-1 rounded-xl">
+              {/* ✅ 수정: 개별 버튼 + gap-2 */}
+              <div className="flex gap-2">
                 <button
                   onClick={() => handleUnitTypeClick("semester")}
-                  className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                  // ✅ 수정: text-xs sm:text-sm (모바일 글자 작게), whitespace-nowrap
+                  className={`flex-1 py-2 px-3 text-xs sm:text-sm font-bold rounded-lg border shadow-sm transition-all whitespace-nowrap ${
                     unitType === "semester"
-                      ? "bg-white text-indigo-600 shadow-sm"
-                      : "text-gray-500"
+                      ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                      : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
                   }`}
                 >
                   학기별
                 </button>
                 <button
                   onClick={() => handleUnitTypeClick("year")}
-                  className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                  // ✅ 수정: text-xs sm:text-sm, whitespace-nowrap
+                  className={`flex-1 py-2 px-3 text-xs sm:text-sm font-bold rounded-lg border shadow-sm transition-all whitespace-nowrap ${
                     unitType === "year"
-                      ? "bg-white text-indigo-600 shadow-sm"
-                      : "text-gray-500"
+                      ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                      : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
                   }`}
                 >
                   연도별
@@ -233,7 +236,7 @@ const AttendanceAlertsPage: React.FC = () => {
             </div>
 
             {/* Selection Area */}
-            <div className="flex-1">
+            <div className="flex-1 w-full">
               <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 flex items-center gap-1">
                 <CalendarDaysIcon className="h-4 w-4" />{" "}
                 {unitType === "semester" ? "학기 선택" : "연도 선택"}
@@ -249,10 +252,10 @@ const AttendanceAlertsPage: React.FC = () => {
                       <button
                         key={s.id}
                         onClick={() => setSelectedSemesterId(s.id)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                        className={`px-3 py-2 rounded-lg text-sm font-bold border shadow-sm transition-all ${
                           selectedSemesterId === s.id
                             ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
-                            : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                            : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
                         }`}
                       >
                         {s.name}
@@ -264,7 +267,7 @@ const AttendanceAlertsPage: React.FC = () => {
                 <select
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="w-full border-gray-200 rounded-xl bg-gray-50 text-sm font-medium focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
                 >
                   {yearOptions.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -287,13 +290,13 @@ const AttendanceAlertsPage: React.FC = () => {
                 value={consecutiveAbsences}
                 onChange={(e) => setConsecutiveAbsences(e.target.value)}
                 onBlur={handleBlur}
-                className="w-full border-gray-200 rounded-xl bg-gray-50 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
               />
             </div>
             <button
               onClick={handleSearchClick}
               disabled={loading}
-              className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50 shadow-sm flex items-center justify-center gap-2"
+              className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50 shadow-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
             >
               {loading ? (
                 <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
@@ -396,7 +399,7 @@ const AttendanceAlertsPage: React.FC = () => {
                       연속 결석
                     </th>
                     <th className="px-6 py-3 text-right font-bold text-gray-500 uppercase text-xs">
-                      관리
+                      {/* 관리 */}
                     </th>
                   </tr>
                 </thead>

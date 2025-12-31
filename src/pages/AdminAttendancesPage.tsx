@@ -839,46 +839,54 @@ const AdminAttendancesPage: React.FC = () => {
               </div>
             ) : (
               <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-4">
-                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                  <div className="w-full sm:w-auto">
+                {/* ✅ items-start로 설정하여 레이아웃 정렬 개선 */}
+                <div className="flex flex-col sm:flex-row items-start gap-4">
+                  {/* 1. 기준 연도 */}
+                  <div className="sm:w-1/3 w-full">
                     <label className="text-xs font-bold text-gray-500 mb-1 block">
                       기준 연도
                     </label>
-                    <select
-                      value={filters.year}
-                      onChange={(e) =>
-                        handleFilterChange(
-                          "year",
-                          e.target.value ? Number(e.target.value) : ""
-                        )
-                      }
-                      className="w-full sm:w-32 py-2 border-gray-200 rounded-lg text-sm focus:bg-white bg-white"
-                      disabled={unitType === "semester"}
-                    >
-                      {yearOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                    {unitType === "semester" && (
-                      <p className="mt-1 text-[10px] text-gray-400">
-                        * 학기는 연도 무관
-                      </p>
-                    )}
+                    <div className="relative">
+                      <select
+                        value={filters.year}
+                        onChange={(e) =>
+                          handleFilterChange(
+                            "year",
+                            e.target.value ? Number(e.target.value) : ""
+                          )
+                        }
+                        // ✅ 스타일: border-gray-300, shadow-sm, px-3, py-2
+                        className="w-full py-2 px-1 border border-gray-300 rounded-lg text-sm bg-white focus:ring-indigo-500 focus:border-indigo-500 shadow-sm disabled:bg-gray-50 disabled:text-gray-400"
+                        disabled={unitType === "semester"}
+                      >
+                        {yearOptions.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                      {/* ✅ 안내 문구 추가 */}
+                      {unitType === "semester" && (
+                        <p className="absolute left-0 top-full mt-1 text-[10px] text-gray-400 whitespace-nowrap">
+                          * 학기는 연도 무관
+                        </p>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="flex-1">
+                  {/* 2. 조회 단위 */}
+                  <div className="flex-1 w-full">
                     <label className="text-xs font-bold text-gray-500 mb-1 block">
                       조회 단위
                     </label>
+                    {/* ✅ 스타일 개선: 개별 버튼 + gap-2 */}
                     <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => handleUnitTypeClick("month")}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                        className={`flex-1 sm:flex-none px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
                           unitType === "month"
                             ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                            : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
                         }`}
                       >
                         월간
@@ -888,22 +896,22 @@ const AdminAttendancesPage: React.FC = () => {
                           hasActiveSemesters && handleUnitTypeClick("semester")
                         }
                         disabled={!hasActiveSemesters}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                        className={`flex-1 sm:flex-none px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
                           hasActiveSemesters
                             ? unitType === "semester"
                               ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                            : "bg-gray-50 text-gray-400 border-gray-100 border-dashed cursor-not-allowed"
+                              : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
+                            : "bg-gray-50 text-gray-400 border-gray-200 border-dashed cursor-not-allowed shadow-none"
                         }`}
                       >
                         학기
                       </button>
                       <button
                         onClick={() => handleUnitTypeClick("year")}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                        className={`flex-1 sm:flex-none px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
                           unitType === "year"
                             ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                            : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
                         }`}
                       >
                         연간
@@ -912,6 +920,7 @@ const AdminAttendancesPage: React.FC = () => {
                   </div>
                 </div>
 
+                {/* 3. 월 선택 영역 (스타일 업그레이드) */}
                 {unitType === "month" && (
                   <div className="pt-2 border-t border-gray-200/50">
                     <label className="text-xs font-bold text-gray-500 mb-2 block">
@@ -923,10 +932,10 @@ const AdminAttendancesPage: React.FC = () => {
                           key={m}
                           type="button"
                           onClick={() => handleUnitValueClick(m)}
-                          className={`py-1.5 rounded-md text-xs font-bold transition-colors ${
+                          className={`py-1.5 rounded-md text-xs font-bold transition-all border ${
                             filters.month === m
-                              ? "bg-indigo-600 text-white shadow-sm"
-                              : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                              ? "bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105"
+                              : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 shadow-sm"
                           }`}
                         >
                           {m}월
@@ -935,6 +944,8 @@ const AdminAttendancesPage: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                {/* 4. 학기 선택 영역 (스타일 업그레이드) */}
                 {unitType === "semester" && semesters.length > 0 && (
                   <div className="pt-2 border-t border-gray-200/50">
                     <label className="text-xs font-bold text-gray-500 mb-2 block">
@@ -953,10 +964,10 @@ const AdminAttendancesPage: React.FC = () => {
                               month: "",
                             }))
                           }
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${
+                          className={`px-3 py-2 rounded-lg text-xs font-bold border transition-all ${
                             filters.semesterId === s.id
-                              ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                              ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
+                              : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 shadow-sm"
                           }`}
                         >
                           {s.name}

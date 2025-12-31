@@ -408,10 +408,10 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
               <button
                 key={m}
                 onClick={() => handleUnitValueClick(m)}
-                className={`py-1.5 rounded-md text-xs font-bold transition-colors ${
+                className={`py-1.5 rounded-lg text-xs font-bold transition-all border ${
                   filters.month === m
-                    ? "bg-indigo-600 text-white shadow-sm"
-                    : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                    ? "bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105"
+                    : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 shadow-sm"
                 }`}
               >
                 {m}월
@@ -433,10 +433,10 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
               <button
                 key={s.id}
                 onClick={() => handleSemesterClick(s.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all shadow-sm ${
                   filters.semesterId === s.id
-                    ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                    : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                    ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
+                    : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
                 }`}
               >
                 {s.name}
@@ -566,37 +566,49 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
               </div>
             ) : (
               <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100">
-                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center mb-2">
-                  <div className="w-full sm:w-auto">
+                {/* ✅ items-start 적용 */}
+                <div className="flex flex-col sm:flex-row items-start gap-4 mb-2">
+                  {/* 1. 기준 연도 */}
+                  <div className="w-full sm:w-32">
                     <label className="text-xs font-bold text-gray-500 mb-1 block">
                       연도
                     </label>
-                    <select
-                      value={filters.year}
-                      onChange={(e) =>
-                        handleFilterChange("year", Number(e.target.value))
-                      }
-                      className="w-full sm:w-32 py-2 border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-100"
-                      disabled={unitType === "semester"}
-                    >
-                      {yearOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <select
+                        value={filters.year}
+                        onChange={(e) =>
+                          handleFilterChange("year", Number(e.target.value))
+                        }
+                        className="w-full py-2 px-1 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-100 shadow-sm disabled:bg-gray-50 disabled:text-gray-400"
+                        disabled={unitType === "semester"}
+                      >
+                        {yearOptions.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                      {/* ✅ 안내 문구 추가 */}
+                      {unitType === "semester" && (
+                        <p className="absolute left-0 top-full mt-1 text-[10px] text-gray-400 whitespace-nowrap">
+                          * 학기는 연도 무관
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex-1">
+
+                  {/* 2. 조회 단위 */}
+                  <div className="flex-1 w-full">
                     <label className="text-xs font-bold text-gray-500 mb-1 block">
                       조회 단위
                     </label>
                     <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => handleUnitTypeClick("month")}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                        className={`px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
                           unitType === "month"
                             ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                            : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
                         }`}
                       >
                         월간
@@ -606,22 +618,22 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                           hasActiveSemesters && handleUnitTypeClick("semester")
                         }
                         disabled={!hasActiveSemesters}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                        className={`px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
                           hasActiveSemesters
                             ? unitType === "semester"
                               ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                            : "bg-gray-50 text-gray-400 border-gray-100 border-dashed cursor-not-allowed"
+                              : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
+                            : "bg-gray-50 text-gray-400 border-gray-200 border-dashed cursor-not-allowed shadow-none"
                         }`}
                       >
                         학기
                       </button>
                       <button
                         onClick={() => handleUnitTypeClick("year")}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                        className={`px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
                           unitType === "year"
                             ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                            : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
                         }`}
                       >
                         연간
@@ -807,8 +819,9 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                     >
                       기도제목 수 {getSortIndicator("totalCount")}
                     </th>
+                    {/* ✅ 우측 정렬로 변경 */}
                     <th
-                      className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
+                      className="px-6 py-3 text-right font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
                       onClick={() => requestSort("latestCreatedAt")}
                     >
                       최근 작성일 {getSortIndicator("latestCreatedAt")}
@@ -870,7 +883,8 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                               {row.totalCount.toLocaleString()}건
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-gray-500">
+                          {/* ✅ 우측 정렬로 변경 */}
+                          <td className="px-6 py-4 text-gray-500 text-right">
                             {safeFormatDate(row.latestCreatedAt)}
                           </td>
                         </tr>
@@ -953,8 +967,9 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                     >
                       기도제목 수 {getSortIndicator("totalCount")}
                     </th>
+                    {/* ✅ 우측 정렬로 변경 */}
                     <th
-                      className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
+                      className="px-6 py-3 text-right font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
                       onClick={() => requestSort("latestCreatedAt")}
                     >
                       최근 작성일 {getSortIndicator("latestCreatedAt")}
@@ -992,7 +1007,8 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
                             {row.totalCount.toLocaleString()}건
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-gray-500">
+                        {/* ✅ 우측 정렬로 변경 */}
+                        <td className="px-6 py-4 text-gray-500 text-right">
                           {safeFormatDate(row.latestCreatedAt)}
                         </td>
                       </tr>

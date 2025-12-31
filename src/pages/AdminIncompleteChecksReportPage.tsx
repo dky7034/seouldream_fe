@@ -178,15 +178,15 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
   const renderUnitButtons = () => {
     if (unitType === "month") {
       return (
-        <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x">
+        <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x pt-2 border-t border-gray-100">
           {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
             <button
               key={m}
               onClick={() => handleUnitValueChange(m)}
-              className={`flex-shrink-0 snap-start px-3 py-1.5 border rounded-full text-xs font-bold ${
+              className={`flex-shrink-0 snap-start px-3 py-1.5 border rounded-lg text-xs font-bold transition-all shadow-sm ${
                 filters.month === m
-                  ? "bg-indigo-600 text-white border-indigo-600"
-                  : "bg-white text-gray-600 hover:bg-gray-50"
+                  ? "bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105"
+                  : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
               }`}
             >
               {m}월
@@ -198,20 +198,20 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
     if (unitType === "semester") {
       if (semesters.length === 0)
         return (
-          <div className="text-xs text-yellow-600 bg-yellow-50 p-2 rounded">
+          <div className="text-xs text-yellow-600 bg-yellow-50 p-2 rounded mt-2">
             활성 학기 없음
           </div>
         );
       return (
-        <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x">
+        <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x pt-2 border-t border-gray-100">
           {semesters.map((s) => (
             <button
               key={s.id}
               onClick={() => handleSemesterClick(s.id)}
-              className={`flex-shrink-0 snap-start px-3 py-1.5 border rounded-full text-xs font-bold ${
+              className={`flex-shrink-0 snap-start px-3 py-1.5 border rounded-lg text-xs font-bold transition-all shadow-sm ${
                 filters.semesterId === s.id
-                  ? "bg-indigo-600 text-white border-indigo-600"
-                  : "bg-white text-gray-600 hover:bg-gray-50"
+                  ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
+                  : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
               }`}
             >
               {s.name}
@@ -296,18 +296,12 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
         }
       }
 
-      // ✅ [추가] 미래 날짜 제한 (Today Cap)
-      // 조회 종료일이 오늘보다 미래라면, 오늘까지만 조회하도록 강제 조정
       if (params.endDate) {
         const today = new Date();
-        // 시간 비교 정규화 (오늘의 끝)
         today.setHours(23, 59, 59, 999);
-
         const reqEnd = new Date(params.endDate);
         reqEnd.setHours(23, 59, 59, 999);
-
         if (reqEnd > today) {
-          // YYYY-MM-DD 포맷으로 변환
           const y = today.getFullYear();
           const m = String(today.getMonth() + 1).padStart(2, "0");
           const d = String(today.getDate()).padStart(2, "0");
@@ -461,57 +455,80 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row gap-4">
+              {/* ✅ 레이아웃 개선: items-start 적용 */}
+              <div className="flex flex-col sm:flex-row items-start gap-4">
+                {/* 1. 연도 */}
                 <div className="sm:w-1/3">
                   <label className="text-xs font-bold text-gray-500 mb-1 block">
                     연도
                   </label>
-                  <select
-                    value={filters.year}
-                    onChange={(e) =>
-                      handleFilterChange(
-                        "year",
-                        e.target.value ? Number(e.target.value) : ""
-                      )
-                    }
-                    className="w-full border-gray-200 rounded-xl text-sm bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500"
-                    disabled={unitType === "semester"}
-                  >
-                    {yearOptions.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={filters.year}
+                      onChange={(e) =>
+                        handleFilterChange(
+                          "year",
+                          e.target.value ? Number(e.target.value) : ""
+                        )
+                      }
+                      className="w-full py-2 px-1 border border-gray-300 rounded-lg text-sm bg-white focus:ring-indigo-500 focus:border-indigo-500 shadow-sm disabled:bg-gray-50 disabled:text-gray-400"
+                      disabled={unitType === "semester"}
+                    >
+                      {yearOptions.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                    {/* ✅ 안내 문구 추가 */}
+                    {unitType === "semester" && (
+                      <p className="absolute left-0 top-full mt-1 text-[10px] text-gray-400 whitespace-nowrap">
+                        * 학기는 연도 무관
+                      </p>
+                    )}
+                  </div>
                 </div>
+
+                {/* 2. 조회 단위 */}
                 <div className="flex-1">
                   <label className="text-xs font-bold text-gray-500 mb-1 block">
                     조회 단위
                   </label>
-                  <div className="flex bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+                  {/* ✅ 스타일 개선: 개별 버튼 + gap-2 */}
+                  <div className="flex flex-wrap gap-2">
                     {(
                       [
                         { t: "month", l: "월간" },
                         { t: "semester", l: "학기" },
                         { t: "year", l: "연간" },
                       ] as const
-                    ).map((u) => (
-                      <button
-                        key={u.t}
-                        onClick={() => handleUnitTypeClick(u.t)}
-                        className={`flex-1 py-2 text-xs font-bold ${
-                          unitType === u.t
-                            ? "bg-indigo-50 text-indigo-600"
-                            : "text-gray-500 hover:bg-gray-100"
-                        }`}
-                        disabled={u.t === "semester" && !hasActiveSemesters}
-                      >
-                        {u.l}
-                      </button>
-                    ))}
+                    ).map((u) => {
+                      const isDisabled =
+                        u.t === "semester" && !hasActiveSemesters;
+                      return (
+                        <button
+                          key={u.t}
+                          onClick={() =>
+                            !isDisabled && handleUnitTypeClick(u.t)
+                          }
+                          disabled={isDisabled}
+                          // ✅ 스타일 개선: 버튼별 Border/Shadow
+                          className={`flex-1 sm:flex-none px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
+                            isDisabled
+                              ? "bg-gray-50 text-gray-400 border-gray-200 border-dashed cursor-not-allowed shadow-none"
+                              : unitType === u.t
+                              ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                              : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
+                          }`}
+                        >
+                          {u.l}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
+              {/* 월/학기 선택 버튼 영역 */}
               {renderUnitButtons()}
             </div>
           )}
@@ -582,7 +599,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                         <p className="text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-wider">
                           미완료 날짜
                         </p>
-                        {/* ✅ 수정: slice 없이 모든 날짜 표시 */}
                         <div className="flex flex-wrap gap-1.5">
                           {item.missedDates.map((d, i) => (
                             <span
@@ -669,7 +685,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                             </span>
                           </td>
                           <td className="px-6 py-4 align-top">
-                            {/* ✅ 수정: slice 없이 모든 날짜 표시 */}
                             <div className="flex flex-wrap gap-1.5">
                               {item.missedDates.map((d, i) => (
                                 <span

@@ -519,9 +519,9 @@ const AdminNoticesPage: React.FC = () => {
                   key={s.id}
                   type="button"
                   onClick={() => handleSemesterClick(s.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all shadow-sm ${
                     filters.semesterId === s.id
-                      ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                      ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
                       : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
                   }`}
                 >
@@ -643,40 +643,54 @@ const AdminNoticesPage: React.FC = () => {
               </div>
             ) : (
               <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100">
-                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center mb-2">
-                  <div className="w-full sm:w-auto">
+                {/* ✅ items-start 적용 */}
+                <div className="flex flex-col sm:flex-row items-start gap-4 mb-2">
+                  {/* 1. 연도 선택 */}
+                  <div className="w-full sm:w-32">
                     <label className="text-xs font-bold text-gray-500 mb-1 block">
                       연도
                     </label>
-                    <select
-                      value={filters.year === "" ? "" : filters.year}
-                      onChange={(e) =>
-                        handleFilterChange(
-                          "year",
-                          e.target.value === "" ? "" : Number(e.target.value)
-                        )
-                      }
-                      className="w-full sm:w-32 py-2 border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-100"
-                      disabled={unitType === "semester"}
-                    >
-                      {yearOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <select
+                        value={filters.year === "" ? "" : filters.year}
+                        onChange={(e) =>
+                          handleFilterChange(
+                            "year",
+                            e.target.value === "" ? "" : Number(e.target.value)
+                          )
+                        }
+                        // ✅ 수정: py-2, px-1, border-gray-300, shadow-sm
+                        className="w-full py-2 px-1 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-100 shadow-sm disabled:bg-gray-50 disabled:text-gray-400"
+                        disabled={unitType === "semester"}
+                      >
+                        {yearOptions.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                      {/* ✅ 안내 문구 추가 */}
+                      {unitType === "semester" && (
+                        <p className="absolute left-0 top-full mt-1 text-[10px] text-gray-400 whitespace-nowrap">
+                          * 학기는 연도 무관
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex-1">
+
+                  {/* 2. 조회 단위 */}
+                  <div className="flex-1 w-full">
                     <label className="text-xs font-bold text-gray-500 mb-1 block">
                       조회 단위
                     </label>
+                    {/* ✅ 수정: 개별 버튼 + gap-2 */}
                     <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => handleUnitTypeClick("month")}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                        className={`px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
                           unitType === "month"
                             ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                            : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
                         }`}
                       >
                         월간
@@ -686,22 +700,22 @@ const AdminNoticesPage: React.FC = () => {
                           hasActiveSemesters && handleUnitTypeClick("semester")
                         }
                         disabled={!hasActiveSemesters}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                        className={`px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
                           hasActiveSemesters
                             ? unitType === "semester"
                               ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                            : "bg-gray-50 text-gray-400 border-gray-100 border-dashed cursor-not-allowed"
+                              : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
+                            : "bg-gray-50 text-gray-400 border-gray-200 border-dashed cursor-not-allowed shadow-none"
                         }`}
                       >
                         학기
                       </button>
                       <button
                         onClick={() => handleUnitTypeClick("year")}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${
+                        className={`px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
                           unitType === "year"
                             ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                            : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
                         }`}
                       >
                         연간
@@ -728,7 +742,8 @@ const AdminNoticesPage: React.FC = () => {
                     onChange={(e) =>
                       handleFilterChange("title", e.target.value)
                     }
-                    className="w-full pl-10 py-2.5 border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white transition-all"
+                    // ✅ 수정: py-2, border-gray-300, rounded-lg, shadow-sm
+                    className="w-full pl-10 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white transition-all shadow-sm"
                   />
                 </div>
               </div>
@@ -740,7 +755,8 @@ const AdminNoticesPage: React.FC = () => {
                 <select
                   value={filters.pinned}
                   onChange={(e) => handleFilterChange("pinned", e.target.value)}
-                  className="w-full py-2.5 border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white"
+                  // ✅ 수정: py-2, border-gray-300, rounded-lg, shadow-sm
+                  className="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white shadow-sm"
                 >
                   <option value="all">전체</option>
                   <option value="true">고정된 공지만</option>
@@ -889,8 +905,9 @@ const AdminNoticesPage: React.FC = () => {
                         <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">
                           작성자
                         </th>
+                        {/* ✅ 관리 헤더 우측 정렬 유지 */}
                         <th className="px-6 py-3 text-right font-bold text-gray-500 uppercase text-xs">
-                          관리
+                          {/* 관리 */}
                         </th>
                       </tr>
                     </thead>
@@ -925,6 +942,7 @@ const AdminNoticesPage: React.FC = () => {
                               notice.createdBy?.name
                             )}
                           </td>
+                          {/* ✅ 관리 열: 우측 정렬 + 텍스트 버튼 스타일 */}
                           <td className="px-6 py-4 text-right">
                             {user?.role === "EXECUTIVE" && (
                               <div className="flex justify-end gap-2">
@@ -932,13 +950,13 @@ const AdminNoticesPage: React.FC = () => {
                                   onClick={() =>
                                     navigate(`/admin/notices/${notice.id}/edit`)
                                   }
-                                  className="text-gray-400 hover:text-indigo-600 font-bold text-xs bg-white border border-gray-200 px-2 py-1 rounded"
+                                  className="text-gray-400 hover:text-indigo-600 font-bold text-xs"
                                 >
                                   수정
                                 </button>
                                 <button
                                   onClick={() => handleDelete(notice)}
-                                  className="text-gray-400 hover:text-red-500 font-bold text-xs bg-white border border-gray-200 px-2 py-1 rounded"
+                                  className="text-gray-400 hover:text-red-500 font-bold text-xs"
                                 >
                                   삭제
                                 </button>
