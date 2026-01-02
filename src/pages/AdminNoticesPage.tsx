@@ -30,6 +30,12 @@ import {
 type SortKey = "createdAt";
 type UnitType = "year" | "month" | "semester";
 
+// 스크롤바 숨김 스타일
+const scrollbarHideStyle: React.CSSProperties = {
+  msOverflowStyle: "none" /* IE and Edge */,
+  scrollbarWidth: "none" /* Firefox */,
+};
+
 const AdminNoticesPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -43,7 +49,6 @@ const AdminNoticesPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
 
-  // 동명이인 판별을 위한 전체 멤버 리스트
   const [allMembersForNameCheck, setAllMembersForNameCheck] = useState<
     { id: number; name: string; birthDate?: string }[]
   >([]);
@@ -55,7 +60,6 @@ const AdminNoticesPage: React.FC = () => {
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const hasActiveSemesters = semesters.length > 0;
 
-  // ✅ 날짜 포맷팅 함수
   const safeFormatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return "-";
     const targetStr =
@@ -68,7 +72,6 @@ const AdminNoticesPage: React.FC = () => {
     return `${year}.${month}.${day}`;
   };
 
-  // ───────────────── URL 기반 초기값 설정 ─────────────────
   const [filters, setFilters] = useState(() => {
     const title = searchParams.get("title") ?? "";
     const pinnedParam = searchParams.get("pinned");
@@ -440,7 +443,6 @@ const AdminNoticesPage: React.FC = () => {
   };
 
   const requestSort = (key: SortKey) => {
-    // 현재는 createdAt만 지원
     let nextDirection: "asc" | "desc" = "desc";
     const [currentKey, currentDir] = sortOrder.split(",");
 
@@ -465,7 +467,6 @@ const AdminNoticesPage: React.FC = () => {
       .sort((a, b) => b - a);
     const cy = new Date().getFullYear();
 
-    // 연도 옵션이 비어있어도 최소한 현재 연도는 보여주도록 함
     const options =
       validYears.length > 0
         ? validYears.map((year) => ({ value: year, label: `${year}년` }))
@@ -474,25 +475,35 @@ const AdminNoticesPage: React.FC = () => {
     return [{ value: "", label: "전체 연도" }, ...options];
   }, [availableYears]);
 
+  // ✅ [수정] 가로 스크롤 칩 UI 적용 (renderUnitButtons)
   const renderUnitButtons = () => {
     switch (unitType) {
       case "month":
         return (
           <div className="pt-2 border-t border-gray-200/50 mt-2">
-            <label className="text-xs font-bold text-gray-500 mb-2 block">
-              월 선택
-            </label>
-            <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5">
+            <div className="flex justify-between items-end mb-2">
+              <label className="text-xs font-bold text-gray-500">월 선택</label>
+              <span className="text-[10px] text-gray-400 font-normal sm:hidden">
+                좌우로 스크롤
+              </span>
+            </div>
+            <div
+              className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap scrollbar-hide"
+              style={scrollbarHideStyle}
+            >
               {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                 <button
                   key={m}
                   type="button"
                   onClick={() => handleUnitValueClick(m)}
-                  className={`py-1.5 rounded-md text-xs font-bold transition-colors ${
-                    filters.month === m
-                      ? "bg-indigo-600 text-white shadow-sm"
-                      : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
-                  }`}
+                  className={`
+                    flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors whitespace-nowrap
+                    ${
+                      filters.month === m
+                        ? "bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-600"
+                        : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                    }
+                  `}
                 >
                   {m}월
                 </button>
@@ -510,20 +521,31 @@ const AdminNoticesPage: React.FC = () => {
         }
         return (
           <div className="pt-2 border-t border-gray-200/50 mt-2">
-            <label className="text-xs font-bold text-gray-500 mb-2 block">
-              학기 선택
-            </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex justify-between items-end mb-2">
+              <label className="text-xs font-bold text-gray-500">
+                학기 선택
+              </label>
+              <span className="text-[10px] text-gray-400 font-normal sm:hidden">
+                좌우로 스크롤
+              </span>
+            </div>
+            <div
+              className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap scrollbar-hide"
+              style={scrollbarHideStyle}
+            >
               {semesters.map((s) => (
                 <button
                   key={s.id}
                   type="button"
                   onClick={() => handleSemesterClick(s.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all shadow-sm ${
-                    filters.semesterId === s.id
-                      ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
-                      : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                  }`}
+                  className={`
+                    flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all shadow-sm whitespace-nowrap
+                    ${
+                      filters.semesterId === s.id
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-1 ring-indigo-600"
+                        : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                    }
+                  `}
                 >
                   {s.name}
                 </button>
@@ -552,8 +574,8 @@ const AdminNoticesPage: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <MegaphoneIcon className="h-7 w-7 text-indigo-500" />
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2 whitespace-nowrap">
+              <MegaphoneIcon className="h-7 w-7 text-indigo-500 flex-shrink-0" />
               공지사항 {user?.role === "EXECUTIVE" ? "관리" : "목록"}
             </h1>
             <p className="text-sm text-gray-500 mt-1">
@@ -565,7 +587,7 @@ const AdminNoticesPage: React.FC = () => {
           {user?.role === "EXECUTIVE" && (
             <button
               onClick={() => navigate("/admin/notices/add")}
-              className="flex items-center justify-center gap-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm font-bold shadow-sm transition-all"
+              className="flex items-center justify-center gap-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm font-bold shadow-sm transition-all whitespace-nowrap"
             >
               <PlusIcon className="h-4 w-4" /> 새 공지사항
             </button>
@@ -580,42 +602,44 @@ const AdminNoticesPage: React.FC = () => {
 
         {/* Filter Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 border-b border-gray-50 pb-4">
-            <div className="flex items-center gap-2">
-              <FunnelIcon className="h-5 w-5 text-gray-400" />
-              <h3 className="font-bold text-gray-700">조회 조건 설정</h3>
-            </div>
-            {/* Unit vs Range Toggle */}
-            <div className="bg-gray-100 p-1 rounded-xl flex text-xs font-bold w-fit">
-              <button
-                onClick={() => {
-                  setFilterType("unit");
-                  setCurrentPage(0);
-                  syncSearchParams(filters, "unit", unitType, sortOrder, 0);
-                }}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  filterType === "unit"
-                    ? "bg-white text-indigo-600 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                단위별 조회
-              </button>
-              <button
-                onClick={() => {
-                  setFilterType("range");
-                  setCurrentPage(0);
-                  syncSearchParams(filters, "range", unitType, sortOrder, 0);
-                }}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  filterType === "range"
-                    ? "bg-white text-indigo-600 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                기간 직접설정
-              </button>
-            </div>
+          {/* 1. 제목 영역 (단독 배치) */}
+          <div className="flex items-center gap-2 mb-4">
+            <FunnelIcon className="h-5 w-5 text-gray-400" />
+            <h3 className="font-bold text-gray-700 whitespace-nowrap">
+              조회 조건 설정
+            </h3>
+          </div>
+
+          {/* 2. 모드 변경 버튼 (제목 아래로 이동 & 가로 꽉 채움) */}
+          <div className="bg-gray-100 p-1 rounded-xl flex text-xs sm:text-sm font-bold mb-5">
+            <button
+              onClick={() => {
+                setFilterType("unit");
+                setCurrentPage(0);
+                syncSearchParams(filters, "unit", unitType, sortOrder, 0);
+              }}
+              className={`flex-1 py-2 rounded-lg transition-all whitespace-nowrap text-center ${
+                filterType === "unit"
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              단위별
+            </button>
+            <button
+              onClick={() => {
+                setFilterType("range");
+                setCurrentPage(0);
+                syncSearchParams(filters, "range", unitType, sortOrder, 0);
+              }}
+              className={`flex-1 py-2 rounded-lg transition-all whitespace-nowrap text-center ${
+                filterType === "range"
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              기간설정
+            </button>
           </div>
 
           <div className="space-y-5">
@@ -643,7 +667,6 @@ const AdminNoticesPage: React.FC = () => {
               </div>
             ) : (
               <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100">
-                {/* ✅ items-start 적용 */}
                 <div className="flex flex-col sm:flex-row items-start gap-4 mb-2">
                   {/* 1. 연도 선택 */}
                   <div className="w-full sm:w-32">
@@ -659,7 +682,6 @@ const AdminNoticesPage: React.FC = () => {
                             e.target.value === "" ? "" : Number(e.target.value)
                           )
                         }
-                        // ✅ 수정: py-2, px-1, border-gray-300, shadow-sm
                         className="w-full py-2 px-1 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-100 shadow-sm disabled:bg-gray-50 disabled:text-gray-400"
                         disabled={unitType === "semester"}
                       >
@@ -669,7 +691,6 @@ const AdminNoticesPage: React.FC = () => {
                           </option>
                         ))}
                       </select>
-                      {/* ✅ 안내 문구 추가 */}
                       {unitType === "semester" && (
                         <p className="absolute left-0 top-full mt-1 text-[10px] text-gray-400 whitespace-nowrap">
                           * 학기는 연도 무관
@@ -683,11 +704,10 @@ const AdminNoticesPage: React.FC = () => {
                     <label className="text-xs font-bold text-gray-500 mb-1 block">
                       조회 단위
                     </label>
-                    {/* ✅ 수정: 개별 버튼 + gap-2 */}
                     <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => handleUnitTypeClick("month")}
-                        className={`px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
+                        className={`px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all whitespace-nowrap ${
                           unitType === "month"
                             ? "bg-indigo-50 border-indigo-200 text-indigo-700"
                             : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
@@ -700,7 +720,7 @@ const AdminNoticesPage: React.FC = () => {
                           hasActiveSemesters && handleUnitTypeClick("semester")
                         }
                         disabled={!hasActiveSemesters}
-                        className={`px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
+                        className={`px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all whitespace-nowrap ${
                           hasActiveSemesters
                             ? unitType === "semester"
                               ? "bg-indigo-50 border-indigo-200 text-indigo-700"
@@ -712,7 +732,7 @@ const AdminNoticesPage: React.FC = () => {
                       </button>
                       <button
                         onClick={() => handleUnitTypeClick("year")}
-                        className={`px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
+                        className={`px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all whitespace-nowrap ${
                           unitType === "year"
                             ? "bg-indigo-50 border-indigo-200 text-indigo-700"
                             : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
@@ -742,7 +762,6 @@ const AdminNoticesPage: React.FC = () => {
                     onChange={(e) =>
                       handleFilterChange("title", e.target.value)
                     }
-                    // ✅ 수정: py-2, border-gray-300, rounded-lg, shadow-sm
                     className="w-full pl-10 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white transition-all shadow-sm"
                   />
                 </div>
@@ -755,7 +774,6 @@ const AdminNoticesPage: React.FC = () => {
                 <select
                   value={filters.pinned}
                   onChange={(e) => handleFilterChange("pinned", e.target.value)}
-                  // ✅ 수정: py-2, border-gray-300, rounded-lg, shadow-sm
                   className="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white shadow-sm"
                 >
                   <option value="all">전체</option>
@@ -771,7 +789,7 @@ const AdminNoticesPage: React.FC = () => {
                 <div className="flex bg-gray-100 p-1 rounded-xl">
                   <button
                     onClick={() => requestSort("createdAt")}
-                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
                       sortOrder === "createdAt,desc"
                         ? "bg-white text-indigo-700 shadow-sm"
                         : "text-gray-500 hover:text-gray-700"
@@ -792,7 +810,7 @@ const AdminNoticesPage: React.FC = () => {
                         0
                       );
                     }}
-                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
                       sortOrder === "createdAt,asc"
                         ? "bg-white text-indigo-700 shadow-sm"
                         : "text-gray-500 hover:text-gray-700"
@@ -830,7 +848,7 @@ const AdminNoticesPage: React.FC = () => {
                       className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 transition-all"
                     >
                       <div className="flex justify-between items-start gap-2 mb-2">
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <Link
                             to={`/admin/notices/${notice.id}`}
                             className="text-lg font-bold text-indigo-600 hover:text-indigo-800 line-clamp-1"
@@ -838,13 +856,13 @@ const AdminNoticesPage: React.FC = () => {
                             {notice.title}
                           </Link>
                           <div className="flex flex-col gap-0.5 mt-1">
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-gray-500 whitespace-nowrap">
                               작성:{" "}
                               <span className="font-medium text-gray-700">
                                 {safeFormatDate(notice.createdAt)}
                               </span>
                             </span>
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-gray-500 whitespace-nowrap">
                               작성자:{" "}
                               <span className="font-medium text-gray-700">
                                 {getFormattedName(
@@ -856,7 +874,7 @@ const AdminNoticesPage: React.FC = () => {
                           </div>
                         </div>
                         {notice.pinned && (
-                          <div className="bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg flex items-center gap-1">
+                          <div className="bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg flex items-center gap-1 flex-shrink-0">
                             <MapPinIcon className="h-3 w-3" />
                             <span className="text-[10px] font-bold">고정</span>
                           </div>
@@ -869,13 +887,13 @@ const AdminNoticesPage: React.FC = () => {
                             onClick={() =>
                               navigate(`/admin/notices/${notice.id}/edit`)
                             }
-                            className="bg-gray-50 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-100 hover:bg-indigo-50 flex items-center gap-1"
+                            className="bg-gray-50 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-100 hover:bg-indigo-50 flex items-center gap-1 whitespace-nowrap"
                           >
                             <PencilIcon className="h-3 w-3" /> 수정
                           </button>
                           <button
                             onClick={() => handleDelete(notice)}
-                            className="bg-gray-50 text-red-500 px-3 py-1.5 rounded-lg text-xs font-bold border border-red-100 hover:bg-red-50 flex items-center gap-1"
+                            className="bg-gray-50 text-red-500 px-3 py-1.5 rounded-lg text-xs font-bold border border-red-100 hover:bg-red-50 flex items-center gap-1 whitespace-nowrap"
                           >
                             <TrashIcon className="h-3 w-3" /> 삭제
                           </button>
@@ -905,7 +923,6 @@ const AdminNoticesPage: React.FC = () => {
                         <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">
                           작성자
                         </th>
-                        {/* ✅ 관리 헤더 우측 정렬 유지 */}
                         <th className="px-6 py-3 text-right font-bold text-gray-500 uppercase text-xs">
                           {/* 관리 */}
                         </th>
@@ -920,7 +937,7 @@ const AdminNoticesPage: React.FC = () => {
                           <td className="px-6 py-4 font-bold text-indigo-600">
                             <Link
                               to={`/admin/notices/${notice.id}`}
-                              className="hover:underline"
+                              className="hover:underline line-clamp-1"
                             >
                               {notice.title}
                             </Link>
@@ -933,16 +950,15 @@ const AdminNoticesPage: React.FC = () => {
                               </div>
                             )}
                           </td>
-                          <td className="px-6 py-4 text-gray-500">
+                          <td className="px-6 py-4 text-gray-500 whitespace-nowrap">
                             {safeFormatDate(notice.createdAt)}
                           </td>
-                          <td className="px-6 py-4 text-gray-700 font-medium">
+                          <td className="px-6 py-4 text-gray-700 font-medium whitespace-nowrap">
                             {getFormattedName(
                               notice.createdBy?.id,
                               notice.createdBy?.name
                             )}
                           </td>
-                          {/* ✅ 관리 열: 우측 정렬 + 텍스트 버튼 스타일 */}
                           <td className="px-6 py-4 text-right">
                             {user?.role === "EXECUTIVE" && (
                               <div className="flex justify-end gap-2">
@@ -950,13 +966,13 @@ const AdminNoticesPage: React.FC = () => {
                                   onClick={() =>
                                     navigate(`/admin/notices/${notice.id}/edit`)
                                   }
-                                  className="text-gray-400 hover:text-indigo-600 font-bold text-xs"
+                                  className="text-gray-400 hover:text-indigo-600 font-bold text-xs whitespace-nowrap"
                                 >
                                   수정
                                 </button>
                                 <button
                                   onClick={() => handleDelete(notice)}
-                                  className="text-gray-400 hover:text-red-500 font-bold text-xs"
+                                  className="text-gray-400 hover:text-red-500 font-bold text-xs whitespace-nowrap"
                                 >
                                   삭제
                                 </button>

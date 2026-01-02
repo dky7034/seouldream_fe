@@ -1,4 +1,3 @@
-// src/components/attendance/TakeAttendanceView.tsx
 import React, { useEffect, useState, useMemo } from "react";
 import { attendanceService } from "../../services/attendanceService";
 import { memberService } from "../../services/memberService";
@@ -161,25 +160,29 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
   useEffect(() => {
     if (selectedDate || allSemesters.length === 0) return;
 
+    // ✅ [버그 수정] 학기 기간 여부와 상관없이 무조건 '이번 주 주일'을 기본값으로 설정
+    // (기존에는 기간 아니라고 종료일(6/30)로 튀는 문제 있었음)
     const defaultSunday = toISODate(getMostRecentSunday());
-    const isValidDate = allSemesters.some(
-      (s) => defaultSunday >= s.startDate && defaultSunday <= s.endDate
-    );
-
-    if (isValidDate) {
-      setSelectedDate(defaultSunday);
-    } else {
-      const sortedSemesters = [...allSemesters].sort((a, b) =>
-        b.endDate.localeCompare(a.endDate)
-      );
-      const latestSemester = sortedSemesters[0];
-      if (latestSemester) {
-        setSelectedDate(latestSemester.endDate);
-      } else {
-        setSelectedDate(defaultSunday);
-      }
-    }
+    setSelectedDate(defaultSunday);
   }, [allSemesters, selectedDate]);
+
+  // ✅ [추가] 학기 정보를 바탕으로 선택 가능한 최소/최대 날짜 계산
+  const { minDate, maxDate } = useMemo(() => {
+    if (allSemesters.length === 0)
+      return { minDate: undefined, maxDate: undefined };
+
+    // allSemesters는 이미 활성화된 학기(active=true)만 가져온 상태
+    const startDates = allSemesters.map((s) => s.startDate).sort();
+    const endDates = allSemesters.map((s) => s.endDate).sort();
+
+    const earliest = startDates[0];
+    const latest = endDates[endDates.length - 1];
+
+    return {
+      minDate: new Date(earliest),
+      maxDate: new Date(latest),
+    };
+  }, [allSemesters]);
 
   const semesterForSelectedDate = useMemo(() => {
     if (!selectedDate || allSemesters.length === 0) return null;
@@ -438,6 +441,11 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
             <KoreanCalendarPicker
               value={selectedDate}
               onChange={onDateSelect}
+              // ✅ [핵심 1] 일요일(day 0)만 선택 가능
+              filterDate={(date) => date.getDay() === 0}
+              // ✅ [핵심 2] 학기 기간 내로만 연도/월 이동 제한
+              minDate={minDate}
+              maxDate={maxDate}
             />
 
             {semesterForSelectedDate ? (
@@ -468,14 +476,12 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
           <>
             {/* 2. 멤버별 출석 체크 섹션 */}
             <div className="space-y-4">
-              {/* ✅ [개선] 헤더 영역 레이아웃 재구성: 제목과 버튼 분리 및 반응형 처리 */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1 mb-2">
                 <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 whitespace-nowrap">
                   <ClipboardDocumentCheckIcon className="h-5 w-5 text-indigo-500" />
                   멤버 출석 & 기도제목
                 </h3>
 
-                {/* ✅ [개선] 일괄 변경 버튼 Grid Layout + 스타일 통일 */}
                 <div className="grid grid-cols-2 gap-2 w-full sm:w-auto">
                   <button
                     type="button"
@@ -513,13 +519,10 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                               {formatDisplayName(member, allMembers)}
                             </h4>
                             <p className="text-xs text-gray-500 mt-0.5 truncate">
-                              {member.role === "CELL_LEADER"
-                                ? "셀리더"
-                                : "셀원"}
+                              {member.role === "CELL_LEADER" ? "셀장" : "셀원"}
                             </p>
                           </div>
 
-                          {/* Custom Toggle Buttons */}
                           <div className="flex bg-gray-100 p-1 rounded-xl flex-shrink-0">
                             <button
                               type="button"
@@ -560,7 +563,6 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                           </div>
                         </div>
 
-                        {/* Prayer Input */}
                         <div>
                           <label className="text-xs font-bold text-gray-500 mb-1.5 flex items-center gap-1 whitespace-nowrap">
                             기도제목 및 특이사항{" "}
@@ -614,7 +616,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                     value={cellShare}
                     onChange={(e) => setCellShare(e.target.value)}
                     readOnly={isEditMode}
-                    placeholder="셀 모임에서 나눈 은혜를 기록해 주세요."
+                    placeholder="셀 모임에서 나눈 은혜를 적어주세요."
                     rows={4}
                     className={`w-full text-sm p-4 rounded-xl shadow-sm resize-y min-h-[120px] transition-colors
                     ${

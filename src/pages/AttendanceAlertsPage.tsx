@@ -259,40 +259,43 @@ const AttendanceAlertsPage: React.FC = () => {
         )}
 
         {/* Filter Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6 space-y-5">
-          <div className="flex flex-col sm:flex-row items-start gap-5">
-            {/* Unit Toggle */}
-            <div className="sm:w-1/3">
-              <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 flex items-center gap-1">
-                <FunnelIcon className="h-4 w-4" /> 조회 기준
-              </label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleUnitTypeClick("semester")}
-                  className={`flex-1 py-2 px-3 text-xs sm:text-sm font-bold rounded-lg border shadow-sm transition-all whitespace-nowrap ${
-                    unitType === "semester"
-                      ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                      : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
-                  }`}
-                >
-                  학기별
-                </button>
-                <button
-                  onClick={() => handleUnitTypeClick("year")}
-                  className={`flex-1 py-2 px-3 text-xs sm:text-sm font-bold rounded-lg border shadow-sm transition-all whitespace-nowrap ${
-                    unitType === "year"
-                      ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                      : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
-                  }`}
-                >
-                  연도별
-                </button>
-              </div>
-            </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6">
+          {/* 1. 제목 영역 (단독 배치) */}
+          <div className="flex items-center gap-2 mb-4">
+            <FunnelIcon className="h-5 w-5 text-gray-400" />
+            <h3 className="font-bold text-gray-700 whitespace-nowrap">
+              조회 조건 설정
+            </h3>
+          </div>
 
-            {/* Selection Area */}
-            <div className="flex-1 w-full">
-              <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 flex items-center gap-1">
+          {/* 2. 탭 버튼 영역 (상단 탭 스타일) */}
+          <div className="bg-gray-100 p-1 rounded-xl flex text-xs sm:text-sm font-bold mb-5">
+            <button
+              onClick={() => handleUnitTypeClick("semester")}
+              className={`flex-1 py-2 rounded-lg transition-all whitespace-nowrap text-center ${
+                unitType === "semester"
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              학기별 조회
+            </button>
+            <button
+              onClick={() => handleUnitTypeClick("year")}
+              className={`flex-1 py-2 rounded-lg transition-all whitespace-nowrap text-center ${
+                unitType === "year"
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              연도별 조회
+            </button>
+          </div>
+
+          <div className="space-y-5">
+            {/* 3. 상세 선택 영역 (학기/연도) */}
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1">
                 <CalendarDaysIcon className="h-4 w-4" />{" "}
                 {unitType === "semester" ? "학기 선택" : "연도 선택"}
               </label>
@@ -300,9 +303,9 @@ const AttendanceAlertsPage: React.FC = () => {
               {unitType === "semester" ? (
                 <>
                   {semesters.length === 0 ? (
-                    <span className="text-sm text-gray-400 py-2 block">
-                      활성 학기 없음
-                    </span>
+                    <div className="rounded-lg bg-yellow-50 p-3 text-xs text-yellow-800 border border-yellow-100">
+                      활성 학기가 없습니다.
+                    </div>
                   ) : (
                     <>
                       <div className="sm:hidden mb-1 text-[10px] text-gray-400 font-normal text-right">
@@ -325,7 +328,6 @@ const AttendanceAlertsPage: React.FC = () => {
                               }
                             `}
                           >
-                            {/* 활성 상태 표시 (API가 활성 학기만 주더라도 UI 일관성 유지) */}
                             <span
                               className={`w-1.5 h-1.5 rounded-full ${
                                 s.isActive ? "bg-green-400" : "bg-gray-300"
@@ -352,34 +354,35 @@ const AttendanceAlertsPage: React.FC = () => {
                 </select>
               )}
             </div>
-          </div>
 
-          <div className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row items-end gap-4">
-            <div className="w-full sm:flex-1">
-              <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 block">
-                연속 결석 기준 (회)
-              </label>
-              <input
-                type="number"
-                min={1}
-                value={consecutiveAbsences}
-                onChange={(e) => setConsecutiveAbsences(e.target.value)}
-                onBlur={handleBlur}
-                className="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
-              />
+            {/* 4. 연속 결석 기준 입력 및 조회 버튼 */}
+            <div className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row items-end gap-4">
+              <div className="w-full sm:flex-1">
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 block">
+                  연속 결석 기준 (회)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={consecutiveAbsences}
+                  onChange={(e) => setConsecutiveAbsences(e.target.value)}
+                  onBlur={handleBlur}
+                  className="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+                />
+              </div>
+              <button
+                onClick={handleSearchClick}
+                disabled={loading}
+                className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50 shadow-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] whitespace-nowrap"
+              >
+                {loading ? (
+                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                ) : (
+                  <MagnifyingGlassIcon className="h-4 w-4" />
+                )}
+                조회하기
+              </button>
             </div>
-            <button
-              onClick={handleSearchClick}
-              disabled={loading}
-              className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50 shadow-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] whitespace-nowrap"
-            >
-              {loading ? (
-                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-              ) : (
-                <MagnifyingGlassIcon className="h-4 w-4" />
-              )}
-              조회하기
-            </button>
           </div>
         </div>
 

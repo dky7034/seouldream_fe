@@ -586,7 +586,7 @@ const CellAttendanceMatrixCard: React.FC<{
                     >
                       {availableYears.map((year) => (
                         <option key={year} value={year}>
-                          {year}년 전체
+                          {year}년
                         </option>
                       ))}
                     </select>
@@ -625,17 +625,19 @@ const CellAttendanceMatrixCard: React.FC<{
                 ))}
               </div>
             </div>
-            <div className="flex items-center justify-end text-xs text-gray-500 bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm">
-              <FaClock className="mr-1.5 text-gray-400" />
-              <span className="font-mono text-gray-700">
-                {formatDate(startDate)} ~ {formatDate(endDate)}
-                {/* 방학 제외 안내 뱃지 */}
-                {unitType === "year" && (
-                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">
-                    방학 제외
-                  </span>
-                )}
-              </span>
+            {/* 👇 [여기]를 위 코드로 교체하세요 👇 */}
+            <div className="flex flex-wrap items-center justify-between sm:justify-end gap-y-2 gap-x-3 text-xs text-gray-500 bg-white px-3.5 py-2.5 rounded-xl border border-gray-200 shadow-sm w-full sm:w-auto">
+              <div className="flex items-center">
+                <FaClock className="mr-1.5 text-indigo-400 flex-shrink-0" />
+                <span className="font-mono text-gray-700 font-bold tracking-tight text-sm">
+                  {formatDate(startDate)} ~ {formatDate(endDate)}
+                </span>
+              </div>
+              {unitType === "year" && (
+                <span className="flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-orange-50 text-orange-600 border border-orange-100 shadow-sm">
+                  ✨ 방학 제외
+                </span>
+              )}
             </div>
           </div>
           {unitType === "month" && activeSemester && (

@@ -135,7 +135,7 @@ const CellPrayersManager: React.FC<CellPrayersManagerProps> = ({
 
   const fetchPrayers = useCallback(async () => {
     if (!user.cellId) {
-      setError("셀 리더 정보에 셀 ID가 없습니다. 관리자에게 문의하세요.");
+      setError("셀장 정보에 셀 ID가 없습니다. 관리자에게 문의하세요.");
       setLoading(false);
       return;
     }

@@ -796,36 +796,36 @@ const AdminAttendancesPage: React.FC = () => {
 
         {/* Filter Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6">
-          <div className="flex items-center justify-between mb-4 border-b border-gray-50 pb-2">
-            <div className="flex items-center gap-2">
-              <FunnelIcon className="h-5 w-5 text-gray-400" />
-              <h3 className="font-bold text-gray-700 whitespace-nowrap">
-                검색 및 필터
-              </h3>
-            </div>
-            {/* ✅ [수정] whitespace-nowrap 추가: 작은 화면에서 버튼 내 줄바꿈 방지 */}
-            <div className="bg-gray-100 p-1 rounded-xl flex text-xs font-bold">
-              <button
-                onClick={() => setFilterType("unit")}
-                className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
-                  filterType === "unit"
-                    ? "bg-white text-indigo-600 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                단위별 조회
-              </button>
-              <button
-                onClick={() => setFilterType("range")}
-                className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
-                  filterType === "range"
-                    ? "bg-white text-indigo-600 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                기간 직접설정
-              </button>
-            </div>
+          {/* 1. 제목 영역 (justify-between 제거 및 단독 배치) */}
+          <div className="flex items-center gap-2 mb-4">
+            <FunnelIcon className="h-5 w-5 text-gray-400" />
+            <h3 className="font-bold text-gray-700 whitespace-nowrap">
+              검색 및 필터
+            </h3>
+          </div>
+
+          {/* 2. 모드 변경 버튼 (제목 아래로 이동 & 가로 꽉 채움) */}
+          <div className="bg-gray-100 p-1 rounded-xl flex text-xs sm:text-sm font-bold mb-5">
+            <button
+              onClick={() => setFilterType("unit")}
+              className={`flex-1 py-2 rounded-lg transition-all whitespace-nowrap text-center ${
+                filterType === "unit"
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              단위별
+            </button>
+            <button
+              onClick={() => setFilterType("range")}
+              className={`flex-1 py-2 rounded-lg transition-all whitespace-nowrap text-center ${
+                filterType === "range"
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              기간설정
+            </button>
           </div>
 
           <div className="space-y-5">

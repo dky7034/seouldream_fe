@@ -699,33 +699,36 @@ const AdminPrayersPage: React.FC = () => {
         </div>
 
         {/* ====== 기간 필터 영역 ====== */}
-        <div className="p-4 bg-gray-50 rounded-lg mb-3 sm:mb-4 space-y-4 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <h3 className="text-base sm:text-lg font-semibold">
+        <div className="p-4 bg-gray-50 rounded-lg mb-3 sm:mb-4 space-y-4 shadow-sm border border-gray-100">
+          {/* 1. 제목 영역 (단독 배치) */}
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="text-base sm:text-lg font-bold text-gray-800">
               조회 기간 설정
             </h3>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => setFilterType("unit")}
-                className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
-                  filterType === "unit"
-                    ? "bg-blue-500 text-white"
-                    : "bg-white border"
-                }`}
-              >
-                단위로 조회
-              </button>
-              <button
-                onClick={() => setFilterType("range")}
-                className={`px-3 py-1 text-xs sm:text-sm rounded-full ${
-                  filterType === "range"
-                    ? "bg-blue-500 text-white"
-                    : "bg-white border"
-                }`}
-              >
-                기간으로 조회
-              </button>
-            </div>
+          </div>
+
+          {/* 2. 탭 버튼 영역 (제목 아래로 이동 & 가로 꽉 채움) */}
+          <div className="bg-white p-1 rounded-xl border border-gray-200 flex text-xs sm:text-sm font-bold shadow-sm">
+            <button
+              onClick={() => setFilterType("unit")}
+              className={`flex-1 py-2 rounded-lg transition-all whitespace-nowrap text-center ${
+                filterType === "unit"
+                  ? "bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-200"
+                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              단위별 조회
+            </button>
+            <button
+              onClick={() => setFilterType("range")}
+              className={`flex-1 py-2 rounded-lg transition-all whitespace-nowrap text-center ${
+                filterType === "range"
+                  ? "bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-200"
+                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              기간 설정
+            </button>
           </div>
 
           {filterType === "range" ? (

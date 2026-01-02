@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import authService from "../services/authService";
 import type { CreateMemberRequest } from "../types";
 import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
-// 👇 아이콘 추가
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 
 interface FormErrors {
@@ -34,7 +33,6 @@ const RegisterPage: React.FC = () => {
   const [errors, setErrors] = useState<FormErrors>({});
   const [passwordMatchMsg, setPasswordMatchMsg] = useState<string>("");
 
-  // 👇 비밀번호 보임/숨김 상태 관리
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
@@ -69,7 +67,6 @@ const RegisterPage: React.FC = () => {
     }
   };
 
-  // 비밀번호 일치 여부 체크
   useEffect(() => {
     if (passwordConfirm && formData.password) {
       if (formData.password === passwordConfirm) {
@@ -107,27 +104,22 @@ const RegisterPage: React.FC = () => {
   const validate = (): FormErrors => {
     const newErrors: FormErrors = {};
 
-    // 이메일 (선택 항목이지만 입력값이 있다면 형식 검사 수행)
     if (formData.email && !/^\S+@\S+\.\S+$/.test(formData.email)) {
       newErrors.email = "올바른 이메일 형식이 아닙니다.";
     }
 
-    // 연락처 (숫자, -만 허용)
     if (!/^[0-9-]+$/.test(formData.phone)) {
       newErrors.phone = "연락처는 숫자와 하이픈(-)만 입력 가능합니다.";
     }
 
-    // 등록 연도
     if (formData.joinYear && formData.joinYear > new Date().getFullYear()) {
       newErrors.joinYear = "등록 연도는 현재 연도보다 미래일 수 없습니다.";
     }
 
-    // 비밀번호 확인
     if (formData.password !== passwordConfirm) {
       newErrors.password = "비밀번호가 일치하지 않습니다.";
     }
 
-    // 아이디 중복 체크
     if (!hasUsernameBeenChecked) {
       newErrors.username = "아이디 중복 확인을 해주세요.";
     } else if (!isUsernameAvailable) {
@@ -177,7 +169,7 @@ const RegisterPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* 이름 (필수) */}
+                {/* 이름 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     이름 <span className="text-red-500">*</span>
@@ -192,7 +184,7 @@ const RegisterPage: React.FC = () => {
                   />
                 </div>
 
-                {/* 아이디 + 중복 확인 (필수) */}
+                {/* 아이디 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     아이디 <span className="text-red-500">*</span>
@@ -234,7 +226,7 @@ const RegisterPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 이메일 (선택 항목) */}
+                {/* 이메일 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     이메일
@@ -253,7 +245,7 @@ const RegisterPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* 연락처 (필수) */}
+                {/* 연락처 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     연락처 <span className="text-red-500">*</span>
@@ -274,7 +266,7 @@ const RegisterPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* 👇 비밀번호 (필수) - 눈 모양 아이콘 추가됨 */}
+                {/* 비밀번호 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     비밀번호 <span className="text-red-500">*</span>
@@ -303,7 +295,7 @@ const RegisterPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 👇 비밀번호 확인 (필수) - 눈 모양 아이콘 추가됨 */}
+                {/* 비밀번호 확인 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     비밀번호 확인 <span className="text-red-500">*</span>
@@ -349,20 +341,17 @@ const RegisterPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 성별 / 생년월일 (필수) */}
+                {/* 성별 / 생년월일 */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
                       성별 <span className="text-red-500">*</span>
                     </label>
-
-                    {/* ✅ select 높이 고정 (h-10) */}
                     <select
                       name="gender"
                       value={formData.gender}
                       onChange={handleChange}
-                      className="mt-1 block w-full h-10 px-3 text-sm border border-gray-300 rounded-md shadow-sm bg-white
-                 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="mt-1 block w-full h-10 px-3 text-sm border border-gray-300 rounded-md shadow-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                     >
                       <option value="MALE">남성</option>
                       <option value="FEMALE">여성</option>
@@ -374,14 +363,14 @@ const RegisterPage: React.FC = () => {
                       생년월일 <span className="text-red-500">*</span>
                     </label>
 
-                    {/* ✅ react-datepicker 래퍼/인풋 높이 강제 맞춤 */}
+                    {/* ✅ 스타일: button 높이(h-10) 적용 및 placeholder 추가 */}
                     <div
                       className="mt-1
-                 [&_.react-datepicker-wrapper]:w-full
-                 [&_.react-datepicker__input-container]:w-full
-                 [&_input]:!h-10
-                 [&_input]:!py-0
-                 [&_input]:!leading-10"
+                        [&_.react-datepicker-wrapper]:w-full
+                        [&_.react-datepicker__input-container]:w-full
+                        [&_button]:!h-10
+                        [&_button]:!flex
+                        [&_button]:!items-center"
                     >
                       <KoreanCalendarPicker
                         value={formData.birthDate}
@@ -392,12 +381,14 @@ const RegisterPage: React.FC = () => {
                           }))
                         }
                         maxDate={new Date()}
+                        // ✅ 안내 문구
+                        placeholder="생년월일을 선택해주세요"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* 등록 연도 / 역할 (필수) */}
+                {/* 등록 연도 / 역할 */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">

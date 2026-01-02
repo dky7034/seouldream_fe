@@ -34,6 +34,7 @@ import {
   FaInfoCircle,
   FaCalendarAlt,
   FaBullhorn,
+  FaChevronDown,
 } from "react-icons/fa";
 
 type UnitType = "semester" | "month";
@@ -943,7 +944,7 @@ const CellLeaderDashboard: React.FC = () => {
           셀 배정 대기 중
         </h2>
         <p className="text-gray-500 text-center mb-6 leading-relaxed">
-          관리자(임원단)로부터 셀 리더 권한은 부여받았으나,
+          관리자(임원단)로부터 셀장 권한은 부여받았으나,
           <br />
           아직 담당 셀이 지정되지 않았습니다.
           <br />
@@ -976,47 +977,50 @@ const CellLeaderDashboard: React.FC = () => {
             <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
               내 셀 대시보드
             </h2>
-            <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500 mt-1">
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500 mt-2">
               {user.cellName && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-100">
                   {user.cellName}
                 </span>
               )}
-              {semesters.length > 1 ? (
-                <div className="flex items-center bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
-                  <FaCalendarAlt className="text-indigo-500 mr-2 text-xs" />
-                  <select
-                    value={activeSemester?.id || ""}
-                    onChange={(e) =>
-                      handleSemesterChange(Number(e.target.value))
-                    }
-                    className="bg-transparent text-indigo-700 font-bold text-xs sm:text-sm focus:outline-none cursor-pointer"
-                  >
-                    {semesters.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} 기준
-                      </option>
-                    ))}
-                  </select>
+
+              {/* 학기 선택 Select 개선 */}
+              {semesters.length > 0 ? (
+                <div className="relative group">
+                  <div className="flex items-center bg-white px-2.5 py-0.5 rounded-full border border-gray-200 shadow-sm hover:border-indigo-300 transition-all cursor-pointer">
+                    <FaCalendarAlt className="text-indigo-500 mr-1.5 text-xs" />
+                    <select
+                      value={activeSemester?.id || ""}
+                      onChange={(e) =>
+                        handleSemesterChange(Number(e.target.value))
+                      }
+                      className="appearance-none bg-transparent text-gray-700 font-bold text-xs focus:outline-none cursor-pointer pr-4"
+                      style={{ textAlignLast: "center" }}
+                    >
+                      {semesters.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} 기준
+                        </option>
+                      ))}
+                    </select>
+                    <FaChevronDown className="absolute right-2 text-[10px] text-gray-400 pointer-events-none group-hover:text-indigo-400" />
+                  </div>
                 </div>
-              ) : activeSemester ? (
-                <span className="font-medium text-indigo-600">
-                  [{activeSemester.name}] 기준
-                </span>
               ) : (
-                <span>활성화된 학기 없음</span>
+                <span className="text-gray-400">활성화된 학기 없음</span>
               )}
             </div>
           </div>
 
+          {/* 보기 모드 버튼 (월별/학기) */}
           {activeSemester && (
-            <div className="flex gap-1 bg-gray-100 p-1 rounded-lg self-start">
+            <div className="flex bg-gray-100 p-1 rounded-xl self-start sm:self-center">
               <button
                 onClick={() => handleUnitTypeClick("month")}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${
                   unitType === "month"
-                    ? "bg-white text-indigo-700 shadow ring-1 ring-black/5"
-                    : "text-gray-500 hover:bg-gray-200"
+                    ? "bg-white text-indigo-600 shadow-sm ring-1 ring-black/5"
+                    : "text-gray-500 hover:text-gray-700"
                 }`}
                 type="button"
               >
@@ -1024,10 +1028,10 @@ const CellLeaderDashboard: React.FC = () => {
               </button>
               <button
                 onClick={() => handleUnitTypeClick("semester")}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${
                   unitType === "semester"
-                    ? "bg-white text-indigo-700 shadow ring-1 ring-black/5"
-                    : "text-gray-500 hover:bg-gray-200"
+                    ? "bg-white text-indigo-600 shadow-sm ring-1 ring-black/5"
+                    : "text-gray-500 hover:text-gray-700"
                 }`}
                 type="button"
               >
@@ -1037,15 +1041,22 @@ const CellLeaderDashboard: React.FC = () => {
           )}
         </div>
 
-        {/* Month Buttons */}
+        {/* Month Buttons (가로 스크롤 적용) */}
         {unitType === "month" && activeSemester && (
-          <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm animate-fadeIn">
-            <span className="text-xs font-bold text-gray-500 block mb-2">
-              {activeSemester.name} 상세 월 선택:
-            </span>
+          <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm animate-fadeIn">
+            <div className="flex justify-between items-end mb-2 px-1">
+              <span className="text-xs font-bold text-gray-500">
+                상세 월 선택
+              </span>
+              <span className="text-[10px] text-gray-400 font-normal sm:hidden">
+                좌우로 스크롤
+              </span>
+            </div>
+
             <div
               ref={monthButtonsContainerRef}
-              className="flex flex-wrap gap-2"
+              className="flex overflow-x-auto gap-2 pb-1 -mx-1 px-1 scrollbar-hide snap-x"
+              style={{ scrollBehavior: "smooth" }}
             >
               {getSemesterMonths().map((m) => (
                 <button
@@ -1054,11 +1065,14 @@ const CellLeaderDashboard: React.FC = () => {
                   ref={(el) => {
                     monthButtonRefs.current[m] = el;
                   }}
-                  className={`px-3 py-1.5 text-xs rounded-full border transition-all ${
-                    selectedMonth === m
-                      ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-300"
-                      : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                  }`}
+                  className={`
+                      flex-shrink-0 px-4 py-1.5 text-xs font-bold rounded-full border transition-all snap-start whitespace-nowrap
+                      ${
+                        selectedMonth === m
+                          ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-200"
+                          : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                      }
+                    `}
                   type="button"
                 >
                   {m}월
@@ -1068,6 +1082,7 @@ const CellLeaderDashboard: React.FC = () => {
           </div>
         )}
 
+        {/* 요약 칩들 */}
         <SummaryChips
           incompleteCount={realIncompleteCheckCount}
           memberCount={members.length}
