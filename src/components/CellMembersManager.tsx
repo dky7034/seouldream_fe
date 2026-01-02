@@ -148,7 +148,7 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
 
       {!loading && !error && (
         <>
-          {/* ✅ 모바일: 카드형 리스트 (최적화됨) */}
+          {/* ✅ [수정됨] 모바일: 카드형 리스트 (정보 잘림 방지) */}
           <div className="sm:hidden space-y-3 px-1">
             {sortedMembers.map((member) => {
               const isMe = user.memberId === member.id;
@@ -171,31 +171,33 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                   }`}
                 >
                   {/* 상단: 이름 + 역할 뱃지 */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3 overflow-hidden">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      {/* 프로필 아바타 */}
                       <div
-                        className={`h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center text-lg font-bold ${
+                        className={`h-11 w-11 flex-shrink-0 rounded-full flex items-center justify-center text-lg font-bold border ${
                           isMe
-                            ? "bg-indigo-100 text-indigo-600"
-                            : "bg-gray-100 text-gray-500"
+                            ? "bg-indigo-50 text-indigo-600 border-indigo-100"
+                            : "bg-gray-100 text-gray-500 border-gray-200"
                         }`}
                       >
                         {displayName.charAt(0)}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-gray-900 text-base truncate">
+
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-gray-900 text-base">
                             {displayName}
                           </span>
                           {isMe && (
-                            <span className="flex-shrink-0 text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100 whitespace-nowrap">
+                            <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">
                               나
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-1 mt-0.5">
+                        <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                           <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap ${
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
                               member.role === "EXECUTIVE"
                                 ? "bg-red-50 text-red-700"
                                 : member.role === "CELL_LEADER"
@@ -206,7 +208,7 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                             {translateRole(member.role)}
                           </span>
                           {!member.active && (
-                            <span className="px-2 py-0.5 rounded bg-gray-200 text-gray-500 text-[10px] font-bold whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded bg-gray-200 text-gray-500 text-[10px] font-bold">
                               비활동
                             </span>
                           )}
@@ -215,23 +217,26 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                     </div>
                   </div>
 
-                  {/* 하단: 정보 그리드 (whitespace-nowrap 적용) */}
-                  <div className="grid grid-cols-2 gap-y-2 text-xs text-gray-500 border-t border-gray-50 pt-3">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <CakeIcon className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-                      <span className="truncate whitespace-nowrap">
-                        {displayBirthDate || "-"} {ageDisplay}
+                  {/* 하단: 정보 그리드 (줄바꿈 허용으로 잘림 방지) */}
+                  <div className="grid grid-cols-1 gap-y-2 text-xs text-gray-600 border-t border-gray-50 pt-3">
+                    <div className="flex items-center gap-2">
+                      <CakeIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <span>
+                        {displayBirthDate || "미입력"}{" "}
+                        <span className="text-gray-400">{ageDisplay}</span>
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <CalendarDaysIcon className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-                      <span className="truncate whitespace-nowrap">
-                        {member.joinYear ? `${member.joinYear}년 등록` : "-"}
+                    <div className="flex items-center gap-2">
+                      <CalendarDaysIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <span>
+                        {member.joinYear
+                          ? `${member.joinYear}년 등록`
+                          : "등록연도 미상"}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5 col-span-2 min-w-0">
-                      <ClockIcon className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-                      <span className="truncate whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      <ClockIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <span>
                         배정일:{" "}
                         {safeFormatDate(member.cellAssignmentDate) || "미배정"}
                       </span>
@@ -248,7 +253,7 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
             )}
           </div>
 
-          {/* ✅ 데스크톱: 테이블 뷰 */}
+          {/* ✅ 데스크톱: 테이블 뷰 (기존 유지) */}
           <div className="hidden sm:block bg-white shadow-sm rounded-b-2xl border-x border-b border-gray-200 overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead className="bg-gray-50/50">
