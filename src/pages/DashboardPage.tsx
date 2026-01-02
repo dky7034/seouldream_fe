@@ -52,6 +52,12 @@ import { DemographicsSection } from "../components/DemographicsSection";
 type SummaryMode = "SEMESTER" | "YEAR";
 type IncompleteFilter = "WEEK" | "MONTH" | "SEMESTER";
 
+// 스크롤바 숨김 스타일
+const scrollbarHideStyle: React.CSSProperties = {
+  msOverflowStyle: "none" /* IE and Edge */,
+  scrollbarWidth: "none" /* Firefox */,
+};
+
 // ✅ 날짜 포맷팅 함수 (Display Only)
 const safeFormatDate = (dateStr: string | null | undefined) => {
   if (!dateStr) return "-";
@@ -63,25 +69,20 @@ const safeFormatDate = (dateStr: string | null | undefined) => {
 
 // --- Helper Functions ---
 
-// ✅ 차트/통계용 날짜 계산 (미래 날짜 제한 적용됨)
-// ✅ [수정됨] 6번째 인자(selectedYear) 추가 및 로직 반영
 const computeTrendRange = (
   isExecutive: boolean,
   summaryMode: SummaryMode,
   period: string,
   semesters: SemesterDto[],
   selectedSemesterId: number | null,
-  selectedYear: number // 👈 [중요] 이 인자가 빠져있어서 에러가 난 것입니다. 추가해주세요!
+  selectedYear: number
 ) => {
   let range = { startDate: "", endDate: "" };
 
   if (!isExecutive) {
     range = getPeriodDates(period);
   } else {
-    // const currentYear = new Date().getFullYear(); // 👈 기존 로직 (삭제)
-
     if (summaryMode === "YEAR") {
-      // ✅ [수정] 인자로 받은 selectedYear를 사용하도록 변경
       range = {
         startDate: `${selectedYear}-01-01`,
         endDate: `${selectedYear}-12-31`,
@@ -91,7 +92,6 @@ const computeTrendRange = (
       if (semester) {
         range = { startDate: semester.startDate, endDate: semester.endDate };
       } else {
-        // Fallback도 selectedYear 기준
         range = {
           startDate: `${selectedYear}-01-01`,
           endDate: `${selectedYear}-12-31`,
@@ -100,7 +100,7 @@ const computeTrendRange = (
     }
   }
 
-  // 🔹 Future Cap: 종료일이 오늘보다 미래면 오늘로 제한
+  // 🔹 Future Cap
   const today = new Date();
   today.setHours(23, 59, 59, 999);
 
@@ -115,7 +115,6 @@ const computeTrendRange = (
   return range;
 };
 
-// ✅ [수정됨] 누락 리포트용 날짜 계산 (학기 범위 준수)
 const computeIncompleteRange = (
   filter: IncompleteFilter,
   semesters: SemesterDto[],
@@ -123,7 +122,6 @@ const computeIncompleteRange = (
 ) => {
   let requestedRange = { startDate: "", endDate: "" };
 
-  // 1. 기본 범위 계산 (주간/월간/학기전체)
   if (filter === "WEEK") {
     requestedRange = getThisWeekRange();
   } else if (filter === "MONTH") {
@@ -135,7 +133,6 @@ const computeIncompleteRange = (
       endDate: toISODateString(last),
     };
   } else {
-    // 학기 전체
     const semester =
       semesters.find((s) => s.id === selectedSemesterId) ??
       semesters.find((s) => s.isActive) ??
@@ -150,39 +147,26 @@ const computeIncompleteRange = (
     }
   }
 
-  // 2. [핵심 수정] 선택된 학기가 있다면, 조회 범위가 학기 시작일보다 이전으로 가지 않도록 자름 (Clamp Start)
-  // 예: 이번 주가 12/29~1/4 인데, 학기 시작일이 1/1이라면 -> 1/1~1/4 로 조회
   const selectedSemester = semesters.find((s) => s.id === selectedSemesterId);
 
   if (selectedSemester) {
     if (requestedRange.startDate < selectedSemester.startDate) {
       requestedRange.startDate = selectedSemester.startDate;
     }
-    // 학기 종료일보다 미래도 자름
     if (requestedRange.endDate > selectedSemester.endDate) {
       requestedRange.endDate = selectedSemester.endDate;
     }
   }
 
-  // 3. Future Cap: 오늘 이후 미래 날짜 제한
   const today = new Date();
   today.setHours(23, 59, 59, 999);
 
   if (requestedRange.endDate) {
     const reqEnd = new Date(requestedRange.endDate);
     reqEnd.setHours(23, 59, 59, 999);
-
-    // 만약 시작일 자체가 미래라면? (데이터 없음 처리 위해 그대로 두거나, 오늘로 맞춤)
-    // 여기서는 endDate만 오늘로 당김.
     if (reqEnd > today) {
       requestedRange.endDate = toISODateString(new Date());
     }
-  }
-
-  // 방어 로직: Start > End가 되어버린 경우 (예: 학기가 아직 시작 안 했는데 이번 주 조회)
-  if (requestedRange.startDate > requestedRange.endDate) {
-    // 조회 불가하므로 빈 범위 리턴하거나 그대로 둬서 API가 빈 배열 주게 함.
-    // 여기서는 그대로 둠.
   }
 
   return requestedRange;
@@ -248,7 +232,6 @@ const DashboardFilterToolbar: React.FC<{
             className="py-2 pl-3 pr-8 w-full sm:w-auto text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm cursor-pointer"
           >
             {semesters.map((s) => (
-              // ✅ [UX] 활성/마감 상태 표시
               <option key={s.id} value={s.id}>
                 {s.name} ({s.startDate.substring(0, 4)}){" "}
                 {s.isActive ? "(진행중)" : "(마감됨)"}
@@ -259,15 +242,15 @@ const DashboardFilterToolbar: React.FC<{
       </div>
 
       <div className="flex items-center gap-2">
-        <span className="text-xs text-gray-500 hidden sm:inline">
+        <span className="text-xs text-gray-500 hidden sm:inline whitespace-nowrap">
           그래프 단위:
         </span>
-        <div className="flex bg-white rounded-md shadow-sm border border-gray-200 p-1">
+        <div className="flex bg-white rounded-md shadow-sm border border-gray-200 p-1 flex-shrink-0">
           {(["DAY", "MONTH"] as const).map((opt) => (
             <button
               key={opt}
               onClick={() => onGroupByChange(opt)}
-              className={`px-3 py-1 text-xs font-medium rounded ${
+              className={`px-3 py-1 text-xs font-medium rounded whitespace-nowrap ${
                 groupBy === opt
                   ? "bg-indigo-50 text-indigo-700 font-bold"
                   : "text-gray-500 hover:bg-gray-50"
@@ -282,7 +265,6 @@ const DashboardFilterToolbar: React.FC<{
   );
 };
 
-// ... (Card, TopSummaryChips, OverallAttendanceSummaryCard, AttendanceTrend, IncompleteAttendanceSection, IncompleteFilterTabs 컴포넌트는 기존과 동일) ...
 const Card: React.FC<{
   icon?: React.ReactNode;
   title: string;
@@ -293,24 +275,22 @@ const Card: React.FC<{
   <div
     className={`bg-white p-4 sm:p-6 rounded-2xl shadow-lg h-full flex flex-col ${className}`}
   >
-    {" "}
     <div className="flex justify-between items-center mb-4 border-b pb-3">
-      {" "}
       <div className="flex items-center min-w-0">
-        {" "}
         {icon && (
           <div className="text-lg sm:text-xl text-gray-500 mr-3">{icon}</div>
-        )}{" "}
+        )}
         <h3 className="text-base sm:text-lg font-semibold text-gray-800 truncate">
-          {" "}
-          {title}{" "}
-        </h3>{" "}
-      </div>{" "}
-      {actions && <div className="flex-shrink-0 ml-2">{actions}</div>}{" "}
-    </div>{" "}
-    <div className="flex-1">{children}</div>{" "}
+          {title}
+        </h3>
+      </div>
+      {actions && <div className="flex-shrink-0 ml-2">{actions}</div>}
+    </div>
+    <div className="flex-1">{children}</div>
   </div>
 );
+
+// ✅ [수정] TopSummaryChips: 가로 스크롤 & 줄바꿈 방지
 const TopSummaryChips: React.FC<{ data: DashboardDto }> = ({ data }) => {
   const getAttendanceChangeIcon = (change: number) => {
     if (change > 0) return <FaArrowUp className="mr-2" />;
@@ -323,43 +303,41 @@ const TopSummaryChips: React.FC<{ data: DashboardDto }> = ({ data }) => {
     return "bg-gray-50 text-gray-500 border-gray-100";
   };
   return (
-    <div className="flex flex-wrap gap-2 sm:gap-3">
-      {" "}
-      <div className="inline-flex items-center px-3 py-2 rounded-full bg-yellow-50 text-yellow-700 text-xs sm:text-sm border border-yellow-100">
-        {" "}
+    <div
+      className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 scrollbar-hide"
+      style={scrollbarHideStyle}
+    >
+      <div className="inline-flex items-center px-3 py-2 rounded-full bg-yellow-50 text-yellow-700 text-xs sm:text-sm border border-yellow-100 whitespace-nowrap flex-shrink-0">
         <FaBullhorn className="mr-2" /> 이번 주 공지{" "}
-        {data.weeklyNoticeCount ?? 0}개{" "}
-      </div>{" "}
-      <div className="inline-flex items-center px-3 py-2 rounded-full bg-blue-50 text-blue-700 text-xs sm:text-sm border border-blue-100">
-        {" "}
+        {data.weeklyNoticeCount ?? 0}개
+      </div>
+      <div className="inline-flex items-center px-3 py-2 rounded-full bg-blue-50 text-blue-700 text-xs sm:text-sm border border-blue-100 whitespace-nowrap flex-shrink-0">
         <FaPrayingHands className="mr-2" /> 이번 주 기도제목{" "}
-        {data.weeklyPrayerCount ?? 0}개{" "}
-      </div>{" "}
+        {data.weeklyPrayerCount ?? 0}개
+      </div>
       {data.newcomerCount > 0 && (
-        <div className="inline-flex items-center px-3 py-2 rounded-full bg-emerald-50 text-emerald-700 text-xs sm:text-sm font-medium border border-emerald-100">
-          {" "}
-          <FaUserPlus className="mr-2" /> 이번 주 새가족 {data.newcomerCount}명{" "}
+        <div className="inline-flex items-center px-3 py-2 rounded-full bg-emerald-50 text-emerald-700 text-xs sm:text-sm font-medium border border-emerald-100 whitespace-nowrap flex-shrink-0">
+          <FaUserPlus className="mr-2" /> 이번 주 새가족 {data.newcomerCount}명
         </div>
-      )}{" "}
+      )}
       <div
-        className={`inline-flex items-center px-3 py-2 rounded-full text-xs sm:text-sm font-medium border ${attendanceChangeColor(
+        className={`inline-flex items-center px-3 py-2 rounded-full text-xs sm:text-sm font-medium border whitespace-nowrap flex-shrink-0 ${attendanceChangeColor(
           data.attendanceChange
         )}`}
       >
-        {" "}
         {getAttendanceChangeIcon(data.attendanceChange)} 지난주 대비 출석 인원{" "}
-        {data.attendanceChange > 0 ? "+" : ""} {data.attendanceChange}명{" "}
-      </div>{" "}
+        {data.attendanceChange > 0 ? "+" : ""} {data.attendanceChange}명
+      </div>
       {data.unassignedMemberCount > 0 && (
-        <div className="inline-flex items-center px-3 py-2 rounded-full bg-orange-50 text-orange-700 text-xs sm:text-sm font-medium border border-orange-100">
-          {" "}
+        <div className="inline-flex items-center px-3 py-2 rounded-full bg-orange-50 text-orange-700 text-xs sm:text-sm font-medium border border-orange-100 whitespace-nowrap flex-shrink-0">
           <FaUserTag className="mr-2" />셀 미배정 인원{" "}
-          {data.unassignedMemberCount}명{" "}
+          {data.unassignedMemberCount}명
         </div>
-      )}{" "}
+      )}
     </div>
   );
 };
+
 const OverallAttendanceSummaryCard: React.FC<{
   summary: OverallAttendanceSummaryDto | OverallAttendanceStatDto | null;
   label?: string;
@@ -380,39 +358,32 @@ const OverallAttendanceSummaryCard: React.FC<{
   const rateColor = (rate || 0) < 10 ? "text-red-500" : "text-indigo-600";
   return (
     <div className="grid grid-cols-1 gap-4 text-center">
-      {" "}
       <div className="p-4 sm:p-5 bg-indigo-50 rounded-lg relative group">
-        {" "}
         <div className="flex justify-center items-center gap-1 mb-1">
-          {" "}
-          <p className="text-xs sm:text-sm font-medium text-indigo-500">
-            {" "}
-            {label}{" "}
-          </p>{" "}
-          <div className="relative group/tooltip cursor-help">
-            {" "}
-            <span className="text-xs text-indigo-400">ⓘ</span>{" "}
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-800 text-white text-[10px] rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity pointer-events-none z-10 shadow-lg">
-              {" "}
-              전체 재적 인원 대비 출석률입니다. <br /> (보고서 미제출도 모수에
-              포함){" "}
-            </div>{" "}
-          </div>{" "}
-        </div>{" "}
-        <p className={`mt-1 text-2xl sm:text-3xl font-semibold ${rateColor}`}>
-          {" "}
-          {typeof rate === "number" ? `${rate.toFixed(0)}%` : "-"}{" "}
-        </p>{" "}
-        {typeof present === "number" && typeof possible === "number" && (
-          <p className="text-xs text-gray-500 mt-1">
-            {" "}
-            ({present}명 출석 / 총 {possible}명 대상){" "}
+          <p className="text-xs sm:text-sm font-medium text-indigo-500 whitespace-nowrap">
+            {label}
           </p>
-        )}{" "}
-      </div>{" "}
+          <div className="relative group/tooltip cursor-help">
+            <span className="text-xs text-indigo-400">ⓘ</span>
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-800 text-white text-[10px] rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity pointer-events-none z-10 shadow-lg">
+              전체 재적 인원 대비 출석률입니다. <br /> (보고서 미제출도 모수에
+              포함)
+            </div>
+          </div>
+        </div>
+        <p className={`mt-1 text-2xl sm:text-3xl font-semibold ${rateColor}`}>
+          {typeof rate === "number" ? `${rate.toFixed(0)}%` : "-"}
+        </p>
+        {typeof present === "number" && typeof possible === "number" && (
+          <p className="text-xs text-gray-500 mt-1 whitespace-nowrap">
+            ({present}명 출석 / 총 {possible}명 대상)
+          </p>
+        )}
+      </div>
     </div>
   );
 };
+
 const AttendanceTrend: React.FC<{
   data?: AggregatedTrendDto[] | null;
   selectedGroupBy: AttendanceSummaryGroupBy;
@@ -423,8 +394,7 @@ const AttendanceTrend: React.FC<{
   if (items.length === 0) {
     return (
       <div className="mt-4 h-24 flex items-center justify-center text-sm text-gray-500">
-        {" "}
-        데이터가 없습니다.{" "}
+        데이터가 없습니다.
       </div>
     );
   }
@@ -434,141 +404,117 @@ const AttendanceTrend: React.FC<{
     shouldLimit && items.length > MAX_ITEMS ? items.slice(-MAX_ITEMS) : items;
   return (
     <div className="mt-4">
-      {" "}
       <div className="flex justify-between items-center mb-2">
-        {" "}
-        <h2 className="text-sm sm:text-base font-semibold text-gray-800">
-          {" "}
-          {title}{" "}
-        </h2>{" "}
+        <h2 className="text-sm sm:text-base font-semibold text-gray-800 whitespace-nowrap">
+          {title}
+        </h2>
         {dateRange && (
-          <span className="text-[10px] text-gray-400">
-            {" "}
+          <span className="text-[10px] text-gray-400 whitespace-nowrap">
             {safeFormatDate(dateRange.startDate)} ~{" "}
-            {safeFormatDate(dateRange.endDate)}{" "}
+            {safeFormatDate(dateRange.endDate)}
           </span>
-        )}{" "}
-      </div>{" "}
+        )}
+      </div>
       <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-        {" "}
         {slicedData.map((item) => (
           <div key={item.dateGroup} className="space-y-1">
-            {" "}
             <div className="flex justify-between text-[11px] sm:text-xs text-gray-600">
-              {" "}
-              <span>
-                {" "}
-                {formatDateGroupLabel(selectedGroupBy, item.dateGroup)}{" "}
-              </span>{" "}
-              <span>
-                {" "}
-                {item.attendanceRate.toFixed(0)}% ({item.presentRecords}/{" "}
-                {item.totalRecords}){" "}
-              </span>{" "}
-            </div>{" "}
+              <span className="whitespace-nowrap">
+                {formatDateGroupLabel(selectedGroupBy, item.dateGroup)}
+              </span>
+              <span className="whitespace-nowrap">
+                {item.attendanceRate.toFixed(0)}% ({item.presentRecords}/
+                {item.totalRecords})
+              </span>
+            </div>
             <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-              {" "}
               <div
                 className="h-2 rounded-full bg-blue-500"
                 style={{ width: `${item.attendanceRate}%` }}
-              />{" "}
-            </div>{" "}
+              />
+            </div>
           </div>
-        ))}{" "}
-      </div>{" "}
+        ))}
+      </div>
     </div>
   );
 };
+
+// ✅ [수정] 테이블 텍스트 줄바꿈 방지
 const IncompleteAttendanceSection: React.FC<{
   reports: IncompleteCheckReportDto[];
 }> = ({ reports }) => {
   if (!reports || reports.length === 0) {
     return (
       <div className="py-4 text-center text-sm text-gray-500">
-        {" "}
-        누락된 셀이 없습니다.{" "}
+        누락된 셀이 없습니다.
       </div>
     );
   }
   const top = reports.slice(0, 5);
   return (
     <div>
-      {" "}
       <div className="border border-gray-100 rounded-xl overflow-hidden mt-2">
-        {" "}
         <table className="min-w-full text-xs sm:text-sm">
-          {" "}
           <thead className="bg-gray-50">
-            {" "}
             <tr>
-              {" "}
-              <th className="px-3 py-2 text-left font-medium text-gray-500">
-                {" "}
-                셀 이름{" "}
-              </th>{" "}
-              <th className="px-3 py-2 text-center font-medium text-gray-500">
-                {" "}
-                횟수{" "}
-              </th>{" "}
-              <th className="px-3 py-2 text-left font-medium text-gray-500">
-                {" "}
-                최근 누락{" "}
-              </th>{" "}
-            </tr>{" "}
-          </thead>{" "}
+              <th className="px-3 py-2 text-left font-medium text-gray-500 whitespace-nowrap">
+                셀 이름
+              </th>
+              <th className="px-3 py-2 text-center font-medium text-gray-500 whitespace-nowrap">
+                횟수
+              </th>
+              <th className="px-3 py-2 text-left font-medium text-gray-500 whitespace-nowrap">
+                최근 누락
+              </th>
+            </tr>
+          </thead>
           <tbody>
-            {" "}
             {top.map((r, i) => (
               <tr
                 key={r.cellId}
                 className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}
               >
-                {" "}
-                <td className="px-3 py-2">
-                  {" "}
+                <td className="px-3 py-2 whitespace-nowrap">
                   <Link
                     to={`/admin/cells/${r.cellId}`}
                     className="font-medium hover:text-indigo-600"
                   >
-                    {" "}
-                    {r.cellName}{" "}
-                  </Link>{" "}
-                </td>{" "}
-                <td className="px-3 py-2 text-center text-red-600 font-bold">
-                  {" "}
-                  {r.missedDatesCount}{" "}
-                </td>{" "}
-                <td className="px-3 py-2 text-gray-500">
-                  {" "}
-                  {safeFormatDate(r.missedDates[r.missedDates.length - 1])}{" "}
-                </td>{" "}
+                    {r.cellName}
+                  </Link>
+                </td>
+                <td className="px-3 py-2 text-center text-red-600 font-bold whitespace-nowrap">
+                  {r.missedDatesCount}
+                </td>
+                <td className="px-3 py-2 text-gray-500 whitespace-nowrap">
+                  {safeFormatDate(r.missedDates[r.missedDates.length - 1])}
+                </td>
               </tr>
-            ))}{" "}
-          </tbody>{" "}
-        </table>{" "}
-      </div>{" "}
+            ))}
+          </tbody>
+        </table>
+      </div>
       {reports.length > 5 && (
         <div className="text-right mt-2">
-          {" "}
           <Link
             to="/admin/incomplete-checks-report"
-            className="text-xs text-indigo-500 hover:text-indigo-700"
+            className="text-xs text-indigo-500 hover:text-indigo-700 whitespace-nowrap"
           >
-            {" "}
-            전체 보기{" "}
-          </Link>{" "}
+            전체 보기
+          </Link>
         </div>
-      )}{" "}
+      )}
     </div>
   );
 };
+
+// ✅ [수정] 탭 버튼 줄바꿈 방지
 const IncompleteFilterTabs: React.FC<{
   value: IncompleteFilter;
   onChange: (v: IncompleteFilter) => void;
   disableSemester?: boolean;
 }> = ({ value, onChange, disableSemester }) => (
-  <div className="inline-flex gap-1 bg-gray-100 p-1 rounded-lg">
-    {" "}
+  <div className="inline-flex gap-1 bg-gray-100 p-1 rounded-lg flex-shrink-0">
     {[
       { id: "WEEK", label: "이번 주" },
       { id: "MONTH", label: "이번 달" },
@@ -578,7 +524,7 @@ const IncompleteFilterTabs: React.FC<{
         key={opt.id}
         onClick={() => onChange(opt.id as IncompleteFilter)}
         disabled={opt.id === "SEMESTER" && disableSemester}
-        className={`px-3 py-1.5 text-xs font-medium rounded-md ${
+        className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap ${
           value === opt.id
             ? "bg-white text-indigo-700 shadow"
             : "text-gray-600 hover:bg-gray-200"
@@ -588,10 +534,9 @@ const IncompleteFilterTabs: React.FC<{
             : ""
         }`}
       >
-        {" "}
-        {opt.label}{" "}
+        {opt.label}
       </button>
-    ))}{" "}
+    ))}
   </div>
 );
 
@@ -620,7 +565,6 @@ const DashboardPage: React.FC = () => {
   const [incompleteFilter, setIncompleteFilter] =
     useState<IncompleteFilter>("WEEK");
 
-  // ✅ [수정] computeIncompleteRange 호출
   const incompleteDateRange = useMemo(() => {
     return computeIncompleteRange(
       incompleteFilter,
@@ -641,7 +585,7 @@ const DashboardPage: React.FC = () => {
   const isExecutive = user?.role === "EXECUTIVE";
   const isCellLeader = user?.role === "CELL_LEADER";
 
-  // ✅ [수정] 임원단 학기 목록 로딩 로직 (모든 학기 표시)
+  // 임원단 학기 목록 로딩 로직 (모든 학기 표시)
   useEffect(() => {
     let alive = true;
     if (!isExecutive) return;
@@ -651,14 +595,12 @@ const DashboardPage: React.FC = () => {
         const fullList = await semesterService.getAllSemesters();
         if (!alive) return;
 
-        // ✅ 임원단은 모든 학기를 봐야 하므로 filter(isActive) 제거!
         const sortedList = fullList.sort(
           (a, b) =>
             new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
         );
         setSemesters(sortedList);
 
-        // 기본 선택값 설정 (현재 날짜가 포함된 학기, 없으면 최신 학기)
         const today = new Date();
         const currentMonthTotal =
           today.getFullYear() * 12 + (today.getMonth() + 1);
@@ -719,7 +661,7 @@ const DashboardPage: React.FC = () => {
       period,
       semesters,
       selectedSemesterId,
-      new Date().getFullYear() // dashboard는 올해 기준
+      new Date().getFullYear()
     );
 
     try {
@@ -768,7 +710,6 @@ const DashboardPage: React.FC = () => {
           : Promise.resolve([]),
       ]);
 
-      // 임원단 제외 필터링
       const filteredUnassigned = (unassignedData as any[]).filter(
         (m) => m.role !== "EXECUTIVE"
       );
@@ -869,7 +810,7 @@ const DashboardPage: React.FC = () => {
     <div className="bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
         <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 whitespace-nowrap">
             대시보드
           </h1>
           <p className="mt-2 text-sm text-gray-600">
@@ -945,7 +886,7 @@ const DashboardPage: React.FC = () => {
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
                     <div className="flex items-center gap-2">
                       <FaExclamationTriangle className="text-orange-500" />
-                      <h4 className="font-semibold text-gray-800">
+                      <h4 className="font-semibold text-gray-800 whitespace-nowrap">
                         출석 누락 리포트
                       </h4>
                     </div>
@@ -957,7 +898,7 @@ const DashboardPage: React.FC = () => {
                   </div>
 
                   {incompleteDateRange && (
-                    <p className="text-[11px] text-gray-400 text-right mb-2">
+                    <p className="text-[11px] text-gray-400 text-right mb-2 whitespace-nowrap">
                       조회 기간: {incompleteRangeLabel}
                     </p>
                   )}
@@ -973,12 +914,11 @@ const DashboardPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* ✅ [위치 이동] 미배정 인원 상세 리스트 (통계 위로) */}
                 <div id="unassigned-section" className="mt-8 border-t pt-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <FaUserTag className="text-orange-500 text-lg" />
-                      <h4 className="font-semibold text-gray-800">
+                      <h4 className="font-semibold text-gray-800 whitespace-nowrap">
                         셀 미배정 인원 목록 ({unassignedList.length}명)
                       </h4>
                     </div>
@@ -990,7 +930,7 @@ const DashboardPage: React.FC = () => {
                     </div>
                   ) : (
                     <>
-                      {/* 모바일 뷰 */}
+                      {/* 모바일 뷰: 카드 레이아웃 최적화 */}
                       <div className="block md:hidden bg-gray-50 p-3 space-y-3 rounded-lg">
                         {unassignedList.slice(0, 5).map((member) => {
                           return (
@@ -1004,17 +944,19 @@ const DashboardPage: React.FC = () => {
                                     onClick={() =>
                                       navigate(`/admin/users/${member.id}`)
                                     }
-                                    className="text-base font-bold text-indigo-600 hover:underline flex items-center gap-1"
+                                    className="text-base font-bold text-indigo-600 hover:underline flex items-center gap-1 min-w-0"
                                   >
-                                    {member.name}
+                                    <span className="truncate">
+                                      {member.name}
+                                    </span>
                                     <FaChevronRight
                                       size={10}
-                                      className="opacity-50"
+                                      className="opacity-50 flex-shrink-0"
                                     />
                                   </button>
                                   <div className="mt-1 flex items-center gap-2">
                                     <span
-                                      className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${
+                                      className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium whitespace-nowrap ${
                                         member.gender === "MALE"
                                           ? "bg-blue-50 text-blue-700"
                                           : "bg-pink-50 text-pink-700"
@@ -1029,13 +971,15 @@ const DashboardPage: React.FC = () => {
                               </div>
                               <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-3">
                                 <div>
-                                  <span className="text-gray-400 block">
+                                  <span className="text-gray-400 block whitespace-nowrap">
                                     연락처
                                   </span>
-                                  {member.phone}
+                                  <span className="truncate">
+                                    {member.phone}
+                                  </span>
                                 </div>
                                 <div>
-                                  <span className="text-gray-400 block">
+                                  <span className="text-gray-400 block whitespace-nowrap">
                                     등록
                                   </span>
                                   {member.registeredDate?.substring(0, 4) ||
@@ -1046,7 +990,7 @@ const DashboardPage: React.FC = () => {
                                 onClick={() =>
                                   navigate(`/admin/users/${member.id}/edit`)
                                 }
-                                className="w-full py-1.5 bg-indigo-50 text-indigo-600 rounded text-xs font-semibold hover:bg-indigo-100"
+                                className="w-full py-1.5 bg-indigo-50 text-indigo-600 rounded text-xs font-semibold hover:bg-indigo-100 whitespace-nowrap"
                               >
                                 셀 배정하기
                               </button>
@@ -1064,7 +1008,7 @@ const DashboardPage: React.FC = () => {
                           <div className="text-center pt-2">
                             <Link
                               to="/admin/statistics"
-                              className="text-xs text-indigo-500 hover:underline"
+                              className="text-xs text-indigo-500 hover:underline whitespace-nowrap"
                             >
                               전체 보기
                             </Link>
@@ -1072,24 +1016,24 @@ const DashboardPage: React.FC = () => {
                         )}
                       </div>
 
-                      {/* 데스크탑 뷰 */}
+                      {/* 데스크탑 뷰: 테이블 */}
                       <div className="hidden md:block overflow-x-auto border border-gray-100 rounded-lg">
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50">
                             <tr>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 whitespace-nowrap">
                                 이름
                               </th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 whitespace-nowrap">
                                 성별
                               </th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 whitespace-nowrap">
                                 연락처
                               </th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 whitespace-nowrap">
                                 등록 연도
                               </th>
-                              <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">
+                              <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 whitespace-nowrap">
                                 관리
                               </th>
                             </tr>
@@ -1113,7 +1057,7 @@ const DashboardPage: React.FC = () => {
                                   </td>
                                   <td className="px-4 py-3 whitespace-nowrap text-xs">
                                     <span
-                                      className={`px-2 py-0.5 rounded ${
+                                      className={`px-2 py-0.5 rounded whitespace-nowrap ${
                                         member.gender === "MALE"
                                           ? "bg-blue-50 text-blue-700"
                                           : "bg-pink-50 text-pink-700"
@@ -1138,7 +1082,7 @@ const DashboardPage: React.FC = () => {
                                           `/admin/users/${member.id}/edit`
                                         )
                                       }
-                                      className="text-indigo-600 hover:text-indigo-800 font-medium"
+                                      className="text-indigo-600 hover:text-indigo-800 font-medium whitespace-nowrap"
                                     >
                                       셀 배정
                                     </button>
@@ -1164,7 +1108,7 @@ const DashboardPage: React.FC = () => {
                           <div className="bg-gray-50 px-4 py-2 text-right border-t border-gray-100">
                             <Link
                               to="/admin/statistics"
-                              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium whitespace-nowrap"
                             >
                               전체 보기 &rarr;
                             </Link>
@@ -1182,7 +1126,7 @@ const DashboardPage: React.FC = () => {
                       <div className="mt-8 border-t pt-6">
                         <div className="flex items-center gap-2 mb-4">
                           <FaUserFriends className="text-blue-500 text-lg" />
-                          <h4 className="font-semibold text-gray-800">
+                          <h4 className="font-semibold text-gray-800 whitespace-nowrap">
                             공동체 구성 통계
                           </h4>
                         </div>

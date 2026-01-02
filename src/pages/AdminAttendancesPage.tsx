@@ -71,8 +71,14 @@ const translateAttendanceStatus = (status: string) => {
   }
 };
 
+// 스크롤바 숨김 스타일
+const scrollbarHideStyle: React.CSSProperties = {
+  msOverflowStyle: "none",
+  scrollbarWidth: "none",
+};
+
 // ─────────────────────────────────────────────────────────────
-// Sub Component 1: AttendanceStats (상단 종합 통계 카드)
+// Sub Component 1: AttendanceStats
 // ─────────────────────────────────────────────────────────────
 
 const AttendanceStats = memo(
@@ -116,7 +122,6 @@ const AttendanceStats = memo(
 
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        {/* 1. 주간 평균 출석 */}
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <div>
@@ -134,7 +139,6 @@ const AttendanceStats = memo(
               <UsersIcon className="h-6 w-6 text-indigo-600" />
             </div>
           </div>
-
           <div className="mt-4 flex items-center">
             <div
               className={`flex items-center px-2 py-0.5 rounded text-xs font-bold ${bgTrendColor} ${trendColor}`}
@@ -148,7 +152,6 @@ const AttendanceStats = memo(
           </div>
         </div>
 
-        {/* 2. 평균 출석률 */}
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <div>
@@ -171,7 +174,6 @@ const AttendanceStats = memo(
           </div>
         </div>
 
-        {/* 3. 장기 결석자 */}
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <div>
@@ -199,7 +201,7 @@ const AttendanceStats = memo(
 );
 
 // ─────────────────────────────────────────────────────────────
-// Sub Component 2: AttendanceMatrixView (✅ 로직 대폭 수정 & 필터 적용)
+// Sub Component 2: AttendanceMatrixView
 // ─────────────────────────────────────────────────────────────
 
 const AttendanceMatrixView = memo(
@@ -211,7 +213,7 @@ const AttendanceMatrixView = memo(
     unitType,
     isLoading,
     includeExecutive,
-    semesters, // ✅ [추가] 방학 필터링을 위해 학기 정보 필요
+    semesters,
   }: {
     members: MemberDto[];
     attendances: AttendanceDto[];
@@ -222,7 +224,6 @@ const AttendanceMatrixView = memo(
     includeExecutive: boolean;
     semesters: SemesterDto[];
   }) => {
-    // 1. 출석 데이터 Map 변환 (조회 속도 향상)
     const attendanceMap = useMemo(() => {
       const map = new Map<string, string>();
       attendances.forEach((att) => {
@@ -234,7 +235,6 @@ const AttendanceMatrixView = memo(
       return map;
     }, [attendances]);
 
-    // 2. ⭐️ 통계 계산 (옵션에 따라 임원 포함/제외 분기 처리)
     const stats = useMemo(() => {
       if (!startDate || !endDate || members.length === 0) {
         return { rate: 0, unchecked: 0 };
@@ -255,10 +255,8 @@ const AttendanceMatrixView = memo(
       start.setHours(0, 0, 0, 0);
       end.setHours(23, 59, 59, 999);
       today.setHours(23, 59, 59, 999);
-
       const effectiveEnd = end > today ? today : end;
 
-      // (1) 조회 기간 내의 '모든 주일(일요일)' 리스트 생성
       const targetSundayKeys: string[] = [];
       const current = new Date(start);
 
@@ -267,31 +265,24 @@ const AttendanceMatrixView = memo(
       }
 
       while (current <= effectiveEnd) {
-        // ✅ [추가] 방학 기간 필터링 (Year 모드일 때)
         let isSemesterDate = true;
         const currentDateStr = toDateKey(current);
-
         if (unitType === "year" && semesters.length > 0) {
           const isInSemester = semesters.some(
             (s) => currentDateStr >= s.startDate && currentDateStr <= s.endDate
           );
           if (!isInSemester) isSemesterDate = false;
         }
-
-        if (isSemesterDate) {
-          targetSundayKeys.push(currentDateStr);
-        }
+        if (isSemesterDate) targetSundayKeys.push(currentDateStr);
         current.setDate(current.getDate() + 7);
       }
 
-      // (2) 멤버별 순회하며 카운팅
       let totalPresent = 0;
       let totalPossible = 0;
       let totalUnchecked = 0;
 
       members.forEach((member) => {
         if (!includeExecutive && member.role === "EXECUTIVE") return;
-
         let joinDateStr = "2000-01-01";
         if (member.cellAssignmentDate)
           joinDateStr = member.cellAssignmentDate.substring(0, 10);
@@ -301,25 +292,17 @@ const AttendanceMatrixView = memo(
 
         targetSundayKeys.forEach((sundayKey) => {
           if (sundayKey > todayStr) return;
-
           const key = `${member.id}-${sundayKey}`;
           const status = attendanceMap.get(key);
-
-          // ⭐️ 핵심: (배정일 이후) OR (기록이 있음) 인 경우만 유효 주차로 인정
           if (sundayKey >= joinDateStr || status) {
             totalPossible++;
-
-            if (status === "PRESENT") {
-              totalPresent++;
-            } else if (!status) {
-              totalUnchecked++;
-            }
+            if (status === "PRESENT") totalPresent++;
+            else if (!status) totalUnchecked++;
           }
         });
       });
 
       const rate = totalPossible > 0 ? (totalPresent / totalPossible) * 100 : 0;
-
       return { rate, unchecked: totalUnchecked };
     }, [
       startDate,
@@ -353,7 +336,6 @@ const AttendanceMatrixView = memo(
 
     return (
       <div className="space-y-6 animate-fadeIn">
-        {/* 통계 요약 카드 */}
         <div className="grid grid-cols-2 gap-4 text-center">
           <div className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm">
             <p className="text-xs font-bold text-gray-500 uppercase">출석률</p>
@@ -361,11 +343,10 @@ const AttendanceMatrixView = memo(
               {stats.rate.toFixed(0)}
               <span className="text-base ml-0.5">%</span>
             </p>
-            <p className="text-[10px] text-gray-400 mt-1">
+            <p className="text-[10px] text-gray-400 mt-1 whitespace-nowrap">
               * {includeExecutive ? "임원 포함" : "임원 제외"}, 방학 제외
             </p>
           </div>
-
           <div
             className={`p-4 rounded-2xl border shadow-sm ${
               stats.unchecked > 0
@@ -390,10 +371,9 @@ const AttendanceMatrixView = memo(
           </div>
         </div>
 
-        {/* 매트릭스 컨테이너 */}
         <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-5">
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
-            <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+            <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2 whitespace-nowrap">
               <FaTh className="text-indigo-500" />
               {unitType === "year"
                 ? `${targetYear}년 전체 현황`
@@ -402,7 +382,6 @@ const AttendanceMatrixView = memo(
                 : `${targetYear}년 ${targetMonth}월 상세 현황`}
             </h4>
           </div>
-
           <AttendanceMatrix
             mode={matrixMode}
             startDate={startDate}
@@ -414,7 +393,7 @@ const AttendanceMatrixView = memo(
             loading={isLoading}
             limitStartDate={startDate}
             limitEndDate={endDate}
-            semesters={semesters} // ✅ [추가]
+            semesters={semesters}
           />
         </div>
       </div>
@@ -432,7 +411,6 @@ const AdminAttendancesPage: React.FC = () => {
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
 
-  // Data States
   const [matrixAttendances, setMatrixAttendances] = useState<AttendanceDto[]>(
     []
   );
@@ -440,19 +418,16 @@ const AdminAttendancesPage: React.FC = () => {
   const [overallStats, setOverallStats] =
     useState<OverallAttendanceStatDto | null>(null);
 
-  // Loading States
   const [statsLoading, setStatsLoading] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Filter Data & Options
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const hasActiveSemesters = semesters.length > 0;
   const [hasAutoSelectedSemester, setHasAutoSelectedSemester] = useState(false);
   const [allCells, setAllCells] = useState<{ id: number; name: string }[]>([]);
 
-  // Filters State
   const [filters, setFilters] = useState<Filters>({
     startDate: "",
     endDate: "",
@@ -474,7 +449,6 @@ const AdminAttendancesPage: React.FC = () => {
   const isExecutive = useMemo(() => user?.role === "EXECUTIVE", [user]);
   const isCellLeader = useMemo(() => user?.role === "CELL_LEADER", [user]);
 
-  // Effects & Logic
   useEffect(() => {
     if (semesters.length > 0 && !hasAutoSelectedSemester) {
       const today = new Date();
@@ -559,7 +533,6 @@ const AdminAttendancesPage: React.FC = () => {
         if (rawEnd > lastSem.endDate) rawEnd = lastSem.endDate;
       }
     }
-
     return { startDate: rawStart, endDate: rawEnd };
   }, [filterType, filters, semesters, unitType]);
 
@@ -569,7 +542,6 @@ const AdminAttendancesPage: React.FC = () => {
       memberId: normalizeNumberInput(filters.member?.value),
       cellId: normalizeNumberInput(filters.cell?.value),
     };
-
     if (effectiveDateRange) {
       params.startDate = effectiveDateRange.startDate;
       params.endDate = effectiveDateRange.endDate;
@@ -577,7 +549,6 @@ const AdminAttendancesPage: React.FC = () => {
       params.startDate = "2999-01-01";
       params.endDate = "2999-01-01";
     }
-
     return Object.fromEntries(
       Object.entries(params).filter(
         ([, v]) => v !== null && v !== "" && v !== undefined
@@ -652,7 +623,6 @@ const AdminAttendancesPage: React.FC = () => {
         .then(setAvailableYears)
         .catch(() => setAvailableYears([]));
 
-      // ✅ [수정] 모든 학기 불러오기 (true 제거) 및 정렬
       semesterService
         .getAllSemesters()
         .then((data) => {
@@ -671,7 +641,6 @@ const AdminAttendancesPage: React.FC = () => {
     }
   }, [user]);
 
-  // Filter Handlers
   const handleFilterChange = (key: keyof Filters, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
@@ -745,7 +714,6 @@ const AdminAttendancesPage: React.FC = () => {
     });
   };
 
-  // Options Helpers
   const statusOptions = useMemo(
     () => [
       { value: "", label: "모든 상태" },
@@ -813,12 +781,12 @@ const AdminAttendancesPage: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2 whitespace-nowrap">
               <CalendarDaysIcon className="h-7 w-7 text-indigo-500" />
               출석 관리
             </h1>
             <p className="text-sm text-gray-500 mt-1">
-              기간·셀·멤버별 출석 기록을 매트릭스로 확인하고 관리합니다.
+              기간·셀·멤버별 출석 기록을 확인하고 관리합니다.
             </p>
           </div>
         </div>
@@ -831,12 +799,15 @@ const AdminAttendancesPage: React.FC = () => {
           <div className="flex items-center justify-between mb-4 border-b border-gray-50 pb-2">
             <div className="flex items-center gap-2">
               <FunnelIcon className="h-5 w-5 text-gray-400" />
-              <h3 className="font-bold text-gray-700">검색 및 필터</h3>
+              <h3 className="font-bold text-gray-700 whitespace-nowrap">
+                검색 및 필터
+              </h3>
             </div>
+            {/* ✅ [수정] whitespace-nowrap 추가: 작은 화면에서 버튼 내 줄바꿈 방지 */}
             <div className="bg-gray-100 p-1 rounded-xl flex text-xs font-bold">
               <button
                 onClick={() => setFilterType("unit")}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
+                className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
                   filterType === "unit"
                     ? "bg-white text-indigo-600 shadow-sm"
                     : "text-gray-500 hover:text-gray-700"
@@ -846,7 +817,7 @@ const AdminAttendancesPage: React.FC = () => {
               </button>
               <button
                 onClick={() => setFilterType("range")}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
+                className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
                   filterType === "range"
                     ? "bg-white text-indigo-600 shadow-sm"
                     : "text-gray-500 hover:text-gray-700"
@@ -916,10 +887,11 @@ const AdminAttendancesPage: React.FC = () => {
                     <label className="text-xs font-bold text-gray-500 mb-1 block">
                       조회 단위
                     </label>
+                    {/* ✅ [수정] whitespace-nowrap 추가: 버튼 글자 꺾임 방지 */}
                     <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => handleUnitTypeClick("month")}
-                        className={`flex-1 sm:flex-none px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
+                        className={`flex-1 sm:flex-none px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all whitespace-nowrap ${
                           unitType === "month"
                             ? "bg-indigo-50 border-indigo-200 text-indigo-700"
                             : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
@@ -932,7 +904,7 @@ const AdminAttendancesPage: React.FC = () => {
                           hasActiveSemesters && handleUnitTypeClick("semester")
                         }
                         disabled={!hasActiveSemesters}
-                        className={`flex-1 sm:flex-none px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
+                        className={`flex-1 sm:flex-none px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all whitespace-nowrap ${
                           hasActiveSemesters
                             ? unitType === "semester"
                               ? "bg-indigo-50 border-indigo-200 text-indigo-700"
@@ -944,7 +916,7 @@ const AdminAttendancesPage: React.FC = () => {
                       </button>
                       <button
                         onClick={() => handleUnitTypeClick("year")}
-                        className={`flex-1 sm:flex-none px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
+                        className={`flex-1 sm:flex-none px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all whitespace-nowrap ${
                           unitType === "year"
                             ? "bg-indigo-50 border-indigo-200 text-indigo-700"
                             : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
@@ -957,7 +929,7 @@ const AdminAttendancesPage: React.FC = () => {
                 </div>
 
                 {unitType === "month" && (
-                  <div className="pt-2 border-t border-gray-200/50">
+                  <div className="pt-3 border-t border-gray-200/50 mt-3 animate-fadeIn">
                     <label className="text-xs font-bold text-gray-500 mb-2 block">
                       월 선택
                     </label>
@@ -967,7 +939,7 @@ const AdminAttendancesPage: React.FC = () => {
                           key={m}
                           type="button"
                           onClick={() => handleUnitValueClick(m)}
-                          className={`py-1.5 rounded-md text-xs font-bold transition-all border ${
+                          className={`py-1.5 rounded-md text-xs font-bold transition-all border whitespace-nowrap ${
                             filters.month === m
                               ? "bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105"
                               : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 shadow-sm"
@@ -981,11 +953,20 @@ const AdminAttendancesPage: React.FC = () => {
                 )}
 
                 {unitType === "semester" && semesters.length > 0 && (
-                  <div className="pt-2 border-t border-gray-200/50">
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">
-                      학기 선택
-                    </label>
-                    <div className="flex flex-wrap gap-2">
+                  <div className="pt-3 border-t border-gray-200/50 mt-3 animate-fadeIn">
+                    <div className="flex justify-between items-end mb-2">
+                      <label className="text-xs font-bold text-gray-500">
+                        학기 선택
+                      </label>
+                      <span className="text-[10px] text-gray-400 font-normal sm:hidden">
+                        좌우로 스크롤하여 선택
+                      </span>
+                    </div>
+
+                    <div
+                      className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap scrollbar-hide"
+                      style={scrollbarHideStyle}
+                    >
                       {semesters.map((s) => (
                         <button
                           key={s.id}
@@ -998,13 +979,21 @@ const AdminAttendancesPage: React.FC = () => {
                               month: "",
                             }))
                           }
-                          className={`px-3 py-2 rounded-lg text-xs font-bold border transition-all ${
-                            filters.semesterId === s.id
-                              ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
-                              : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 shadow-sm"
-                          }`}
+                          className={`
+                            flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all shadow-sm whitespace-nowrap
+                            ${
+                              filters.semesterId === s.id
+                                ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-1 ring-indigo-600"
+                                : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
+                            }
+                          `}
                         >
-                          {s.name} {s.isActive ? "(진행중)" : "(마감됨)"}
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              s.isActive ? "bg-green-400" : "bg-gray-300"
+                            }`}
+                          ></span>
+                          <span>{s.name}</span>
                         </button>
                       ))}
                     </div>
@@ -1034,7 +1023,7 @@ const AdminAttendancesPage: React.FC = () => {
                     />
                   </div>
                 ) : (
-                  <div className="h-[46px] px-3 flex items-center w-full bg-gray-50 border border-gray-200 rounded-xl text-gray-500 text-sm">
+                  <div className="h-[46px] px-3 flex items-center w-full bg-gray-50 border border-gray-200 rounded-xl text-gray-500 text-sm whitespace-nowrap overflow-hidden text-ellipsis">
                     {user?.cellName || "내 셀"}
                   </div>
                 )}
@@ -1091,7 +1080,7 @@ const AdminAttendancesPage: React.FC = () => {
                   />
                   <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
                 </div>
-                <span className="text-sm font-bold text-gray-500 group-hover:text-gray-800 transition-colors">
+                <span className="text-sm font-bold text-gray-500 group-hover:text-gray-800 transition-colors whitespace-nowrap">
                   임원단 포함하여 보기
                 </span>
               </label>
@@ -1101,7 +1090,7 @@ const AdminAttendancesPage: React.FC = () => {
               <button
                 type="button"
                 onClick={resetFilters}
-                className="text-xs font-bold text-gray-500 hover:text-gray-800 underline decoration-gray-300 underline-offset-2"
+                className="text-xs font-bold text-gray-500 hover:text-gray-800 underline decoration-gray-300 underline-offset-2 whitespace-nowrap"
               >
                 필터 초기화
               </button>
@@ -1109,7 +1098,7 @@ const AdminAttendancesPage: React.FC = () => {
                 type="button"
                 onClick={handleSearch}
                 disabled={loading}
-                className="flex items-center justify-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed transition-all"
+                className="flex items-center justify-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed transition-all whitespace-nowrap"
               >
                 <MagnifyingGlassIcon className="h-4 w-4" />
                 {loading ? "조회 중..." : "조회하기"}
@@ -1137,7 +1126,7 @@ const AdminAttendancesPage: React.FC = () => {
             unitType={unitType}
             isLoading={loading}
             includeExecutive={filters.includeExecutive}
-            semesters={semesters} // ✅ [추가] prop 전달
+            semesters={semesters}
           />
         )}
       </div>

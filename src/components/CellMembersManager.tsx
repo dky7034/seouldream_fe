@@ -121,15 +121,15 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
       {/* 헤더 영역 */}
       <div className="bg-white px-5 py-4 border-b border-gray-100 sm:rounded-t-2xl sm:border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2 whitespace-nowrap">
             <UserCircleIcon className="h-6 w-6 text-indigo-500" />
             셀원 목록
             <span className="bg-indigo-100 text-indigo-700 text-xs py-0.5 px-2.5 rounded-full font-bold">
               {members.length}
             </span>
           </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            현재 셀에 배정된 모든 멤버 정보를 관리합니다.
+          <p className="mt-1 text-sm text-gray-500 whitespace-nowrap sm:whitespace-normal truncate sm:overflow-visible">
+            셀에 배정된 모든 멤버 정보를 관리합니다.
           </p>
         </div>
       </div>
@@ -148,7 +148,7 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
 
       {!loading && !error && (
         <>
-          {/* ✅ 모바일: 카드형 리스트 */}
+          {/* ✅ 모바일: 카드형 리스트 (최적화됨) */}
           <div className="sm:hidden space-y-3 px-1">
             {sortedMembers.map((member) => {
               const isMe = user.memberId === member.id;
@@ -172,9 +172,9 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                 >
                   {/* 상단: 이름 + 역할 뱃지 */}
                   <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3 overflow-hidden">
                       <div
-                        className={`h-10 w-10 rounded-full flex items-center justify-center text-lg font-bold ${
+                        className={`h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center text-lg font-bold ${
                           isMe
                             ? "bg-indigo-100 text-indigo-600"
                             : "bg-gray-100 text-gray-500"
@@ -182,53 +182,56 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                       >
                         {displayName.charAt(0)}
                       </div>
-                      <div>
-                        <div className="font-bold text-gray-900 text-base flex items-center gap-1.5">
-                          {displayName}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-gray-900 text-base truncate">
+                            {displayName}
+                          </span>
                           {isMe && (
-                            <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">
+                            <span className="flex-shrink-0 text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100 whitespace-nowrap">
                               나
                             </span>
                           )}
                         </div>
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
-                            member.role === "EXECUTIVE"
-                              ? "bg-red-50 text-red-700"
-                              : member.role === "CELL_LEADER"
-                              ? "bg-yellow-50 text-yellow-700"
-                              : "bg-green-50 text-green-700"
-                          }`}
-                        >
-                          {translateRole(member.role)}
-                        </span>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap ${
+                              member.role === "EXECUTIVE"
+                                ? "bg-red-50 text-red-700"
+                                : member.role === "CELL_LEADER"
+                                ? "bg-yellow-50 text-yellow-700"
+                                : "bg-green-50 text-green-700"
+                            }`}
+                          >
+                            {translateRole(member.role)}
+                          </span>
+                          {!member.active && (
+                            <span className="px-2 py-0.5 rounded bg-gray-200 text-gray-500 text-[10px] font-bold whitespace-nowrap">
+                              비활동
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    {/* 상태 뱃지 */}
-                    {!member.active && (
-                      <span className="px-2 py-1 rounded-md bg-gray-200 text-gray-500 text-[10px] font-bold">
-                        비활동
-                      </span>
-                    )}
                   </div>
 
-                  {/* 하단: 정보 그리드 */}
+                  {/* 하단: 정보 그리드 (whitespace-nowrap 적용) */}
                   <div className="grid grid-cols-2 gap-y-2 text-xs text-gray-500 border-t border-gray-50 pt-3">
-                    <div className="flex items-center gap-1.5">
-                      <CakeIcon className="h-3.5 w-3.5 text-gray-400" />
-                      <span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <CakeIcon className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                      <span className="truncate whitespace-nowrap">
                         {displayBirthDate || "-"} {ageDisplay}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <CalendarDaysIcon className="h-3.5 w-3.5 text-gray-400" />
-                      <span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <CalendarDaysIcon className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                      <span className="truncate whitespace-nowrap">
                         {member.joinYear ? `${member.joinYear}년 등록` : "-"}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5 col-span-2">
-                      <ClockIcon className="h-3.5 w-3.5 text-gray-400" />
-                      <span>
+                    <div className="flex items-center gap-1.5 col-span-2 min-w-0">
+                      <ClockIcon className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                      <span className="truncate whitespace-nowrap">
                         배정일:{" "}
                         {safeFormatDate(member.cellAssignmentDate) || "미배정"}
                       </span>
@@ -260,7 +263,7 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                     <th
                       key={col.key}
                       onClick={() => requestSort(col.key as keyof MemberDto)}
-                      className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                      className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
                     >
                       {col.label}{" "}
                       {renderSortIndicator(col.key as keyof MemberDto)}
@@ -308,7 +311,7 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
-                          className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-bold rounded-full ${
+                          className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-bold rounded-full whitespace-nowrap ${
                             member.role === "EXECUTIVE"
                               ? "bg-red-100 text-red-800"
                               : member.role === "CELL_LEADER"

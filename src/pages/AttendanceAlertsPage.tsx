@@ -22,6 +22,12 @@ import {
 
 type UnitType = "semester" | "year";
 
+// 스크롤바 숨김 스타일
+const scrollbarHideStyle: React.CSSProperties = {
+  msOverflowStyle: "none" /* IE and Edge */,
+  scrollbarWidth: "none" /* Firefox */,
+};
+
 const AttendanceAlertsPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -58,8 +64,7 @@ const AttendanceAlertsPage: React.FC = () => {
   // 데이터 로딩
   const fetchSemesters = useCallback(async () => {
     try {
-      // ✅ [복구] 활성 학기만 조회 (true)
-      // 결석 관리는 현재 케어가 필요한 멤버를 찾는 것이므로 활성 학기만 보여주는 것이 적합함
+      // 활성 학기만 조회
       const data = await semesterService.getAllSemesters(true);
       const sorted = data.sort((a, b) =>
         b.startDate.localeCompare(a.startDate)
@@ -237,7 +242,7 @@ const AttendanceAlertsPage: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2 whitespace-nowrap">
               <ExclamationCircleIcon className="h-7 w-7 text-red-500" />
               결석 관리
             </h1>
@@ -291,29 +296,48 @@ const AttendanceAlertsPage: React.FC = () => {
                 <CalendarDaysIcon className="h-4 w-4" />{" "}
                 {unitType === "semester" ? "학기 선택" : "연도 선택"}
               </label>
+
               {unitType === "semester" ? (
-                <div className="flex flex-wrap gap-2">
+                <>
                   {semesters.length === 0 ? (
-                    <span className="text-sm text-gray-400 py-2">
+                    <span className="text-sm text-gray-400 py-2 block">
                       활성 학기 없음
                     </span>
                   ) : (
-                    semesters.map((s) => (
-                      <button
-                        key={s.id}
-                        onClick={() => setSelectedSemesterId(s.id)}
-                        className={`px-3 py-2 rounded-lg text-sm font-bold border shadow-sm transition-all ${
-                          selectedSemesterId === s.id
-                            ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
-                            : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
-                        }`}
+                    <>
+                      <div className="sm:hidden mb-1 text-[10px] text-gray-400 font-normal text-right">
+                        좌우로 스크롤하여 선택
+                      </div>
+                      <div
+                        className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap scrollbar-hide"
+                        style={scrollbarHideStyle}
                       >
-                        {/* ✅ [수정] 심플한 이름만 표시 (활성 학기만 보여주므로 상태 불필요) */}
-                        {s.name}
-                      </button>
-                    ))
+                        {semesters.map((s) => (
+                          <button
+                            key={s.id}
+                            onClick={() => setSelectedSemesterId(s.id)}
+                            className={`
+                              flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold border shadow-sm transition-all whitespace-nowrap
+                              ${
+                                selectedSemesterId === s.id
+                                  ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-1 ring-indigo-600"
+                                  : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                              }
+                            `}
+                          >
+                            {/* 활성 상태 표시 (API가 활성 학기만 주더라도 UI 일관성 유지) */}
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                s.isActive ? "bg-green-400" : "bg-gray-300"
+                              }`}
+                            ></span>
+                            {s.name}
+                          </button>
+                        ))}
+                      </div>
+                    </>
                   )}
-                </div>
+                </>
               ) : (
                 <select
                   value={selectedYear}
@@ -347,7 +371,7 @@ const AttendanceAlertsPage: React.FC = () => {
             <button
               onClick={handleSearchClick}
               disabled={loading}
-              className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50 shadow-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+              className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50 shadow-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] whitespace-nowrap"
             >
               {loading ? (
                 <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
@@ -364,7 +388,7 @@ const AttendanceAlertsPage: React.FC = () => {
           <>
             <div className="flex items-center gap-2 mb-4 px-1">
               <UserGroupIcon className="h-5 w-5 text-gray-400" />
-              <span className="font-bold text-gray-700">
+              <span className="font-bold text-gray-700 whitespace-nowrap">
                 검색 결과{" "}
                 <span className="text-indigo-600">{alerts.length}</span>명
               </span>
@@ -398,20 +422,20 @@ const AttendanceAlertsPage: React.FC = () => {
                         </span>
                       </div>
                       <div className="flex items-start gap-3">
-                        <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 text-lg">
+                        <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 text-lg flex-shrink-0">
                           {displayName.charAt(0)}
                         </div>
-                        <div>
-                          <h3 className="text-base font-bold text-gray-900">
+                        <div className="min-w-0">
+                          <h3 className="text-base font-bold text-gray-900 truncate">
                             {displayName}
                           </h3>
-                          <p className="text-xs text-gray-500 mt-0.5">
+                          <p className="text-xs text-gray-500 mt-0.5 truncate">
                             {alert.cellName || "소속 셀 없음"}
                           </p>
                         </div>
                       </div>
                       <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between text-xs">
-                        <div className="text-gray-500">
+                        <div className="text-gray-500 truncate mr-2">
                           마지막 출석:{" "}
                           <span className="font-medium text-gray-900">
                             {safeFormatDate(alert.lastAttendanceDate)}
@@ -421,7 +445,7 @@ const AttendanceAlertsPage: React.FC = () => {
                           onClick={() =>
                             navigate(`/admin/users/${alert.memberId}`)
                           }
-                          className="text-indigo-600 font-bold flex items-center gap-0.5"
+                          className="text-indigo-600 font-bold flex items-center gap-0.5 whitespace-nowrap flex-shrink-0"
                         >
                           상세보기 <ChevronRightIcon className="h-3 w-3" />
                         </button>
@@ -437,19 +461,19 @@ const AttendanceAlertsPage: React.FC = () => {
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">
+                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs whitespace-nowrap">
                       이름
                     </th>
-                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">
+                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs whitespace-nowrap">
                       소속 셀
                     </th>
-                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">
+                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs whitespace-nowrap">
                       마지막 출석
                     </th>
-                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">
+                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs whitespace-nowrap">
                       연속 결석
                     </th>
-                    <th className="px-6 py-3 text-right font-bold text-gray-500 uppercase text-xs">
+                    <th className="px-6 py-3 text-right font-bold text-gray-500 uppercase text-xs whitespace-nowrap">
                       {/* 관리 */}
                     </th>
                   </tr>
@@ -481,21 +505,21 @@ const AttendanceAlertsPage: React.FC = () => {
                           key={alert.memberId}
                           className="hover:bg-gray-50 transition-colors"
                         >
-                          <td className="px-6 py-4 font-bold text-gray-900">
+                          <td className="px-6 py-4 font-bold text-gray-900 whitespace-nowrap">
                             {displayName}
                           </td>
-                          <td className="px-6 py-4 text-gray-500">
+                          <td className="px-6 py-4 text-gray-500 whitespace-nowrap">
                             {alert.cellName || "-"}
                           </td>
-                          <td className="px-6 py-4 text-gray-500">
+                          <td className="px-6 py-4 text-gray-500 whitespace-nowrap">
                             {safeFormatDate(alert.lastAttendanceDate)}
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <span className="bg-red-50 text-red-700 px-2 py-1 rounded font-bold text-xs">
                               {alert.consecutiveAbsences}회
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-right">
+                          <td className="px-6 py-4 text-right whitespace-nowrap">
                             <button
                               onClick={() =>
                                 navigate(`/admin/users/${alert.memberId}`)

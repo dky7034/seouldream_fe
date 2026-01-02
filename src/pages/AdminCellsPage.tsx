@@ -47,6 +47,12 @@ type Filters = {
   semesterId: number | "";
 };
 
+// 스크롤바 숨김 스타일 (인라인 적용용)
+const scrollbarHideStyle: React.CSSProperties = {
+  msOverflowStyle: "none" /* IE and Edge */,
+  scrollbarWidth: "none" /* Firefox */,
+};
+
 const AdminCellsPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -108,7 +114,7 @@ const AdminCellsPage: React.FC = () => {
   const [unitType, setUnitType] = useState<"year" | "month" | "semester">(
     "semester"
   );
-  // semesters 데이터가 로드되면 언제나 true일 것이므로 단순 길이 체크
+
   const hasSemesters = semesters.length > 0;
 
   const updateQueryParams = useCallback(
@@ -222,7 +228,6 @@ const AdminCellsPage: React.FC = () => {
 
   const fetchSemesters = useCallback(async () => {
     try {
-      // ✅ [수정] 모든 학기 조회 (true 제거) 및 정렬
       const data = await semesterService.getAllSemesters();
       const sorted = data.sort(
         (a, b) =>
@@ -364,7 +369,7 @@ const AdminCellsPage: React.FC = () => {
         s.startDate.substring(0, 7) <= currentYM &&
         s.endDate.substring(0, 7) >= currentYM
     );
-    if (!target) target = semesters[0]; // 정렬된 목록의 첫 번째(최신)
+    if (!target) target = semesters[0];
 
     if (target)
       updateQueryParams({
@@ -466,10 +471,12 @@ const AdminCellsPage: React.FC = () => {
     return sortConfig.direction === "ascending" ? " ▲" : " ▼";
   };
 
+  // ✅ 모바일 최적화된 렌더링 함수
   const renderUnitButtons = () => {
+    // 1. 월 선택 (그리드 유지, 모바일 터치 최적화)
     if (unitType === "month") {
       return (
-        <div className="pt-2 border-t border-gray-200/50 mt-2">
+        <div className="pt-3 border-t border-gray-200/50 mt-3 animate-fadeIn">
           <label className="text-xs font-bold text-gray-500 mb-2 block">
             월 선택
           </label>
@@ -491,6 +498,8 @@ const AdminCellsPage: React.FC = () => {
         </div>
       );
     }
+
+    // 2. 학기 선택 (가로 스크롤 칩 UI 적용)
     if (unitType === "semester") {
       if (semesters.length === 0)
         return (
@@ -499,23 +508,39 @@ const AdminCellsPage: React.FC = () => {
           </div>
         );
       return (
-        <div className="pt-2 border-t border-gray-200/50 mt-2">
-          <label className="text-xs font-bold text-gray-500 mb-2 block">
-            학기 선택
-          </label>
-          <div className="flex flex-wrap gap-2">
+        <div className="pt-3 border-t border-gray-200/50 mt-3 animate-fadeIn">
+          <div className="flex justify-between items-end mb-2">
+            <label className="text-xs font-bold text-gray-500">학기 선택</label>
+            <span className="text-[10px] text-gray-400 font-normal sm:hidden">
+              좌우로 스크롤하여 선택
+            </span>
+          </div>
+
+          {/* 가로 스크롤 컨테이너: -mx-4 px-4로 모바일에서 전체 폭 활용 */}
+          <div
+            className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap scrollbar-hide"
+            style={scrollbarHideStyle}
+          >
             {semesters.map((s) => (
               <button
                 key={s.id}
                 onClick={() => handleSemesterClick(s.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all shadow-sm ${
-                  filters.semesterId === s.id
-                    ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
-                    : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
-                }`}
+                className={`
+                  flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all shadow-sm whitespace-nowrap
+                  ${
+                    filters.semesterId === s.id
+                      ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-1 ring-indigo-600"
+                      : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
+                  }
+                `}
               >
-                {/* ✅ [수정] 학기 상태 표시 (진행중/마감됨) */}
-                {s.name} {s.isActive ? "(진행중)" : "(마감됨)"}
+                {/* 텍스트 대신 점(Dot)으로 상태 표시 */}
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    s.isActive ? "bg-green-400" : "bg-gray-300"
+                  }`}
+                ></span>
+                <span>{s.name}</span>
               </button>
             ))}
           </div>

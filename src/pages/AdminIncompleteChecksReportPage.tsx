@@ -29,6 +29,12 @@ type Filters = {
   semesterId: number | "";
 };
 
+// 스크롤바 숨김 스타일
+const scrollbarHideStyle: React.CSSProperties = {
+  msOverflowStyle: "none" /* IE and Edge */,
+  scrollbarWidth: "none" /* Firefox */,
+};
+
 const AdminIncompleteChecksReportPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -175,49 +181,85 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
     setFilters((prev) => ({ ...prev, semesterId, year: "", month: "" }));
   };
 
+  // ✅ 렌더링 함수 개선: 가로 스크롤 칩 UI 적용
   const renderUnitButtons = () => {
+    // 1. 월 선택
     if (unitType === "month") {
       return (
-        <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x pt-2 border-t border-gray-100">
-          {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-            <button
-              key={m}
-              onClick={() => handleUnitValueChange(m)}
-              className={`flex-shrink-0 snap-start px-3 py-1.5 border rounded-lg text-xs font-bold transition-all shadow-sm ${
-                filters.month === m
-                  ? "bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105"
-                  : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
-              }`}
-            >
-              {m}월
-            </button>
-          ))}
+        <div className="pt-2 border-t border-gray-200/50 mt-2">
+          <div className="flex justify-between items-end mb-2">
+            <label className="text-xs font-bold text-gray-500">월 선택</label>
+            <span className="text-[10px] text-gray-400 font-normal sm:hidden">
+              좌우로 스크롤
+            </span>
+          </div>
+          <div
+            className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap scrollbar-hide"
+            style={scrollbarHideStyle}
+          >
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+              <button
+                key={m}
+                onClick={() => handleUnitValueChange(m)}
+                className={`
+                  flex-shrink-0 px-3 py-1.5 border rounded-lg text-xs font-bold transition-all shadow-sm whitespace-nowrap
+                  ${
+                    filters.month === m
+                      ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-1 ring-indigo-600"
+                      : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                  }
+                `}
+              >
+                {m}월
+              </button>
+            ))}
+          </div>
         </div>
       );
     }
+
+    // 2. 학기 선택
     if (unitType === "semester") {
       if (semesters.length === 0)
         return (
-          <div className="text-xs text-yellow-600 bg-yellow-50 p-2 rounded mt-2">
+          <div className="text-xs text-yellow-600 bg-yellow-50 p-2 rounded mt-2 border border-yellow-100">
             활성 학기 없음
           </div>
         );
       return (
-        <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x pt-2 border-t border-gray-100">
-          {semesters.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => handleSemesterClick(s.id)}
-              className={`flex-shrink-0 snap-start px-3 py-1.5 border rounded-lg text-xs font-bold transition-all shadow-sm ${
-                filters.semesterId === s.id
-                  ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
-                  : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
-              }`}
-            >
-              {/* ✅ [수정] 활성 학기만 보여주므로 상태 텍스트 제거 */}
-              {s.name}
-            </button>
-          ))}
+        <div className="pt-2 border-t border-gray-200/50 mt-2">
+          <div className="flex justify-between items-end mb-2">
+            <label className="text-xs font-bold text-gray-500">학기 선택</label>
+            <span className="text-[10px] text-gray-400 font-normal sm:hidden">
+              좌우로 스크롤
+            </span>
+          </div>
+          <div
+            className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap scrollbar-hide"
+            style={scrollbarHideStyle}
+          >
+            {semesters.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => handleSemesterClick(s.id)}
+                className={`
+                  flex-shrink-0 px-3 py-1.5 border rounded-lg text-xs font-bold transition-all shadow-sm whitespace-nowrap
+                  ${
+                    filters.semesterId === s.id
+                      ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-1 ring-indigo-600"
+                      : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                  }
+                `}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    s.isActive ? "bg-green-400" : "bg-gray-300"
+                  } inline-block mr-1.5`}
+                ></span>
+                {s.name}
+              </button>
+            ))}
+          </div>
         </div>
       );
     }
@@ -298,7 +340,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
         }
       }
 
-      // ✅ 날짜 Boundary Cutoff (Future Cap & Year End Cap)
+      // ✅ 날짜 Boundary Cutoff
       if (params.endDate) {
         const today = new Date();
         today.setHours(23, 59, 59, 999);
@@ -313,7 +355,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
           params.endDate = `${y}-${m}-${d}`;
         }
 
-        // B. 연말 날짜 제한 (연도 선택 시)
+        // B. 연말 날짜 제한
         if (filters.year && filterType === "unit" && unitType === "year") {
           const yearEnd = `${filters.year}-12-31`;
           if (params.endDate > yearEnd) {
@@ -354,7 +396,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
 
   const fetchSemesters = useCallback(async () => {
     try {
-      // ✅ [수정] 활성 학기만 조회 (true) -> 운영 목적상 적합
       const data = await semesterService.getAllSemesters(true);
       const sorted = data.sort((a, b) =>
         b.startDate.localeCompare(a.startDate)
@@ -402,7 +443,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2 whitespace-nowrap">
               <ExclamationCircleIcon className="h-7 w-7 text-red-500" /> 출석
               누락 현황
             </h1>
@@ -417,7 +458,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
             <ExclamationCircleIcon className="h-5 w-5" /> {error}
             <button
               onClick={() => fetchIncompleteChecks({ skipLoading: false })}
-              className="ml-auto text-xs bg-white border border-red-200 px-3 py-1 rounded-lg hover:bg-red-50"
+              className="ml-auto text-xs bg-white border border-red-200 px-3 py-1 rounded-lg hover:bg-red-50 whitespace-nowrap"
             >
               다시 시도
             </button>
@@ -430,7 +471,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
             <div className="flex bg-gray-100 p-1 rounded-xl w-full sm:w-auto self-start">
               <button
                 onClick={() => setFilterType("unit")}
-                className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
                   filterType === "unit"
                     ? "bg-white text-indigo-600 shadow-sm"
                     : "text-gray-500"
@@ -440,7 +481,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
               </button>
               <button
                 onClick={() => setFilterType("range")}
-                className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
                   filterType === "range"
                     ? "bg-white text-indigo-600 shadow-sm"
                     : "text-gray-500"
@@ -528,7 +569,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                             !isDisabled && handleUnitTypeClick(u.t)
                           }
                           disabled={isDisabled}
-                          className={`flex-1 sm:flex-none px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
+                          className={`flex-1 sm:flex-none px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all whitespace-nowrap ${
                             isDisabled
                               ? "bg-gray-50 text-gray-400 border-gray-200 border-dashed cursor-not-allowed shadow-none"
                               : unitType === u.t
@@ -559,12 +600,12 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
             <div className="flex items-center justify-between mb-4 px-1">
               <div className="flex items-center gap-2">
                 <UserGroupIcon className="h-5 w-5 text-gray-400" />
-                <span className="font-bold text-gray-700">
+                <span className="font-bold text-gray-700 whitespace-nowrap">
                   검색 결과{" "}
                   <span className="text-red-600">{report.length}</span>명
                 </span>
               </div>
-              <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
+              <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-md whitespace-nowrap">
                 {periodSummary}
               </span>
             </div>
@@ -597,15 +638,15 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                     >
                       <div className="flex justify-between items-start mb-3">
                         <div>
-                          <h3 className="text-base font-bold text-gray-900">
+                          <h3 className="text-base font-bold text-gray-900 truncate max-w-[120px]">
                             {displayName}
                           </h3>
-                          <p className="text-xs text-gray-500 mt-0.5">
+                          <p className="text-xs text-gray-500 mt-0.5 truncate">
                             {item.cellName}
                           </p>
                         </div>
                         <span
-                          className={`px-2.5 py-1 rounded-lg text-xs font-bold ${badgeClass}`}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap ${badgeClass}`}
                         >
                           {item.missedDatesCount}회 누락
                         </span>
@@ -618,7 +659,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                           {item.missedDates.map((d, i) => (
                             <span
                               key={i}
-                              className="text-xs font-medium text-gray-600 bg-white border border-gray-200 px-1.5 py-0.5 rounded"
+                              className="text-xs font-medium text-gray-600 bg-white border border-gray-200 px-1.5 py-0.5 rounded whitespace-nowrap"
                             >
                               {formatShortDate(d)}
                             </span>
@@ -636,13 +677,13 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs w-1/4">
+                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs w-1/4 whitespace-nowrap">
                       셀장 이름
                     </th>
-                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs w-1/4">
+                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs w-1/4 whitespace-nowrap">
                       셀 이름
                     </th>
-                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs w-1/6">
+                    <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs w-1/6 whitespace-nowrap">
                       누락 횟수
                     </th>
                     <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">
@@ -686,15 +727,15 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                           }
                           className="hover:bg-gray-50 transition-colors cursor-pointer group"
                         >
-                          <td className="px-6 py-4 font-bold text-gray-900 group-hover:text-indigo-600 align-top">
+                          <td className="px-6 py-4 font-bold text-gray-900 group-hover:text-indigo-600 align-top whitespace-nowrap">
                             {displayName}
                           </td>
-                          <td className="px-6 py-4 text-gray-600 align-top">
+                          <td className="px-6 py-4 text-gray-600 align-top whitespace-nowrap">
                             {item.cellName}
                           </td>
                           <td className="px-6 py-4 align-top">
                             <span
-                              className={`px-2.5 py-1 rounded-lg text-xs font-bold ${badgeClass}`}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap ${badgeClass}`}
                             >
                               {item.missedDatesCount}회
                             </span>
@@ -704,7 +745,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                               {item.missedDates.map((d, i) => (
                                 <span
                                   key={i}
-                                  className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded"
+                                  className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap"
                                 >
                                   {formatShortDate(d)}
                                 </span>

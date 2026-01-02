@@ -19,7 +19,6 @@ import {
   FaChartLine,
   FaUserFriends,
   FaUserSlash,
-  FaFilter,
   FaArrowUp,
   FaArrowDown,
   FaMinus,
@@ -38,6 +37,12 @@ import type {
   SemesterDto,
   DashboardDemographicsDto,
 } from "../types";
+
+// 스크롤바 숨김 스타일 (인라인 적용용)
+const scrollbarHideStyle: React.CSSProperties = {
+  msOverflowStyle: "none" /* IE and Edge */,
+  scrollbarWidth: "none" /* Firefox */,
+};
 
 // --- 섹션 헤더 컴포넌트 ---
 const SectionHeader: React.FC<{
@@ -350,7 +355,7 @@ const StatisticsPage: React.FC = () => {
   // 1. 학기 목록 로딩 (모든 학기 조회)
   useEffect(() => {
     semesterService.getAllSemesters().then((list) => {
-      // ✅ [수정] filter 제거 (모든 학기 표시), 최신순 정렬
+      // 최신순 정렬
       const sortedList = list.sort(
         (a, b) =>
           new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
@@ -398,7 +403,7 @@ const StatisticsPage: React.FC = () => {
         const semester = semesters.find((s) => s.id === selectedSemesterId);
         if (!semester) return;
 
-        // 🔹 [유지] 미래 날짜 제한 로직 (Today Cap)
+        // 미래 날짜 제한 로직 (Today Cap)
         const { startDate, endDate } = semester;
         const today = new Date();
         const endObj = new Date(endDate);
@@ -500,28 +505,53 @@ const StatisticsPage: React.FC = () => {
   return (
     <div className="bg-gray-50 min-h-screen pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 헤더 & 필터 */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        {/* 헤더 & 필터 (모바일 최적화: 가로 스크롤 칩) */}
+        <div className="mb-8 space-y-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">통계 및 리포트</h1>
+            <h1 className="text-3xl font-bold text-gray-900 whitespace-nowrap">
+              통계 및 리포트
+            </h1>
             <p className="mt-1 text-sm text-gray-500">
               공동체의 성장 흐름과 구성원 현황을 상세하게 분석합니다.
             </p>
           </div>
-          <div className="flex items-center gap-2 bg-white p-2 rounded-lg shadow-sm border border-gray-200">
-            <FaFilter className="text-gray-400 ml-2" />
-            <select
-              className="text-sm font-medium text-gray-700 bg-transparent border-none focus:ring-0 cursor-pointer pr-8 focus:outline-none"
-              value={selectedSemesterId ?? ""}
-              onChange={(e) => setSelectedSemesterId(Number(e.target.value))}
+
+          <div className="border-t border-gray-200/50 pt-4">
+            <div className="flex justify-between items-end mb-2">
+              <label className="text-xs font-bold text-gray-500">
+                학기 선택
+              </label>
+              <span className="text-[10px] text-gray-400 font-normal sm:hidden">
+                좌우로 스크롤하여 선택
+              </span>
+            </div>
+
+            <div
+              className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap scrollbar-hide"
+              style={scrollbarHideStyle}
             >
               {semesters.map((s) => (
-                // ✅ [수정] 진행중/마감됨 상태 표시
-                <option key={s.id} value={s.id}>
-                  {s.name} {s.isActive ? "(진행중)" : "(마감됨)"}
-                </option>
+                <button
+                  key={s.id}
+                  onClick={() => setSelectedSemesterId(s.id)}
+                  className={`
+                    flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all shadow-sm whitespace-nowrap
+                    ${
+                      selectedSemesterId === s.id
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-1 ring-indigo-600"
+                        : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
+                    }
+                  `}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      s.isActive ? "bg-green-400" : "bg-gray-300"
+                    }`}
+                  ></span>
+                  <span>{s.name}</span>
+                </button>
               ))}
-            </select>
+            </div>
           </div>
         </div>
 

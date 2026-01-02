@@ -19,7 +19,7 @@ import {
 } from "@heroicons/react/24/solid";
 
 // ─────────────────────────────────────────────────────────────
-// ✅ 헬퍼 함수
+// ✅ 헬퍼 함수 및 스타일
 // ─────────────────────────────────────────────────────────────
 
 const toLocalDateStr = (d: Date) => {
@@ -46,6 +46,12 @@ const getThisWeekRange = () => {
     startDate: toLocalDateStr(sunday),
     endDate: toLocalDateStr(saturday),
   };
+};
+
+// 스크롤바 숨김 스타일
+const scrollbarHideStyle: React.CSSProperties = {
+  msOverflowStyle: "none" /* IE and Edge */,
+  scrollbarWidth: "none" /* Firefox */,
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -299,18 +305,18 @@ const CellPrayersPage: React.FC = () => {
       <div className="container mx-auto px-4 py-8 max-w-5xl">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <UserGroupIcon className="h-7 w-7 text-indigo-500" />
-              {titleText}
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2 truncate">
+              <UserGroupIcon className="h-7 w-7 text-indigo-500 flex-shrink-0" />
+              <span className="truncate">{titleText}</span>
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-gray-500 mt-1 whitespace-nowrap">
               선택한 셀에 속한 모든 멤버의 기도제목을 조회합니다.
             </p>
           </div>
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center justify-center gap-1 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm font-bold shadow-sm transition-all"
+            className="flex items-center justify-center gap-1 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm font-bold shadow-sm transition-all whitespace-nowrap"
           >
             <ArrowLeftIcon className="h-4 w-4" /> 뒤로가기
           </button>
@@ -321,11 +327,16 @@ const CellPrayersPage: React.FC = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 border-b border-gray-50 pb-4">
             <div className="flex items-center gap-2">
               <FunnelIcon className="h-5 w-5 text-gray-400" />
-              <h3 className="font-bold text-gray-700">조회 조건 설정</h3>
+              <h3 className="font-bold text-gray-700 whitespace-nowrap">
+                조회 조건 설정
+              </h3>
             </div>
 
-            {/* Segment Control (Filter Type) */}
-            <div className="bg-gray-100 p-1 rounded-xl flex text-xs font-bold overflow-x-auto">
+            {/* Segment Control (Filter Type) - Horizontal Scroll */}
+            <div
+              className="bg-gray-100 p-1 rounded-xl flex text-xs font-bold overflow-x-auto scrollbar-hide"
+              style={scrollbarHideStyle}
+            >
               {[
                 { id: "week", label: "이번 주" },
                 { id: "unit", label: "월/학기/년" },
@@ -338,7 +349,7 @@ const CellPrayersPage: React.FC = () => {
                     setFilterType(tab.id as FilterType);
                     setCurrentPage(0);
                   }}
-                  className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${
+                  className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-all flex-shrink-0 ${
                     filterType === tab.id
                       ? "bg-white text-indigo-600 shadow-sm"
                       : "text-gray-500 hover:text-gray-700"
@@ -394,7 +405,7 @@ const CellPrayersPage: React.FC = () => {
                         setCurrentPage(0);
                       }}
                       disabled={type === "semester" && !hasActiveSemesters}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all whitespace-nowrap ${
                         type === "semester" && !hasActiveSemesters
                           ? "bg-gray-100 text-gray-300 cursor-not-allowed border-gray-100"
                           : unitType === type
@@ -434,20 +445,33 @@ const CellPrayersPage: React.FC = () => {
                       </div>
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-gray-500 mb-2 block">
-                        월 선택
-                      </label>
-                      <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5">
+                      <div className="flex justify-between items-end mb-2">
+                        <label className="text-xs font-bold text-gray-500">
+                          월 선택
+                        </label>
+                        <span className="text-[10px] text-gray-400 font-normal sm:hidden">
+                          좌우로 스크롤
+                        </span>
+                      </div>
+
+                      {/* 가로 스크롤 적용 */}
+                      <div
+                        className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap sm:pb-0 scrollbar-hide"
+                        style={scrollbarHideStyle}
+                      >
                         {Array.from({ length: 12 }, (_, i) => i + 1).map(
                           (m) => (
                             <button
                               key={m}
                               onClick={() => handleFilterChange("month", m)}
-                              className={`py-1.5 rounded-md text-xs font-bold transition-colors ${
-                                filters.month === m
-                                  ? "bg-indigo-600 text-white shadow-sm"
-                                  : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
-                              }`}
+                              className={`
+                                flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors whitespace-nowrap
+                                ${
+                                  filters.month === m
+                                    ? "bg-indigo-600 text-white shadow-sm"
+                                    : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                                }
+                              `}
                             >
                               {m}월
                             </button>
@@ -460,19 +484,31 @@ const CellPrayersPage: React.FC = () => {
 
                 {unitType === "semester" && (
                   <div className="pt-2 border-t border-gray-200/50">
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">
-                      학기 선택
-                    </label>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex justify-between items-end mb-2">
+                      <label className="text-xs font-bold text-gray-500">
+                        학기 선택
+                      </label>
+                      <span className="text-[10px] text-gray-400 font-normal sm:hidden">
+                        좌우로 스크롤
+                      </span>
+                    </div>
+                    {/* 가로 스크롤 적용 */}
+                    <div
+                      className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap sm:pb-0 scrollbar-hide"
+                      style={scrollbarHideStyle}
+                    >
                       {semesters.map((s) => (
                         <button
                           key={s.id}
                           onClick={() => handleFilterChange("semesterId", s.id)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                            filters.semesterId === s.id
-                              ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                          }`}
+                          className={`
+                            flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all whitespace-nowrap
+                            ${
+                              filters.semesterId === s.id
+                                ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                                : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                            }
+                          `}
                         >
                           {s.name}
                         </button>
@@ -544,7 +580,7 @@ const CellPrayersPage: React.FC = () => {
                           prayer.member?.name
                         )}
                       </div>
-                      <div className="flex items-center gap-1 text-xs text-gray-400 font-medium">
+                      <div className="flex items-center gap-1 text-xs text-gray-400 font-medium whitespace-nowrap">
                         <CalendarDaysIcon className="h-3.5 w-3.5" />
                         {new Date(prayer.createdAt).toLocaleDateString()}
                       </div>
@@ -558,7 +594,7 @@ const CellPrayersPage: React.FC = () => {
                     </Link>
 
                     <div className="text-right">
-                      <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded-md font-bold">
+                      <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded-md font-bold whitespace-nowrap">
                         작성:{" "}
                         {getFormattedName(
                           prayer.createdBy?.id,

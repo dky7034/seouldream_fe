@@ -169,7 +169,6 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
     if (isValidDate) {
       setSelectedDate(defaultSunday);
     } else {
-      // 학기 기간이 아니면 가장 최근 학기의 종료일로 설정
       const sortedSemesters = [...allSemesters].sort((a, b) =>
         b.endDate.localeCompare(a.endDate)
       );
@@ -180,8 +179,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
         setSelectedDate(defaultSunday);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allSemesters]);
+  }, [allSemesters, selectedDate]);
 
   const semesterForSelectedDate = useMemo(() => {
     if (!selectedDate || allSemesters.length === 0) return null;
@@ -379,7 +377,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
 
       setSubmitError(null);
       setSuccessMessage(null);
-      setIsEditMode(true); // 저장 후 읽기 전용 모드로 전환
+      setIsEditMode(true);
 
       showAlert(
         "저장 완료",
@@ -417,18 +415,18 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
         {/* 1. 날짜 선택 섹션 */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
-            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 whitespace-nowrap">
               <CalendarDaysIcon className="h-5 w-5 text-indigo-500" />
               날짜 선택
             </h3>
             {!loading && selectedDate && (
               <>
                 {isEditMode ? (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 whitespace-nowrap">
                     🔒 제출 완료
                   </span>
                 ) : (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700 whitespace-nowrap">
                     ✨ 작성 중
                   </span>
                 )}
@@ -444,14 +442,14 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
 
             {semesterForSelectedDate ? (
               <div className="mt-3 flex justify-end">
-                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-50 text-green-700 border border-green-100">
+                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-50 text-green-700 border border-green-100 whitespace-nowrap">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5"></span>
                   {semesterForSelectedDate.name} 기간입니다
                 </span>
               </div>
             ) : selectedDate ? (
               <div className="mt-3 flex justify-end">
-                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-red-50 text-red-700 border border-red-100">
+                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-red-50 text-red-700 border border-red-100 whitespace-nowrap">
                   <ExclamationTriangleIcon className="w-3.5 h-3.5 mr-1" />
                   학기 기간이 아닙니다
                 </span>
@@ -470,29 +468,30 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
           <>
             {/* 2. 멤버별 출석 체크 섹션 */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between px-1">
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              {/* ✅ [개선] 헤더 영역 레이아웃 재구성: 제목과 버튼 분리 및 반응형 처리 */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1 mb-2">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 whitespace-nowrap">
                   <ClipboardDocumentCheckIcon className="h-5 w-5 text-indigo-500" />
                   멤버 출석 & 기도제목
                 </h3>
 
-                {/* 일괄 변경 */}
-                <div className="flex gap-1.5 bg-gray-100 p-1 rounded-lg">
+                {/* ✅ [개선] 일괄 변경 버튼 Grid Layout + 스타일 통일 */}
+                <div className="grid grid-cols-2 gap-2 w-full sm:w-auto">
                   <button
                     type="button"
                     onClick={() => handleBulkChange("PRESENT")}
                     disabled={loading || isEditMode}
-                    className="px-2.5 py-1 text-xs font-bold rounded-md bg-white text-green-600 shadow-sm disabled:opacity-50"
+                    className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-bold rounded-xl border border-green-200 bg-white text-green-700 shadow-sm hover:bg-green-50 active:scale-[0.98] transition-all disabled:opacity-50 whitespace-nowrap"
                   >
-                    전원 출석
+                    <CheckCircleIcon className="h-4 w-4" /> 전원 출석
                   </button>
                   <button
                     type="button"
                     onClick={() => handleBulkChange("ABSENT")}
                     disabled={loading || isEditMode}
-                    className="px-2.5 py-1 text-xs font-bold rounded-md text-gray-500 hover:bg-white hover:shadow-sm transition-all disabled:opacity-50"
+                    className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-bold rounded-xl border border-red-200 bg-white text-red-600 shadow-sm hover:bg-red-50 active:scale-[0.98] transition-all disabled:opacity-50 whitespace-nowrap"
                   >
-                    전원 결석
+                    <XCircleIcon className="h-4 w-4" /> 전원 결석
                   </button>
                 </div>
               </div>
@@ -508,12 +507,12 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                       className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-900/5 overflow-hidden"
                     >
                       <div className="p-4 sm:p-5">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h4 className="text-base font-bold text-gray-900">
+                        <div className="flex justify-between items-center mb-4">
+                          <div className="min-w-0 mr-2">
+                            <h4 className="text-base font-bold text-gray-900 truncate">
                               {formatDisplayName(member, allMembers)}
                             </h4>
-                            <p className="text-xs text-gray-500 mt-0.5">
+                            <p className="text-xs text-gray-500 mt-0.5 truncate">
                               {member.role === "CELL_LEADER"
                                 ? "셀리더"
                                 : "셀원"}
@@ -521,7 +520,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                           </div>
 
                           {/* Custom Toggle Buttons */}
-                          <div className="flex bg-gray-100 p-1 rounded-xl">
+                          <div className="flex bg-gray-100 p-1 rounded-xl flex-shrink-0">
                             <button
                               type="button"
                               onClick={() =>
@@ -532,7 +531,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                                 )
                               }
                               disabled={isEditMode}
-                              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
+                              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${
                                 attendance.status === "PRESENT"
                                   ? "bg-white text-green-600 shadow-sm ring-1 ring-black/5"
                                   : "text-gray-400 hover:text-gray-600"
@@ -550,7 +549,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                                 )
                               }
                               disabled={isEditMode}
-                              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
+                              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${
                                 attendance.status === "ABSENT"
                                   ? "bg-white text-red-500 shadow-sm ring-1 ring-black/5"
                                   : "text-gray-400 hover:text-gray-600"
@@ -563,7 +562,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
 
                         {/* Prayer Input */}
                         <div>
-                          <label className="text-xs font-bold text-gray-500 mb-1.5 flex items-center gap-1">
+                          <label className="text-xs font-bold text-gray-500 mb-1.5 flex items-center gap-1 whitespace-nowrap">
                             기도제목 및 특이사항{" "}
                             <span className="text-red-500">*</span>
                           </label>
@@ -600,13 +599,13 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
             <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-900/5 overflow-hidden mt-6">
               <div className="px-5 py-4 border-b border-gray-50 bg-gray-50/50 flex items-center gap-2">
                 <DocumentTextIcon className="h-5 w-5 text-indigo-500" />
-                <h3 className="text-sm font-bold text-gray-900">
+                <h3 className="text-sm font-bold text-gray-900 whitespace-nowrap">
                   셀 모임 보고서
                 </h3>
               </div>
               <div className="p-5 space-y-6">
                 <div>
-                  <label className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-1.5">
+                  <label className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-1.5 whitespace-nowrap">
                     <ChatBubbleLeftRightIcon className="h-4 w-4 text-gray-400" />
                     셀 은혜 나눔 <span className="text-red-500">*</span>
                   </label>
@@ -626,7 +625,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-1.5">
+                  <label className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-1.5 whitespace-nowrap">
                     <ExclamationTriangleIcon className="h-4 w-4 text-gray-400" />
                     셀 특이사항 <span className="text-red-500">*</span>
                   </label>
@@ -654,13 +653,13 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                 {!isEditMode ? (
                   <button
                     type="submit"
-                    className="w-full bg-indigo-600 text-white text-base font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 active:scale-[0.98] transition-all disabled:bg-gray-300 disabled:shadow-none"
+                    className="w-full bg-indigo-600 text-white text-base font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 active:scale-[0.98] transition-all disabled:bg-gray-300 disabled:shadow-none whitespace-nowrap"
                     disabled={loading || memberAttendances.length === 0}
                   >
                     {loading ? "저장 중..." : "출석 및 보고서 제출하기"}
                   </button>
                 ) : (
-                  <div className="w-full bg-gray-100 text-gray-500 text-sm font-bold py-3.5 rounded-xl border border-gray-200 text-center flex items-center justify-center gap-2">
+                  <div className="w-full bg-gray-100 text-gray-500 text-sm font-bold py-3.5 rounded-xl border border-gray-200 text-center flex items-center justify-center gap-2 whitespace-nowrap">
                     <CheckCircleIcon className="h-5 w-5" /> 이미 제출 완료된
                     보고서입니다
                   </div>
