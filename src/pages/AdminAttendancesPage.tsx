@@ -53,7 +53,7 @@ type Filters = {
   year: number | "";
   month: number | "";
   semesterId: number | "";
-  includeExecutive: boolean; // 🔹 [추가] 임원 포함 여부
+  includeExecutive: boolean;
 };
 
 const pad = (n: number) => n.toString().padStart(2, "0");
@@ -72,7 +72,7 @@ const translateAttendanceStatus = (status: string) => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// Sub Component 1: AttendanceStats (상단 종합 통계 카드 - 서버 데이터)
+// Sub Component 1: AttendanceStats (상단 종합 통계 카드)
 // ─────────────────────────────────────────────────────────────
 
 const AttendanceStats = memo(
@@ -210,7 +210,8 @@ const AttendanceMatrixView = memo(
     endDate,
     unitType,
     isLoading,
-    includeExecutive, // 🔹 [추가] 부모로부터 받는 옵션
+    includeExecutive,
+    semesters, // ✅ [추가] 방학 필터링을 위해 학기 정보 필요
   }: {
     members: MemberDto[];
     attendances: AttendanceDto[];
@@ -219,13 +220,13 @@ const AttendanceMatrixView = memo(
     unitType: UnitType;
     isLoading: boolean;
     includeExecutive: boolean;
+    semesters: SemesterDto[];
   }) => {
     // 1. 출석 데이터 Map 변환 (조회 속도 향상)
     const attendanceMap = useMemo(() => {
       const map = new Map<string, string>();
       attendances.forEach((att) => {
         if (att.member?.id && att.date) {
-          // YYYY-MM-DD 추출
           const dateKey = att.date.substring(0, 10);
           map.set(`${att.member.id}-${dateKey}`, att.status);
         }
@@ -249,42 +250,48 @@ const AttendanceMatrixView = memo(
       const start = new Date(startDate);
       const end = new Date(endDate);
       const today = new Date();
-
-      // ✅ 오늘 날짜 문자열 (비교용)
       const todayStr = toDateKey(today);
 
-      // 시간 초기화
       start.setHours(0, 0, 0, 0);
       end.setHours(23, 59, 59, 999);
       today.setHours(23, 59, 59, 999);
 
-      // ✅ 종료일이 오늘보다 미래라면, 오늘까지만 루프를 돔 (미래 통계 제외의 핵심)
       const effectiveEnd = end > today ? today : end;
 
-      // (1) 조회 기간 내의 '모든 주일(일요일)' 리스트 생성 (오늘까지만)
+      // (1) 조회 기간 내의 '모든 주일(일요일)' 리스트 생성
       const targetSundayKeys: string[] = [];
       const current = new Date(start);
 
-      // 시작일이 일요일이 아니면 다음 일요일로 이동
       if (current.getDay() !== 0) {
         current.setDate(current.getDate() + (7 - current.getDay()));
       }
 
       while (current <= effectiveEnd) {
-        targetSundayKeys.push(toDateKey(current));
+        // ✅ [추가] 방학 기간 필터링 (Year 모드일 때)
+        let isSemesterDate = true;
+        const currentDateStr = toDateKey(current);
+
+        if (unitType === "year" && semesters.length > 0) {
+          const isInSemester = semesters.some(
+            (s) => currentDateStr >= s.startDate && currentDateStr <= s.endDate
+          );
+          if (!isInSemester) isSemesterDate = false;
+        }
+
+        if (isSemesterDate) {
+          targetSundayKeys.push(currentDateStr);
+        }
         current.setDate(current.getDate() + 7);
       }
 
       // (2) 멤버별 순회하며 카운팅
-      let totalPresent = 0; // 총 출석 횟수
-      let totalPossible = 0; // 총 유효 주차 (분모)
-      let totalUnchecked = 0; // 총 미체크 개수
+      let totalPresent = 0;
+      let totalPossible = 0;
+      let totalUnchecked = 0;
 
       members.forEach((member) => {
-        // 🔹 [수정] 옵션이 false(미포함)이고, 역할이 임원이면 계산 건너뜀
         if (!includeExecutive && member.role === "EXECUTIVE") return;
 
-        // 배정일/가입일 기준 설정
         let joinDateStr = "2000-01-01";
         if (member.cellAssignmentDate)
           joinDateStr = member.cellAssignmentDate.substring(0, 10);
@@ -293,7 +300,6 @@ const AttendanceMatrixView = memo(
         else if (member.joinYear) joinDateStr = `${member.joinYear}-01-01`;
 
         targetSundayKeys.forEach((sundayKey) => {
-          // ✅ 이중 안전장치: 혹시라도 루프 로직 실수로 미래 날짜가 들어왔다면 제외
           if (sundayKey > todayStr) return;
 
           const key = `${member.id}-${sundayKey}`;
@@ -306,7 +312,6 @@ const AttendanceMatrixView = memo(
             if (status === "PRESENT") {
               totalPresent++;
             } else if (!status) {
-              // 유효한 주차인데 기록이 없으면 -> 미체크
               totalUnchecked++;
             }
           }
@@ -316,12 +321,19 @@ const AttendanceMatrixView = memo(
       const rate = totalPossible > 0 ? (totalPresent / totalPossible) * 100 : 0;
 
       return { rate, unchecked: totalUnchecked };
-    }, [startDate, endDate, members, attendanceMap, includeExecutive]);
+    }, [
+      startDate,
+      endDate,
+      members,
+      attendanceMap,
+      includeExecutive,
+      unitType,
+      semesters,
+    ]);
 
     const matrixMembers = useMemo(
       () =>
         members
-          // 🔹 [추가] 임원 포함 옵션이 꺼져있으면 리스트에서도 숨김
           .filter((m) => includeExecutive || m.role !== "EXECUTIVE")
           .sort((a, b) => a.name.localeCompare(b.name))
           .map((m) => ({
@@ -350,7 +362,7 @@ const AttendanceMatrixView = memo(
               <span className="text-base ml-0.5">%</span>
             </p>
             <p className="text-[10px] text-gray-400 mt-1">
-              * {includeExecutive ? "임원 포함" : "임원 제외"}, 셀 배정일 이후
+              * {includeExecutive ? "임원 포함" : "임원 제외"}, 방학 제외
             </p>
           </div>
 
@@ -402,6 +414,7 @@ const AttendanceMatrixView = memo(
             loading={isLoading}
             limitStartDate={startDate}
             limitEndDate={endDate}
+            semesters={semesters} // ✅ [추가]
           />
         </div>
       </div>
@@ -452,7 +465,7 @@ const AdminAttendancesPage: React.FC = () => {
     year: currentYear,
     month: "" as number | "",
     semesterId: "" as number | "",
-    includeExecutive: false, // 🔹 [추가] 기본값: 임원 제외
+    includeExecutive: false,
   });
 
   const [filterType, setFilterType] = useState<"unit" | "range">("unit");
@@ -638,10 +651,18 @@ const AdminAttendancesPage: React.FC = () => {
         .getAvailableYears()
         .then(setAvailableYears)
         .catch(() => setAvailableYears([]));
+
+      // ✅ [수정] 모든 학기 불러오기 (true 제거) 및 정렬
       semesterService
-        .getAllSemesters(true)
-        .then(setSemesters)
+        .getAllSemesters()
+        .then((data) => {
+          const sorted = data.sort((a, b) =>
+            b.startDate.localeCompare(a.startDate)
+          );
+          setSemesters(sorted);
+        })
         .catch(() => setSemesters([]));
+
       if (user.role === "EXECUTIVE") {
         cellService
           .getAllCells({ size: 1000 })
@@ -674,7 +695,7 @@ const AdminAttendancesPage: React.FC = () => {
       year: currentYear,
       month: "" as number | "",
       semesterId: "" as number | "",
-      includeExecutive: false, // 🔹 [추가] 초기화 시에도 false
+      includeExecutive: false,
     });
     setUnitType("year");
   };
@@ -812,7 +833,6 @@ const AdminAttendancesPage: React.FC = () => {
               <FunnelIcon className="h-5 w-5 text-gray-400" />
               <h3 className="font-bold text-gray-700">검색 및 필터</h3>
             </div>
-            {/* Toggle: Unit vs Range */}
             <div className="bg-gray-100 p-1 rounded-xl flex text-xs font-bold">
               <button
                 onClick={() => setFilterType("unit")}
@@ -838,7 +858,6 @@ const AdminAttendancesPage: React.FC = () => {
           </div>
 
           <div className="space-y-5">
-            {/* Top Row: Date Settings */}
             {filterType === "range" ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -862,9 +881,7 @@ const AdminAttendancesPage: React.FC = () => {
               </div>
             ) : (
               <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-4">
-                {/* ✅ items-start로 설정하여 레이아웃 정렬 개선 */}
                 <div className="flex flex-col sm:flex-row items-start gap-4">
-                  {/* 1. 기준 연도 */}
                   <div className="sm:w-1/3 w-full">
                     <label className="text-xs font-bold text-gray-500 mb-1 block">
                       기준 연도
@@ -878,7 +895,6 @@ const AdminAttendancesPage: React.FC = () => {
                             e.target.value ? Number(e.target.value) : ""
                           )
                         }
-                        // ✅ 스타일: border-gray-300, shadow-sm, px-3, py-2
                         className="w-full py-2 px-1 border border-gray-300 rounded-lg text-sm bg-white focus:ring-indigo-500 focus:border-indigo-500 shadow-sm disabled:bg-gray-50 disabled:text-gray-400"
                         disabled={unitType === "semester"}
                       >
@@ -888,7 +904,6 @@ const AdminAttendancesPage: React.FC = () => {
                           </option>
                         ))}
                       </select>
-                      {/* ✅ 안내 문구 추가 */}
                       {unitType === "semester" && (
                         <p className="absolute left-0 top-full mt-1 text-[10px] text-gray-400 whitespace-nowrap">
                           * 학기는 연도 무관
@@ -897,12 +912,10 @@ const AdminAttendancesPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* 2. 조회 단위 */}
                   <div className="flex-1 w-full">
                     <label className="text-xs font-bold text-gray-500 mb-1 block">
                       조회 단위
                     </label>
-                    {/* ✅ 스타일 개선: 개별 버튼 + gap-2 */}
                     <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => handleUnitTypeClick("month")}
@@ -943,7 +956,6 @@ const AdminAttendancesPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 3. 월 선택 영역 (스타일 업그레이드) */}
                 {unitType === "month" && (
                   <div className="pt-2 border-t border-gray-200/50">
                     <label className="text-xs font-bold text-gray-500 mb-2 block">
@@ -968,7 +980,6 @@ const AdminAttendancesPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* 4. 학기 선택 영역 (스타일 업그레이드) */}
                 {unitType === "semester" && semesters.length > 0 && (
                   <div className="pt-2 border-t border-gray-200/50">
                     <label className="text-xs font-bold text-gray-500 mb-2 block">
@@ -993,7 +1004,7 @@ const AdminAttendancesPage: React.FC = () => {
                               : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 shadow-sm"
                           }`}
                         >
-                          {s.name}
+                          {s.name} {s.isActive ? "(진행중)" : "(마감됨)"}
                         </button>
                       ))}
                     </div>
@@ -1002,7 +1013,6 @@ const AdminAttendancesPage: React.FC = () => {
               </div>
             )}
 
-            {/* Bottom Row: Cell/Member/Status */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="text-xs font-bold text-gray-500 mb-1 block">
@@ -1068,7 +1078,6 @@ const AdminAttendancesPage: React.FC = () => {
               </div>
             </div>
 
-            {/* 🔹 [추가] 임원 포함 체크박스 영역 */}
             <div className="flex items-center justify-end py-2">
               <label className="flex items-center gap-2 cursor-pointer select-none group">
                 <div className="relative">
@@ -1115,7 +1124,6 @@ const AdminAttendancesPage: React.FC = () => {
           </div>
         )}
 
-        {/* Matrix View */}
         {loading ? (
           <div className="flex justify-center py-20">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -1128,7 +1136,8 @@ const AdminAttendancesPage: React.FC = () => {
             endDate={effectiveDateRange?.endDate || ""}
             unitType={unitType}
             isLoading={loading}
-            includeExecutive={filters.includeExecutive} // 🔹 [추가] props 전달
+            includeExecutive={filters.includeExecutive}
+            semesters={semesters} // ✅ [추가] prop 전달
           />
         )}
       </div>

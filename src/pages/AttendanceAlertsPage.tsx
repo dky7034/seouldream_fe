@@ -58,9 +58,16 @@ const AttendanceAlertsPage: React.FC = () => {
   // 데이터 로딩
   const fetchSemesters = useCallback(async () => {
     try {
-      setSemesters(await semesterService.getAllSemesters(true));
+      // ✅ [복구] 활성 학기만 조회 (true)
+      // 결석 관리는 현재 케어가 필요한 멤버를 찾는 것이므로 활성 학기만 보여주는 것이 적합함
+      const data = await semesterService.getAllSemesters(true);
+      const sorted = data.sort((a, b) =>
+        b.startDate.localeCompare(a.startDate)
+      );
+      setSemesters(sorted);
     } catch (err) {
       console.error(err);
+      setSemesters([]);
     }
   }, []);
 
@@ -96,7 +103,8 @@ const AttendanceAlertsPage: React.FC = () => {
         (s) =>
           s.startDate.substring(0, 7) <= ym && s.endDate.substring(0, 7) >= ym
       );
-      if (!target) target = [...semesters].sort((a, b) => b.id - a.id)[0];
+      if (!target) target = semesters[0]; // 최신 학기
+
       if (target) {
         setUnitType("semester");
         setSelectedSemesterId(target.id);
@@ -109,7 +117,6 @@ const AttendanceAlertsPage: React.FC = () => {
   }, [semesters, hasAutoSelectedSemester, selectedYear]);
 
   // 조회 로직
-  // 조회 로직 수정
   const fetchAlerts = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -121,12 +128,7 @@ const AttendanceAlertsPage: React.FC = () => {
         consecutiveAbsences: threshold,
       };
 
-      // 🛑 [수정 전] 단순히 year나 semesterId만 보냄
-      // if (unitType === "year") params.year = selectedYear;
-      // else if (unitType === "semester" && selectedSemesterId)
-      //   params.semesterId = selectedSemesterId;
-
-      // 🟢 [수정 후] 명시적 날짜 계산 및 Future Cap(미래 차단) 적용
+      // 🟢 명시적 날짜 계산 및 Future Cap(미래 차단) 적용
       let calculatedStartDate = "";
       let calculatedEndDate = "";
 
@@ -149,7 +151,7 @@ const AttendanceAlertsPage: React.FC = () => {
         today.setHours(23, 59, 59, 999);
         reqEnd.setHours(23, 59, 59, 999);
 
-        // ✅ 핵심: 조회 종료일이 오늘보다 미래면, 오늘 날짜로 강제 변경
+        // ✅ Future Cap
         if (reqEnd > today) {
           const y = today.getFullYear();
           const m = String(today.getMonth() + 1).padStart(2, "0");
@@ -157,11 +159,10 @@ const AttendanceAlertsPage: React.FC = () => {
           calculatedEndDate = `${y}-${m}-${d}`;
         }
 
-        // 변환된 날짜를 파라미터에 담음 (API가 startDate, endDate를 지원해야 함)
         params.startDate = calculatedStartDate;
         params.endDate = calculatedEndDate;
       } else {
-        // 날짜 계산 실패 시 기존 방식 Fallback
+        // Fallback
         if (unitType === "year") params.year = selectedYear;
         else if (selectedSemesterId) params.semesterId = selectedSemesterId;
       }
@@ -260,11 +261,9 @@ const AttendanceAlertsPage: React.FC = () => {
               <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 flex items-center gap-1">
                 <FunnelIcon className="h-4 w-4" /> 조회 기준
               </label>
-              {/* ✅ 수정: 개별 버튼 + gap-2 */}
               <div className="flex gap-2">
                 <button
                   onClick={() => handleUnitTypeClick("semester")}
-                  // ✅ 수정: text-xs sm:text-sm (모바일 글자 작게), whitespace-nowrap
                   className={`flex-1 py-2 px-3 text-xs sm:text-sm font-bold rounded-lg border shadow-sm transition-all whitespace-nowrap ${
                     unitType === "semester"
                       ? "bg-indigo-50 border-indigo-200 text-indigo-700"
@@ -275,7 +274,6 @@ const AttendanceAlertsPage: React.FC = () => {
                 </button>
                 <button
                   onClick={() => handleUnitTypeClick("year")}
-                  // ✅ 수정: text-xs sm:text-sm, whitespace-nowrap
                   className={`flex-1 py-2 px-3 text-xs sm:text-sm font-bold rounded-lg border shadow-sm transition-all whitespace-nowrap ${
                     unitType === "year"
                       ? "bg-indigo-50 border-indigo-200 text-indigo-700"
@@ -297,7 +295,7 @@ const AttendanceAlertsPage: React.FC = () => {
                 <div className="flex flex-wrap gap-2">
                   {semesters.length === 0 ? (
                     <span className="text-sm text-gray-400 py-2">
-                      학기 없음
+                      활성 학기 없음
                     </span>
                   ) : (
                     semesters.map((s) => (
@@ -310,6 +308,7 @@ const AttendanceAlertsPage: React.FC = () => {
                             : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
                         }`}
                       >
+                        {/* ✅ [수정] 심플한 이름만 표시 (활성 학기만 보여주므로 상태 불필요) */}
                         {s.name}
                       </button>
                     ))

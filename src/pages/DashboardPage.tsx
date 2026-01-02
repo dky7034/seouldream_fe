@@ -52,70 +52,70 @@ import { DemographicsSection } from "../components/DemographicsSection";
 type SummaryMode = "SEMESTER" | "YEAR";
 type IncompleteFilter = "WEEK" | "MONTH" | "SEMESTER";
 
-// ✅ 날짜 포맷팅 함수
+// ✅ 날짜 포맷팅 함수 (Display Only)
 const safeFormatDate = (dateStr: string | null | undefined) => {
   if (!dateStr) return "-";
-  const targetStr =
-    dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
-
-  const date = new Date(targetStr);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}.${month}.${day}`;
+  const y = dateStr.substring(0, 4);
+  const m = dateStr.substring(5, 7);
+  const d = dateStr.substring(8, 10);
+  return `${y}.${m}.${d}`;
 };
 
 // --- Helper Functions ---
 
-// ✅ [수정됨] 차트/통계용 날짜 계산 (미래 날짜 제한 적용)
+// ✅ 차트/통계용 날짜 계산 (미래 날짜 제한 적용됨)
+// ✅ [수정됨] 6번째 인자(selectedYear) 추가 및 로직 반영
 const computeTrendRange = (
   isExecutive: boolean,
   summaryMode: SummaryMode,
   period: string,
   semesters: SemesterDto[],
-  selectedSemesterId: number | null
+  selectedSemesterId: number | null,
+  selectedYear: number // 👈 [중요] 이 인자가 빠져있어서 에러가 난 것입니다. 추가해주세요!
 ) => {
   let range = { startDate: "", endDate: "" };
 
   if (!isExecutive) {
     range = getPeriodDates(period);
   } else {
-    const currentYear = new Date().getFullYear();
+    // const currentYear = new Date().getFullYear(); // 👈 기존 로직 (삭제)
+
     if (summaryMode === "YEAR") {
+      // ✅ [수정] 인자로 받은 selectedYear를 사용하도록 변경
       range = {
-        startDate: `${currentYear}-01-01`,
-        endDate: `${currentYear}-12-31`,
+        startDate: `${selectedYear}-01-01`,
+        endDate: `${selectedYear}-12-31`,
       };
     } else if (summaryMode === "SEMESTER") {
       const semester = semesters.find((s) => s.id === selectedSemesterId);
       if (semester) {
         range = { startDate: semester.startDate, endDate: semester.endDate };
       } else {
-        // Fallback
+        // Fallback도 selectedYear 기준
         range = {
-          startDate: `${currentYear}-01-01`,
-          endDate: `${currentYear}-12-31`,
+          startDate: `${selectedYear}-01-01`,
+          endDate: `${selectedYear}-12-31`,
         };
       }
     }
   }
 
-  // 🔹 [추가] Future Cap: 종료일이 오늘보다 미래면 오늘로 제한
-  // (그래프가 미래까지 그려지는 것을 방지)
+  // 🔹 Future Cap: 종료일이 오늘보다 미래면 오늘로 제한
   const today = new Date();
-  const rangeEnd = new Date(range.endDate);
-
   today.setHours(23, 59, 59, 999);
-  rangeEnd.setHours(23, 59, 59, 999);
 
-  if (rangeEnd > today) {
-    range.endDate = toISODateString(new Date());
+  if (range.endDate) {
+    const rangeEnd = new Date(range.endDate);
+    rangeEnd.setHours(23, 59, 59, 999);
+    if (rangeEnd > today) {
+      range.endDate = toISODateString(new Date());
+    }
   }
 
   return range;
 };
 
-// ✅ [수정됨] 누락 리포트용 날짜 계산 (미래 날짜 제한 적용)
+// ✅ [수정됨] 누락 리포트용 날짜 계산 (학기 범위 준수)
 const computeIncompleteRange = (
   filter: IncompleteFilter,
   semesters: SemesterDto[],
@@ -123,6 +123,7 @@ const computeIncompleteRange = (
 ) => {
   let requestedRange = { startDate: "", endDate: "" };
 
+  // 1. 기본 범위 계산 (주간/월간/학기전체)
   if (filter === "WEEK") {
     requestedRange = getThisWeekRange();
   } else if (filter === "MONTH") {
@@ -149,42 +150,39 @@ const computeIncompleteRange = (
     }
   }
 
-  // 학기 범위 내 교집합 체크 (학기 선택 시)
-  if (filter === "SEMESTER") {
-    const semester = semesters.find((s) => s.id === selectedSemesterId);
-    if (semester) {
-      const reqStart = new Date(requestedRange.startDate);
-      const semStart = new Date(semester.startDate);
-      const finalStart = reqStart > semStart ? reqStart : semStart;
+  // 2. [핵심 수정] 선택된 학기가 있다면, 조회 범위가 학기 시작일보다 이전으로 가지 않도록 자름 (Clamp Start)
+  // 예: 이번 주가 12/29~1/4 인데, 학기 시작일이 1/1이라면 -> 1/1~1/4 로 조회
+  const selectedSemester = semesters.find((s) => s.id === selectedSemesterId);
 
-      const reqEnd = new Date(requestedRange.endDate);
-      const semEnd = new Date(semester.endDate);
-      const finalEnd = reqEnd < semEnd ? reqEnd : semEnd;
-
-      if (finalStart <= finalEnd) {
-        requestedRange = {
-          startDate: toISODateString(finalStart),
-          endDate: toISODateString(finalEnd),
-        };
-      } else {
-        requestedRange = {
-          startDate: semester.startDate,
-          endDate: semester.endDate,
-        };
-      }
+  if (selectedSemester) {
+    if (requestedRange.startDate < selectedSemester.startDate) {
+      requestedRange.startDate = selectedSemester.startDate;
+    }
+    // 학기 종료일보다 미래도 자름
+    if (requestedRange.endDate > selectedSemester.endDate) {
+      requestedRange.endDate = selectedSemester.endDate;
     }
   }
 
-  // 🔹 [추가] Future Cap: 종료일이 오늘보다 미래면 오늘로 제한
-  // (미래 주차를 누락으로 오판하는 것 방지)
+  // 3. Future Cap: 오늘 이후 미래 날짜 제한
   const today = new Date();
-  const reqEnd = new Date(requestedRange.endDate);
-
   today.setHours(23, 59, 59, 999);
-  reqEnd.setHours(23, 59, 59, 999);
 
-  if (reqEnd > today) {
-    requestedRange.endDate = toISODateString(new Date());
+  if (requestedRange.endDate) {
+    const reqEnd = new Date(requestedRange.endDate);
+    reqEnd.setHours(23, 59, 59, 999);
+
+    // 만약 시작일 자체가 미래라면? (데이터 없음 처리 위해 그대로 두거나, 오늘로 맞춤)
+    // 여기서는 endDate만 오늘로 당김.
+    if (reqEnd > today) {
+      requestedRange.endDate = toISODateString(new Date());
+    }
+  }
+
+  // 방어 로직: Start > End가 되어버린 경우 (예: 학기가 아직 시작 안 했는데 이번 주 조회)
+  if (requestedRange.startDate > requestedRange.endDate) {
+    // 조회 불가하므로 빈 범위 리턴하거나 그대로 둬서 API가 빈 배열 주게 함.
+    // 여기서는 그대로 둠.
   }
 
   return requestedRange;
@@ -250,8 +248,10 @@ const DashboardFilterToolbar: React.FC<{
             className="py-2 pl-3 pr-8 w-full sm:w-auto text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm cursor-pointer"
           >
             {semesters.map((s) => (
+              // ✅ [UX] 활성/마감 상태 표시
               <option key={s.id} value={s.id}>
-                {s.name} ({s.startDate.substring(0, 4)})
+                {s.name} ({s.startDate.substring(0, 4)}){" "}
+                {s.isActive ? "(진행중)" : "(마감됨)"}
               </option>
             ))}
           </select>
@@ -282,6 +282,7 @@ const DashboardFilterToolbar: React.FC<{
   );
 };
 
+// ... (Card, TopSummaryChips, OverallAttendanceSummaryCard, AttendanceTrend, IncompleteAttendanceSection, IncompleteFilterTabs 컴포넌트는 기존과 동일) ...
 const Card: React.FC<{
   icon?: React.ReactNode;
   title: string;
@@ -292,80 +293,81 @@ const Card: React.FC<{
   <div
     className={`bg-white p-4 sm:p-6 rounded-2xl shadow-lg h-full flex flex-col ${className}`}
   >
+    {" "}
     <div className="flex justify-between items-center mb-4 border-b pb-3">
+      {" "}
       <div className="flex items-center min-w-0">
+        {" "}
         {icon && (
           <div className="text-lg sm:text-xl text-gray-500 mr-3">{icon}</div>
-        )}
+        )}{" "}
         <h3 className="text-base sm:text-lg font-semibold text-gray-800 truncate">
-          {title}
-        </h3>
-      </div>
-      {actions && <div className="flex-shrink-0 ml-2">{actions}</div>}
-    </div>
-    <div className="flex-1">{children}</div>
+          {" "}
+          {title}{" "}
+        </h3>{" "}
+      </div>{" "}
+      {actions && <div className="flex-shrink-0 ml-2">{actions}</div>}{" "}
+    </div>{" "}
+    <div className="flex-1">{children}</div>{" "}
   </div>
 );
-
 const TopSummaryChips: React.FC<{ data: DashboardDto }> = ({ data }) => {
   const getAttendanceChangeIcon = (change: number) => {
     if (change > 0) return <FaArrowUp className="mr-2" />;
     if (change < 0) return <FaArrowDown className="mr-2" />;
     return <FaMinus className="mr-2" />;
   };
-
   const attendanceChangeColor = (change: number) => {
     if (change > 0) return "bg-indigo-50 text-indigo-700 border-indigo-100";
     if (change < 0) return "bg-gray-100 text-gray-600 border-gray-200";
     return "bg-gray-50 text-gray-500 border-gray-100";
   };
-
   return (
     <div className="flex flex-wrap gap-2 sm:gap-3">
+      {" "}
       <div className="inline-flex items-center px-3 py-2 rounded-full bg-yellow-50 text-yellow-700 text-xs sm:text-sm border border-yellow-100">
-        <FaBullhorn className="mr-2" />
-        이번 주 공지 {data.weeklyNoticeCount ?? 0}개
-      </div>
+        {" "}
+        <FaBullhorn className="mr-2" /> 이번 주 공지{" "}
+        {data.weeklyNoticeCount ?? 0}개{" "}
+      </div>{" "}
       <div className="inline-flex items-center px-3 py-2 rounded-full bg-blue-50 text-blue-700 text-xs sm:text-sm border border-blue-100">
-        <FaPrayingHands className="mr-2" />
-        이번 주 기도제목 {data.weeklyPrayerCount ?? 0}개
-      </div>
+        {" "}
+        <FaPrayingHands className="mr-2" /> 이번 주 기도제목{" "}
+        {data.weeklyPrayerCount ?? 0}개{" "}
+      </div>{" "}
       {data.newcomerCount > 0 && (
         <div className="inline-flex items-center px-3 py-2 rounded-full bg-emerald-50 text-emerald-700 text-xs sm:text-sm font-medium border border-emerald-100">
-          <FaUserPlus className="mr-2" />
-          이번 주 새가족 {data.newcomerCount}명
+          {" "}
+          <FaUserPlus className="mr-2" /> 이번 주 새가족 {data.newcomerCount}명{" "}
         </div>
-      )}
+      )}{" "}
       <div
         className={`inline-flex items-center px-3 py-2 rounded-full text-xs sm:text-sm font-medium border ${attendanceChangeColor(
           data.attendanceChange
         )}`}
       >
-        {getAttendanceChangeIcon(data.attendanceChange)}
-        지난주 대비 출석 인원 {data.attendanceChange > 0 ? "+" : ""}
-        {data.attendanceChange}명
-      </div>
+        {" "}
+        {getAttendanceChangeIcon(data.attendanceChange)} 지난주 대비 출석 인원{" "}
+        {data.attendanceChange > 0 ? "+" : ""} {data.attendanceChange}명{" "}
+      </div>{" "}
       {data.unassignedMemberCount > 0 && (
         <div className="inline-flex items-center px-3 py-2 rounded-full bg-orange-50 text-orange-700 text-xs sm:text-sm font-medium border border-orange-100">
+          {" "}
           <FaUserTag className="mr-2" />셀 미배정 인원{" "}
-          {data.unassignedMemberCount}명
+          {data.unassignedMemberCount}명{" "}
         </div>
-      )}
+      )}{" "}
     </div>
   );
 };
-
 const OverallAttendanceSummaryCard: React.FC<{
   summary: OverallAttendanceSummaryDto | OverallAttendanceStatDto | null;
   label?: string;
 }> = ({ summary, label = "기간 총 출석률" }) => {
   if (!summary) return <div className="text-center p-4">데이터 없음</div>;
-
   let rate: number | undefined;
   let present: number | undefined;
   let possible: number | undefined;
-
-  // DTO 구조에 따른 데이터 추출
   if ("totalSummary" in summary && summary.totalSummary) {
     rate = summary.totalSummary.attendanceRate;
     present = summary.totalSummary.totalPresent;
@@ -375,41 +377,42 @@ const OverallAttendanceSummaryCard: React.FC<{
     present = (summary as any).totalPresent;
     possible = (summary as any).totalPossible ?? summary.totalRecords;
   }
-
   const rateColor = (rate || 0) < 10 ? "text-red-500" : "text-indigo-600";
-
   return (
     <div className="grid grid-cols-1 gap-4 text-center">
+      {" "}
       <div className="p-4 sm:p-5 bg-indigo-50 rounded-lg relative group">
+        {" "}
         <div className="flex justify-center items-center gap-1 mb-1">
+          {" "}
           <p className="text-xs sm:text-sm font-medium text-indigo-500">
-            {label}
-          </p>
+            {" "}
+            {label}{" "}
+          </p>{" "}
           <div className="relative group/tooltip cursor-help">
-            <span className="text-xs text-indigo-400">ⓘ</span>
+            {" "}
+            <span className="text-xs text-indigo-400">ⓘ</span>{" "}
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-800 text-white text-[10px] rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity pointer-events-none z-10 shadow-lg">
-              전체 재적 인원 대비 출석률입니다.
-              <br />
-              (보고서 미제출도 모수에 포함)
-            </div>
-          </div>
-        </div>
-
-        {/* 정수 표현 (.toFixed(0)) */}
+              {" "}
+              전체 재적 인원 대비 출석률입니다. <br /> (보고서 미제출도 모수에
+              포함){" "}
+            </div>{" "}
+          </div>{" "}
+        </div>{" "}
         <p className={`mt-1 text-2xl sm:text-3xl font-semibold ${rateColor}`}>
-          {typeof rate === "number" ? `${rate.toFixed(0)}%` : "-"}
-        </p>
-
+          {" "}
+          {typeof rate === "number" ? `${rate.toFixed(0)}%` : "-"}{" "}
+        </p>{" "}
         {typeof present === "number" && typeof possible === "number" && (
           <p className="text-xs text-gray-500 mt-1">
-            ({present}명 출석 / 총 {possible}명 대상)
+            {" "}
+            ({present}명 출석 / 총 {possible}명 대상){" "}
           </p>
-        )}
-      </div>
+        )}{" "}
+      </div>{" "}
     </div>
   );
 };
-
 const AttendanceTrend: React.FC<{
   data?: AggregatedTrendDto[] | null;
   selectedGroupBy: AttendanceSummaryGroupBy;
@@ -420,7 +423,8 @@ const AttendanceTrend: React.FC<{
   if (items.length === 0) {
     return (
       <div className="mt-4 h-24 flex items-center justify-center text-sm text-gray-500">
-        데이터가 없습니다.
+        {" "}
+        데이터가 없습니다.{" "}
       </div>
     );
   }
@@ -428,118 +432,143 @@ const AttendanceTrend: React.FC<{
   const MAX_ITEMS = 12;
   const slicedData =
     shouldLimit && items.length > MAX_ITEMS ? items.slice(-MAX_ITEMS) : items;
-
   return (
     <div className="mt-4">
+      {" "}
       <div className="flex justify-between items-center mb-2">
+        {" "}
         <h2 className="text-sm sm:text-base font-semibold text-gray-800">
-          {title}
-        </h2>
+          {" "}
+          {title}{" "}
+        </h2>{" "}
         {dateRange && (
           <span className="text-[10px] text-gray-400">
+            {" "}
             {safeFormatDate(dateRange.startDate)} ~{" "}
-            {safeFormatDate(dateRange.endDate)}
+            {safeFormatDate(dateRange.endDate)}{" "}
           </span>
-        )}
-      </div>
+        )}{" "}
+      </div>{" "}
       <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+        {" "}
         {slicedData.map((item) => (
           <div key={item.dateGroup} className="space-y-1">
+            {" "}
             <div className="flex justify-between text-[11px] sm:text-xs text-gray-600">
+              {" "}
               <span>
-                {formatDateGroupLabel(selectedGroupBy, item.dateGroup)}
-              </span>
+                {" "}
+                {formatDateGroupLabel(selectedGroupBy, item.dateGroup)}{" "}
+              </span>{" "}
               <span>
-                {item.attendanceRate.toFixed(0)}% ({item.presentRecords}/
-                {item.totalRecords})
-              </span>
-            </div>
+                {" "}
+                {item.attendanceRate.toFixed(0)}% ({item.presentRecords}/{" "}
+                {item.totalRecords}){" "}
+              </span>{" "}
+            </div>{" "}
             <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+              {" "}
               <div
                 className="h-2 rounded-full bg-blue-500"
                 style={{ width: `${item.attendanceRate}%` }}
-              />
-            </div>
+              />{" "}
+            </div>{" "}
           </div>
-        ))}
-      </div>
+        ))}{" "}
+      </div>{" "}
     </div>
   );
 };
-
 const IncompleteAttendanceSection: React.FC<{
   reports: IncompleteCheckReportDto[];
 }> = ({ reports }) => {
   if (!reports || reports.length === 0) {
     return (
       <div className="py-4 text-center text-sm text-gray-500">
-        누락된 셀이 없습니다.
+        {" "}
+        누락된 셀이 없습니다.{" "}
       </div>
     );
   }
   const top = reports.slice(0, 5);
   return (
     <div>
+      {" "}
       <div className="border border-gray-100 rounded-xl overflow-hidden mt-2">
+        {" "}
         <table className="min-w-full text-xs sm:text-sm">
+          {" "}
           <thead className="bg-gray-50">
+            {" "}
             <tr>
+              {" "}
               <th className="px-3 py-2 text-left font-medium text-gray-500">
-                셀 이름
-              </th>
+                {" "}
+                셀 이름{" "}
+              </th>{" "}
               <th className="px-3 py-2 text-center font-medium text-gray-500">
-                횟수
-              </th>
+                {" "}
+                횟수{" "}
+              </th>{" "}
               <th className="px-3 py-2 text-left font-medium text-gray-500">
-                최근 누락
-              </th>
-            </tr>
-          </thead>
+                {" "}
+                최근 누락{" "}
+              </th>{" "}
+            </tr>{" "}
+          </thead>{" "}
           <tbody>
+            {" "}
             {top.map((r, i) => (
               <tr
                 key={r.cellId}
                 className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}
               >
+                {" "}
                 <td className="px-3 py-2">
+                  {" "}
                   <Link
                     to={`/admin/cells/${r.cellId}`}
                     className="font-medium hover:text-indigo-600"
                   >
-                    {r.cellName}
-                  </Link>
-                </td>
+                    {" "}
+                    {r.cellName}{" "}
+                  </Link>{" "}
+                </td>{" "}
                 <td className="px-3 py-2 text-center text-red-600 font-bold">
-                  {r.missedDatesCount}
-                </td>
+                  {" "}
+                  {r.missedDatesCount}{" "}
+                </td>{" "}
                 <td className="px-3 py-2 text-gray-500">
-                  {safeFormatDate(r.missedDates[r.missedDates.length - 1])}
-                </td>
+                  {" "}
+                  {safeFormatDate(r.missedDates[r.missedDates.length - 1])}{" "}
+                </td>{" "}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            ))}{" "}
+          </tbody>{" "}
+        </table>{" "}
+      </div>{" "}
       {reports.length > 5 && (
         <div className="text-right mt-2">
+          {" "}
           <Link
             to="/admin/incomplete-checks-report"
             className="text-xs text-indigo-500 hover:text-indigo-700"
           >
-            전체 보기
-          </Link>
+            {" "}
+            전체 보기{" "}
+          </Link>{" "}
         </div>
-      )}
+      )}{" "}
     </div>
   );
 };
-
 const IncompleteFilterTabs: React.FC<{
   value: IncompleteFilter;
   onChange: (v: IncompleteFilter) => void;
   disableSemester?: boolean;
 }> = ({ value, onChange, disableSemester }) => (
   <div className="inline-flex gap-1 bg-gray-100 p-1 rounded-lg">
+    {" "}
     {[
       { id: "WEEK", label: "이번 주" },
       { id: "MONTH", label: "이번 달" },
@@ -559,9 +588,10 @@ const IncompleteFilterTabs: React.FC<{
             : ""
         }`}
       >
-        {opt.label}
+        {" "}
+        {opt.label}{" "}
       </button>
-    ))}
+    ))}{" "}
   </div>
 );
 
@@ -590,6 +620,7 @@ const DashboardPage: React.FC = () => {
   const [incompleteFilter, setIncompleteFilter] =
     useState<IncompleteFilter>("WEEK");
 
+  // ✅ [수정] computeIncompleteRange 호출
   const incompleteDateRange = useMemo(() => {
     return computeIncompleteRange(
       incompleteFilter,
@@ -610,7 +641,7 @@ const DashboardPage: React.FC = () => {
   const isExecutive = user?.role === "EXECUTIVE";
   const isCellLeader = user?.role === "CELL_LEADER";
 
-  // 학기 목록 로딩
+  // ✅ [수정] 임원단 학기 목록 로딩 로직 (모든 학기 표시)
   useEffect(() => {
     let alive = true;
     if (!isExecutive) return;
@@ -620,14 +651,19 @@ const DashboardPage: React.FC = () => {
         const fullList = await semesterService.getAllSemesters();
         if (!alive) return;
 
-        const activeList = fullList.filter((s) => s.isActive);
-        setSemesters(activeList);
+        // ✅ 임원단은 모든 학기를 봐야 하므로 filter(isActive) 제거!
+        const sortedList = fullList.sort(
+          (a, b) =>
+            new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+        );
+        setSemesters(sortedList);
 
+        // 기본 선택값 설정 (현재 날짜가 포함된 학기, 없으면 최신 학기)
         const today = new Date();
         const currentMonthTotal =
           today.getFullYear() * 12 + (today.getMonth() + 1);
 
-        const currentSemester = activeList.find((s) => {
+        const currentSemester = sortedList.find((s) => {
           const start = new Date(s.startDate);
           const end = new Date(s.endDate);
           const startMonthTotal =
@@ -639,7 +675,7 @@ const DashboardPage: React.FC = () => {
           );
         });
 
-        const targetSemester = currentSemester || activeList[0];
+        const targetSemester = currentSemester || sortedList[0];
         if (targetSemester) setSelectedSemesterId(targetSemester.id);
       } catch (e) {
         console.error(e);
@@ -677,23 +713,21 @@ const DashboardPage: React.FC = () => {
 
     setError(null);
 
-    // ✅ computeTrendRange가 오늘 날짜 이후를 잘라주므로 안전함
     const { startDate, endDate } = computeTrendRange(
       isExecutive,
       summaryMode,
       period,
       semesters,
-      selectedSemesterId
+      selectedSemesterId,
+      new Date().getFullYear() // dashboard는 올해 기준
     );
 
     try {
-      // 1) 메인 (DashboardDto)
       const mainData = await dashboardService.getDashboardData(period, {
         startDate,
         endDate,
       });
 
-      // 2) 차트 + Summary
       setLoadingCharts(true);
       const chartPromise = statisticsService.getAttendanceTrend({
         startDate,
@@ -725,7 +759,6 @@ const DashboardPage: React.FC = () => {
         summaryPromise,
       ]);
 
-      // 3) 부가 데이터
       setLoadingSub(true);
       const [noticesPage, prayersPage, unassignedData] = await Promise.all([
         noticeService.getAllNotices({ size: 1 }),
@@ -735,7 +768,7 @@ const DashboardPage: React.FC = () => {
           : Promise.resolve([]),
       ]);
 
-      // ✅ [필터링] 미배정 인원에서 임원단(EXECUTIVE) 제외
+      // 임원단 제외 필터링
       const filteredUnassigned = (unassignedData as any[]).filter(
         (m) => m.role !== "EXECUTIVE"
       );
@@ -744,7 +777,6 @@ const DashboardPage: React.FC = () => {
       setTotalPrayers(prayersPage.totalElements);
       setUnassignedList(filteredUnassigned);
 
-      // Dashboard 데이터 업데이트
       setDashboardData({
         ...mainData,
         overallAttendanceSummary:
@@ -897,7 +929,8 @@ const DashboardPage: React.FC = () => {
                         summaryMode,
                         period,
                         semesters,
-                        selectedSemesterId
+                        selectedSemesterId,
+                        new Date().getFullYear()
                       )}
                     />
                     {dashboardData?.cellAttendanceSummaries && (
@@ -1183,7 +1216,8 @@ const DashboardPage: React.FC = () => {
                     summaryMode,
                     period,
                     semesters,
-                    selectedSemesterId
+                    selectedSemesterId,
+                    new Date().getFullYear()
                   )}
                 />
               </Card>

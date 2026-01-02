@@ -2,7 +2,6 @@
 import React, { useMemo } from "react";
 import type { AttendanceDto, SemesterDto } from "../types";
 
-// ✅ [확인] CellDetailPage 등에서 넘겨줄 멤버 객체 타입
 export interface MatrixMember {
   memberId: number;
   memberName: string;
@@ -15,16 +14,13 @@ interface AttendanceMatrixProps {
   mode?: "semester" | "month" | "year";
   startDate?: string;
   endDate?: string;
-
   year: number;
   month: number;
   members: MatrixMember[];
   attendances: AttendanceDto[];
-
   loading?: boolean;
   limitStartDate?: string;
   limitEndDate?: string;
-
   semesters?: SemesterDto[];
   showAttendanceRate?: boolean;
 }
@@ -45,7 +41,6 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
   semesters,
   showAttendanceRate = true,
 }) => {
-  // 🔹 날짜 객체를 YYYY-MM-DD 문자열로 변환 (타임존 이슈 방지)
   const toDateKey = (date: Date) => {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -53,17 +48,15 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
     return `${y}-${m}-${d}`;
   };
 
-  // 🔹 ISO 문자열(2025-01-01T00:00:00)을 YYYY-MM-DD로 자르기
   const normalizeISODate = (v: string | undefined | null) => {
     if (!v) return "";
     return v.slice(0, 10);
   };
 
-  // 🔸 [중요] 오늘 날짜 구하기 (미래 날짜 필터링용)
   const today = new Date();
   const todayStr = toDateKey(today);
 
-  // 1. 테이블 헤더에 표시할 날짜 배열 계산
+  // 1. 테이블 헤더 날짜 계산 (학기 필터링 적용)
   const targetDays = useMemo(() => {
     const days: Date[] = [];
 
@@ -75,8 +68,6 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
       end.setHours(0, 0, 0, 0);
 
       const current = new Date(start);
-
-      // 시작일이 일요일이 아니면 다음 일요일로 이동
       if (current.getDay() !== 0) {
         current.setDate(current.getDate() + (7 - current.getDay()));
       }
@@ -85,21 +76,20 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
         const currentDateStr = toDateKey(current);
         let isValid = true;
 
-        // 연간 모드일 때 학기 기간 외 제외
+        // ✅ [수정] 연간 모드일 때: 방학 기간(학기 범위 밖)은 제외 (교집합만 표시)
         if (mode === "year" && semesters && semesters.length > 0) {
           const isInAnySemester = semesters.some(
             (sem) =>
               currentDateStr >= sem.startDate && currentDateStr <= sem.endDate
           );
           if (!isInAnySemester) {
-            isValid = false;
+            isValid = false; // 학기 중이 아니면 숨김
           }
         }
 
         if (isValid) {
           days.push(new Date(current));
         }
-
         current.setDate(current.getDate() + 7);
       }
       return days;
@@ -121,7 +111,6 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
       }
       date.setDate(date.getDate() + 1);
     }
-
     return days;
   }, [
     mode,
@@ -134,14 +123,11 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
     semesters,
   ]);
 
-  // 2. 출석 데이터 맵핑 (Key: "memberId-YYYY-MM-DD")
   const attendanceMap = useMemo(() => {
     const map = new Map<string, MatrixStatus>();
     for (const att of attendances) {
-      // DTO 구조: att.member.id
       const memberId = att.member?.id;
       const dateKey = normalizeISODate(att.date);
-
       if (!memberId || !dateKey) continue;
       if (att.status === "PRESENT" || att.status === "ABSENT") {
         map.set(`${memberId}-${dateKey}`, att.status);
@@ -155,7 +141,6 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
 
   return (
     <div className="bg-white rounded-2xl">
-      {/* 헤더 */}
       <div className="flex items-center justify-between mb-4 px-2">
         {mode === "year" ? (
           <h3 className="text-lg sm:text-xl font-bold text-gray-800">
@@ -213,9 +198,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
             </thead>
             <tbody>
               {members.map((member) => {
-                // 🔹 1) 멤버별 기준일(배정일/가입일)을 문자열(YYYY-MM-DD)로 확정
                 let joinDateStr = "2000-01-01";
-
                 if (member.cellAssignmentDate) {
                   joinDateStr = normalizeISODate(member.cellAssignmentDate);
                 } else if (member.createdAt) {
@@ -225,35 +208,30 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                 }
 
                 let presentCount = 0;
-                let validWeeksCount = 0; // 💡 분모: 유효한 주일 수
+                let validWeeksCount = 0;
 
                 targetDays.forEach((day) => {
-                  const currentDayStr = toDateKey(day); // 현재 컬럼 날짜
+                  const currentDayStr = toDateKey(day);
                   const status = attendanceMap.get(
                     `${member.memberId}-${currentDayStr}`
                   );
 
-                  // 🔸 [중요] 미래 날짜 필터링 로직 (오늘보다 미래면 통계 제외)
-                  if (currentDayStr > todayStr) {
-                    return; // 분모에 포함하지 않고 건너뜀
-                  }
+                  if (currentDayStr > todayStr) return;
 
-                  // 🔹 2) 핵심 로직: (날짜 >= 기준일) 또는 (기록이 있음)
                   if (currentDayStr >= joinDateStr || status) {
-                    validWeeksCount++; // 분모 증가
+                    validWeeksCount++;
                     if (status === "PRESENT") {
-                      presentCount++; // 분자 증가
+                      presentCount++;
                     }
                   }
                 });
 
-                // 🔹 3) 출석률 계산
                 const attendanceRate =
                   validWeeksCount > 0
                     ? Math.min(
                         100,
                         Math.round((presentCount / validWeeksCount) * 100)
-                      ) // 100을 넘지 않도록 캡(Cap) 적용
+                      )
                     : 0;
 
                 return (
@@ -264,28 +242,22 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                     <td className="sticky left-0 z-30 bg-white p-2 font-medium text-gray-700 border-b border-r border-gray-100 whitespace-nowrap shadow-[1px_0_3px_rgba(0,0,0,0.05)]">
                       {member.memberName}
                     </td>
-
                     {targetDays.length > 0 ? (
                       targetDays.map((day) => {
                         const currentDayStr = toDateKey(day);
                         const status = attendanceMap.get(
                           `${member.memberId}-${currentDayStr}`
                         );
-
-                        // 🔹 4) 렌더링 로직 (시각적 처리)
                         const isBeforeJoin =
                           currentDayStr < joinDateStr && !status;
-                        const isFuture = currentDayStr > todayStr; // ✅ 미래 날짜 확인
+                        const isFuture = currentDayStr > todayStr;
 
                         let content: React.ReactNode;
-
                         if (isFuture) {
-                          // ✅ 미래 날짜는 '-' 처리
                           content = (
                             <span className="text-gray-300 text-xs">-</span>
                           );
                         } else if (isBeforeJoin) {
-                          // 배정일 이전
                           content = (
                             <div
                               className="mx-auto w-2 h-2 rounded-full bg-gray-200"
@@ -305,7 +277,6 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                             </div>
                           );
                         } else {
-                          // 미체크
                           content = (
                             <div
                               className="mx-auto w-3 h-3 rounded-full bg-gray-300 border border-gray-400"
@@ -325,7 +296,6 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                     ) : (
                       <td className="p-2 border-b border-gray-50"></td>
                     )}
-
                     {showAttendanceRate && (
                       <td className="sticky right-0 z-20 bg-white p-2 text-center border-b border-l border-gray-100 font-bold text-indigo-600 shadow-[-1px_0_3px_rgba(0,0,0,0.05)]">
                         {attendanceRate}%
@@ -334,7 +304,6 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                   </tr>
                 );
               })}
-
               {members.length === 0 && (
                 <tr>
                   <td

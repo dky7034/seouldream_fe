@@ -21,17 +21,27 @@ type UnitType = "month" | "semester";
 type FilterMode = "unit" | "range";
 
 /** -----------------------------
- * Helpers
+ * Helpers (Timezone Safe)
  * ----------------------------- */
 
-// 시간 초기화를 포함한 일요일 계산
+// ✅ [추가] 로컬 날짜 파싱 헬퍼
+const parseLocal = (dateStr: string) => {
+  if (!dateStr) return null;
+  const [y, m, d] = dateStr.slice(0, 10).split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+
+// ✅ [수정] 일요일 개수 계산 (정확도 향상)
 const countSundays = (startInput: Date, endInput: Date): number => {
   if (startInput > endInput) return 0;
+
   const current = new Date(startInput);
   current.setHours(0, 0, 0, 0);
-  const end = new Date(endInput);
-  end.setHours(0, 0, 0, 0);
 
+  const end = new Date(endInput);
+  end.setHours(23, 59, 59, 999); // 종료일의 끝까지 포함
+
+  // 시작일 이후 첫 번째 일요일 찾기
   if (current.getDay() !== 0) {
     current.setDate(current.getDate() + (7 - current.getDay()));
   }
@@ -45,15 +55,19 @@ const countSundays = (startInput: Date, endInput: Date): number => {
 };
 
 const isDateInSemesterOrSameMonth = (date: Date, semester: SemesterDto) => {
-  const start = new Date(semester.startDate);
-  const end = new Date(semester.endDate);
+  const start = parseLocal(semester.startDate);
+  const end = parseLocal(semester.endDate);
+  if (!start || !end) return false;
+
   if (date >= start && date <= end) return true;
+
   const isStartMonth =
     date.getFullYear() === start.getFullYear() &&
     date.getMonth() === start.getMonth();
   const isEndMonth =
     date.getFullYear() === end.getFullYear() &&
     date.getMonth() === end.getMonth();
+
   return isStartMonth || isEndMonth;
 };
 
@@ -65,6 +79,7 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
   allMembers,
 }) => {
   const isCellLeader = user.role === "CELL_LEADER";
+  const isExecutive = user.role === "EXECUTIVE";
   const now = new Date();
 
   // Data State
@@ -108,11 +123,14 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
 
   const semesterMonths = useMemo(() => {
     if (!currentSemester) return [];
-    const start = new Date(currentSemester.startDate);
-    const end = new Date(currentSemester.endDate);
+    const start = parseLocal(currentSemester.startDate);
+    const end = parseLocal(currentSemester.endDate);
+    if (!start || !end) return [];
+
     const list: { year: number; month: number; label: string }[] = [];
     const current = new Date(start.getFullYear(), start.getMonth(), 1);
     const endDate = new Date(end.getFullYear(), end.getMonth(), 1);
+
     while (current <= endDate) {
       list.push({
         year: current.getFullYear(),
@@ -124,49 +142,50 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
     return list;
   }, [currentSemester]);
 
+  // ✅ [핵심] 분모(총 조회 주차) 계산 - Future Cap 적용
   const expectedTotalDays = useMemo(() => {
     let start: Date | null = null;
     let end: Date | null = null;
 
     if (effectiveFilterMode === "range") {
       if (filters.startDate && filters.endDate) {
-        start = new Date(filters.startDate);
-        end = new Date(filters.endDate);
+        start = parseLocal(filters.startDate);
+        end = parseLocal(filters.endDate);
       }
     } else {
       if (unitType === "semester" && currentSemester) {
-        start = new Date(currentSemester.startDate);
-        end = new Date(currentSemester.endDate);
+        start = parseLocal(currentSemester.startDate);
+        end = parseLocal(currentSemester.endDate);
       } else if (unitType === "month") {
         start = new Date(filters.year, filters.month - 1, 1);
         end = new Date(filters.year, filters.month, 0);
 
+        // 선택된 월이 학기 기간 내라면 교집합 처리
         if (currentSemester) {
-          const semStart = new Date(currentSemester.startDate);
-          const semEnd = new Date(currentSemester.endDate);
-          semStart.setHours(0, 0, 0, 0);
-          semEnd.setHours(0, 0, 0, 0);
-          if (semStart > start) start = semStart;
-          if (semEnd < end) end = semEnd;
+          const semStart = parseLocal(currentSemester.startDate);
+          const semEnd = parseLocal(currentSemester.endDate);
+          if (semStart && semEnd) {
+            semStart.setHours(0, 0, 0, 0);
+            semEnd.setHours(0, 0, 0, 0);
+            if (semStart > start) start = semStart;
+            if (semEnd < end) end = semEnd;
+          }
         }
       }
     }
 
     if (!start || !end || start > end) return 0;
 
-    // 🔹 [추가] 미래 날짜 제한 (Today Cap)
-    // 통계의 분모(총 주수)를 계산할 때, 오늘 이후의 미래 날짜는 포함하지 않음
+    // 🔹 Future Cap: 오늘 이후의 날짜는 분모에서 제외
+    // (아직 오지 않은 주차 때문에 출석률이 낮아지는 현상 방지)
     const today = new Date();
     today.setHours(23, 59, 59, 999);
 
-    // end 객체 복사 및 시간 설정
     const endObj = new Date(end);
     endObj.setHours(23, 59, 59, 999);
 
-    // 종료일이 오늘보다 미래라면, 오늘까지만 카운트 (Effective End)
     const effectiveEnd = endObj > today ? today : endObj;
 
-    // 시작일조차 미래라면 총 주수는 0
     if (start > effectiveEnd) return 0;
 
     return countSundays(start, effectiveEnd);
@@ -178,16 +197,27 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
 
   const fetchSemesters = useCallback(async () => {
     try {
-      const data = await semesterService.getAllSemesters(true);
-      setSemesters(data || []);
+      // ✅ [수정] 권한별 로딩 정책 분리
+      // 임원: 모든 학기 (과거 분석용)
+      // 셀장: 활성 학기만 (현재 관리용)
+      const fetchActiveOnly = !isExecutive; // 셀장이면 true, 임원이면 false
+
+      const data = await semesterService.getAllSemesters(fetchActiveOnly);
+
+      const sortedData = data.sort((a, b) =>
+        b.startDate.localeCompare(a.startDate)
+      );
+      setSemesters(sortedData);
     } catch {
       setSemesters([]);
     }
-  }, []);
+  }, [isExecutive]);
 
   useEffect(() => {
     if (semesters.length === 0 || isInitialized) return;
     const today = new Date();
+
+    // 현재 날짜가 포함된 학기를 우선 찾음
     const targetSem =
       semesters.find((s) => isDateInSemesterOrSameMonth(today, s)) ||
       semesters.find((s) => s.isActive) ||
@@ -248,6 +278,7 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
   useEffect(() => {
     fetchSemesters();
   }, [fetchSemesters]);
+
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
@@ -262,13 +293,15 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
   const handleSemesterChange = (newSemesterId: number) => {
     const sem = semesters.find((s) => s.id === newSemesterId);
     if (!sem) return;
-    const start = new Date(sem.startDate);
-    setFilters((prev) => ({
-      ...prev,
-      semesterId: newSemesterId,
-      year: start.getFullYear(),
-      month: start.getMonth() + 1,
-    }));
+    const start = parseLocal(sem.startDate);
+    if (start) {
+      setFilters((prev) => ({
+        ...prev,
+        semesterId: newSemesterId,
+        year: start.getFullYear(),
+        month: start.getMonth() + 1,
+      }));
+    }
   };
 
   const handleUnitTypeClick = (type: UnitType) => {
@@ -277,10 +310,10 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
       const today = new Date();
       const currentYear = today.getFullYear();
       const currentMonth = today.getMonth() + 1;
-      const isCurrentMonthValid = semesterMonths.some(
+      const isCurrentMonthInSemester = semesterMonths.some(
         (m) => m.year === currentYear && m.month === currentMonth
       );
-      if (isCurrentMonthValid) {
+      if (isCurrentMonthInSemester) {
         setFilters((prev) => ({
           ...prev,
           year: currentYear,
@@ -408,7 +441,13 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
                     >
                       {semesters.map((s) => (
                         <option key={s.id} value={s.id}>
-                          {s.name} ({s.startDate} ~ {s.endDate})
+                          {s.name}
+                          {/* 임원일 때만 마감 여부 표시, 셀장은 어차피 활성만 보임 */}
+                          {isExecutive
+                            ? s.isActive
+                              ? " (진행중)"
+                              : " (마감됨)"
+                            : ""}
                         </option>
                       ))}
                     </select>
@@ -525,7 +564,7 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
                 baseTotal - (s.presentCount + s.absentCount);
               const displayName = formatName(s.targetId, s.targetName);
 
-              // 출석률 계산 (안전하게 0으로 나누기 방지)
+              // 출석률 계산
               const rate =
                 baseTotal > 0
                   ? Math.round((s.presentCount / baseTotal) * 100)

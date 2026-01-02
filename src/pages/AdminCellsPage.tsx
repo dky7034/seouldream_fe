@@ -108,7 +108,8 @@ const AdminCellsPage: React.FC = () => {
   const [unitType, setUnitType] = useState<"year" | "month" | "semester">(
     "semester"
   );
-  const hasActiveSemesters = semesters.length > 0;
+  // semesters 데이터가 로드되면 언제나 true일 것이므로 단순 길이 체크
+  const hasSemesters = semesters.length > 0;
 
   const updateQueryParams = useCallback(
     (updates: Record<string, string | number | undefined | null>) => {
@@ -221,8 +222,13 @@ const AdminCellsPage: React.FC = () => {
 
   const fetchSemesters = useCallback(async () => {
     try {
-      const data = await semesterService.getAllSemesters(true);
-      setSemesters(data);
+      // ✅ [수정] 모든 학기 조회 (true 제거) 및 정렬
+      const data = await semesterService.getAllSemesters();
+      const sorted = data.sort(
+        (a, b) =>
+          new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+      );
+      setSemesters(sorted);
     } catch (err) {
       console.error("Failed to fetch semesters:", err);
       setSemesters([]);
@@ -243,13 +249,8 @@ const AdminCellsPage: React.FC = () => {
         return { startDate: semester.startDate, endDate: semester.endDate };
     }
 
-    // 🔴 [수정 전] 타입이 number가 아니면 undefined 처리되어 날짜 계산 안 됨
-    // const year = typeof filters.year === "number" ? filters.year : undefined;
-
-    // 🟢 [수정 후] 값이 있으면 Number로 변환하여 사용 (안전장치)
     const year = filters.year ? Number(filters.year) : undefined;
-
-    if (!year) return null; // 연도가 없으면 null 반환 -> 백엔드가 기본값(학기) 처리함
+    if (!year) return null;
 
     const { month } = filters;
     if (month) {
@@ -363,7 +364,7 @@ const AdminCellsPage: React.FC = () => {
         s.startDate.substring(0, 7) <= currentYM &&
         s.endDate.substring(0, 7) >= currentYM
     );
-    if (!target) target = [...semesters].sort((a, b) => b.id - a.id)[0];
+    if (!target) target = semesters[0]; // 정렬된 목록의 첫 번째(최신)
 
     if (target)
       updateQueryParams({
@@ -439,10 +440,6 @@ const AdminCellsPage: React.FC = () => {
       filterType: "unit",
     };
     if (type === "year") {
-      // 🔴 [수정 전] filters.year가 없으면 빈 문자열("")이 들어감 -> 위 함수에서 null 반환됨
-      // updates.year = filters.year || "";
-
-      // 🟢 [수정 후] 선택된 연도가 없으면 '올해'를 기본값으로 설정
       updates.year = filters.year || now.getFullYear();
       updates.month = "";
       updates.semesterId = "";
@@ -498,7 +495,7 @@ const AdminCellsPage: React.FC = () => {
       if (semesters.length === 0)
         return (
           <div className="text-xs text-yellow-800 bg-yellow-50 p-3 rounded-lg border border-yellow-100 mt-2">
-            활성화된 학기가 없습니다.
+            등록된 학기가 없습니다.
           </div>
         );
       return (
@@ -517,7 +514,8 @@ const AdminCellsPage: React.FC = () => {
                     : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
                 }`}
               >
-                {s.name}
+                {/* ✅ [수정] 학기 상태 표시 (진행중/마감됨) */}
+                {s.name} {s.isActive ? "(진행중)" : "(마감됨)"}
               </button>
             ))}
           </div>
@@ -533,7 +531,6 @@ const AdminCellsPage: React.FC = () => {
   return (
     <div className="bg-gray-50 min-h-screen pb-20">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -551,7 +548,6 @@ const AdminCellsPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Filters Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6 space-y-5">
           <div className="flex flex-col sm:flex-row gap-4 mb-2">
             <div className="flex bg-gray-100 p-1 rounded-xl w-full sm:w-auto self-start">
@@ -601,9 +597,7 @@ const AdminCellsPage: React.FC = () => {
             </div>
           ) : (
             <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100">
-              {/* ✅ 레이아웃 개선: items-start 적용 */}
               <div className="flex flex-col sm:flex-row items-start gap-4 mb-2">
-                {/* 1. 연도 선택 */}
                 <div className="w-full sm:w-32">
                   <label className="text-xs font-bold text-gray-500 mb-1 block">
                     연도
@@ -612,7 +606,6 @@ const AdminCellsPage: React.FC = () => {
                     <select
                       value={filters.year}
                       onChange={(e) =>
-                        // 🟢 [수정] e.target.value를 Number()로 감싸서 전달
                         handleFilterChange("year", Number(e.target.value))
                       }
                       className="w-full py-2 px-1 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-100 shadow-sm disabled:bg-gray-50 disabled:text-gray-400"
@@ -625,7 +618,6 @@ const AdminCellsPage: React.FC = () => {
                         </option>
                       ))}
                     </select>
-                    {/* ✅ 안내 문구 추가 */}
                     {unitType === "semester" && (
                       <p className="absolute left-0 top-full mt-1 text-[10px] text-gray-400 whitespace-nowrap">
                         * 학기는 연도 무관
@@ -634,12 +626,10 @@ const AdminCellsPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 2. 조회 단위 */}
                 <div className="flex-1 w-full">
                   <label className="text-xs font-bold text-gray-500 mb-1 block">
                     조회 단위
                   </label>
-                  {/* ✅ 스타일 개선: 개별 버튼 + gap-2 */}
                   <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => handleUnitTypeClick("month")}
@@ -653,11 +643,11 @@ const AdminCellsPage: React.FC = () => {
                     </button>
                     <button
                       onClick={() =>
-                        hasActiveSemesters && handleUnitTypeClick("semester")
+                        hasSemesters && handleUnitTypeClick("semester")
                       }
-                      disabled={!hasActiveSemesters}
+                      disabled={!hasSemesters}
                       className={`px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
-                        hasActiveSemesters
+                        hasSemesters
                           ? unitType === "semester"
                             ? "bg-indigo-50 border-indigo-200 text-indigo-700"
                             : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
@@ -695,7 +685,6 @@ const AdminCellsPage: React.FC = () => {
                   placeholder="검색..."
                   value={localSearchName}
                   onChange={(e) => setLocalSearchName(e.target.value)}
-                  // ✅ 수정: py-2, border-gray-300, rounded-lg, shadow-sm
                   className="w-full pl-10 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white transition-all shadow-sm"
                 />
               </div>
@@ -707,7 +696,6 @@ const AdminCellsPage: React.FC = () => {
               <select
                 value={filters.active}
                 onChange={(e) => handleFilterChange("active", e.target.value)}
-                // ✅ 수정: py-2, border-gray-300, rounded-lg, shadow-sm, px-3
                 className="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white shadow-sm"
               >
                 <option value="all">모든 상태</option>
@@ -729,7 +717,6 @@ const AdminCellsPage: React.FC = () => {
           </div>
         ) : (
           <>
-            {/* Mobile Cards */}
             <div className="space-y-3 md:hidden mb-4">
               {sortedCells.map((cell) => {
                 const leaderName = cell.leader
@@ -825,7 +812,6 @@ const AdminCellsPage: React.FC = () => {
               })}
             </div>
 
-            {/* Desktop Table */}
             <div className="hidden md:block bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50/50">
@@ -904,7 +890,6 @@ const AdminCellsPage: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end gap-2">
-                            {/* ✅ 데스크탑 버튼: 텍스트 스타일 (테두리 없음) */}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -944,7 +929,6 @@ const AdminCellsPage: React.FC = () => {
           </>
         )}
 
-        {/* Delete Modal */}
         {showDeleteConfirmModal && (
           <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-sm">

@@ -29,7 +29,7 @@ import {
   MegaphoneIcon,
 } from "@heroicons/react/24/solid";
 
-// ───────────────── [컴포넌트] AddMemberToCellModal (변경 없음) ─────────────────
+// ───────────────── [컴포넌트] AddMemberToCellModal ─────────────────
 const AddMemberToCellModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
@@ -79,10 +79,12 @@ const AddMemberToCellModal: React.FC<{
       ),
     [candidateMembers, searchTerm]
   );
+
   const selectedMembers = useMemo(
     () => candidateMembers.filter((m) => selectedMemberIds.includes(m.id)),
     [candidateMembers, selectedMemberIds]
   );
+
   const handleToggleMember = (memberId: number) => {
     setSelectedMemberIds((prev) =>
       prev.includes(memberId)
@@ -90,9 +92,11 @@ const AddMemberToCellModal: React.FC<{
         : [...prev, memberId]
     );
   };
+
   const handleRemoveMember = (memberId: number) => {
     setSelectedMemberIds((prev) => prev.filter((id) => id !== memberId));
   };
+
   const handleSave = async () => {
     if (selectedMemberIds.length === 0) return;
     setIsSaving(true);
@@ -102,9 +106,11 @@ const AddMemberToCellModal: React.FC<{
   };
 
   if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex justify-center items-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
+        {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <UserPlusIcon className="h-5 w-5 text-indigo-600" /> 셀 멤버 추가
@@ -116,7 +122,12 @@ const AddMemberToCellModal: React.FC<{
             <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
+
+        {/* Search & Selected Pills */}
         <div className="p-4 border-b border-gray-100 bg-white">
+          <p className="text-xs text-gray-500 mb-2 break-keep">
+            * 현재 소속이 없는 멤버만 검색됩니다.
+          </p>
           <input
             type="text"
             placeholder="이름으로 검색..."
@@ -124,6 +135,8 @@ const AddMemberToCellModal: React.FC<{
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3 transition-all"
           />
+
+          {/* 선택된 멤버 뱃지 (가로 스크롤) */}
           {selectedMembers.length > 0 && (
             <div className="flex overflow-x-auto gap-2 pb-1 no-scrollbar">
               {selectedMembers.map((m) => (
@@ -144,6 +157,8 @@ const AddMemberToCellModal: React.FC<{
             </div>
           )}
         </div>
+
+        {/* List Area */}
         <div className="flex-1 overflow-y-auto p-2">
           {isLoadingMembers ? (
             <div className="flex justify-center items-center h-32">
@@ -151,7 +166,9 @@ const AddMemberToCellModal: React.FC<{
             </div>
           ) : filteredMembers.length === 0 ? (
             <p className="p-8 text-center text-sm text-gray-500">
-              검색 결과가 없습니다.
+              {candidateMembers.length === 0
+                ? "현재 추가 가능한(미소속) 멤버가 없습니다."
+                : "검색 결과가 없습니다."}
             </p>
           ) : (
             <ul className="space-y-1">
@@ -187,6 +204,8 @@ const AddMemberToCellModal: React.FC<{
             </ul>
           )}
         </div>
+
+        {/* Footer */}
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 shrink-0">
           <button
             onClick={onClose}
@@ -200,7 +219,7 @@ const AddMemberToCellModal: React.FC<{
             className="px-6 py-2 rounded-xl text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 shadow-sm transition-colors"
             disabled={selectedMemberIds.length === 0 || isSaving}
           >
-            {isSaving ? "추가 중..." : "추가하기"}
+            {isSaving ? "추가 중..." : `${selectedMemberIds.length}명 추가하기`}
           </button>
         </div>
       </div>
@@ -208,7 +227,7 @@ const AddMemberToCellModal: React.FC<{
   );
 };
 
-// ───────────────── [컴포넌트] CellReportHistoryItem (변경 없음) ─────────────────
+// ───────────────── [컴포넌트] CellReportHistoryItem ─────────────────
 const CellReportHistoryItem: React.FC<{
   cellId: number;
   date: string;
@@ -235,6 +254,7 @@ const CellReportHistoryItem: React.FC<{
         cellId: cellId,
         size: 100,
       });
+
       setReportData({
         cellShare: report?.cellShare || "",
         specialNotes: report?.specialNotes || "",
@@ -246,6 +266,7 @@ const CellReportHistoryItem: React.FC<{
       setLoading(false);
     }
   };
+
   const toggleOpen = () => {
     if (!isOpen && !reportData) {
       fetchReport();
@@ -253,8 +274,14 @@ const CellReportHistoryItem: React.FC<{
     setIsOpen(!isOpen);
   };
 
+  const isEmpty =
+    reportData &&
+    !reportData.cellShare &&
+    !reportData.specialNotes &&
+    reportData.attendances.length === 0;
+
   return (
-    <div className="border border-gray-200 rounded-xl bg-white overflow-hidden mb-3 shadow-sm hover:shadow-md transition-all">
+    <div className="border border-gray-200 rounded-xl bg-white overflow-hidden mb-3 shadow-sm transition-all hover:shadow-md">
       <button
         onClick={toggleOpen}
         className="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-gray-50 transition-colors"
@@ -277,57 +304,102 @@ const CellReportHistoryItem: React.FC<{
           {isOpen ? <FaChevronUp size={14} /> : <FaChevronDown size={14} />}
         </div>
       </button>
+
       {isOpen && (
         <div className="px-5 py-5 border-t border-gray-100 bg-gray-50/30 animate-fadeIn">
           {loading ? (
             <div className="flex justify-center py-4">
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-500"></div>
             </div>
+          ) : isEmpty ? (
+            <div className="text-center py-4 text-sm text-gray-400">
+              등록된 보고서 내용이 없습니다.
+            </div>
           ) : (
             <div className="space-y-6">
-              {(reportData?.cellShare || reportData?.specialNotes) && (
+              {(reportData!.cellShare || reportData!.specialNotes) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-indigo-50/60 p-4 rounded-xl border border-indigo-100">
                     <h4 className="text-xs font-bold text-indigo-800 mb-2 flex items-center gap-1.5">
                       <FaQuoteLeft className="opacity-50" /> 셀 은혜 나눔
                     </h4>
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                      {reportData.cellShare || "내용 없음"}
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                      {reportData!.cellShare || "내용 없음"}
                     </p>
                   </div>
                   <div className="bg-red-50/60 p-4 rounded-xl border border-red-100">
                     <h4 className="text-xs font-bold text-red-800 mb-2 flex items-center gap-1.5">
                       <MegaphoneIcon className="h-3 w-3" /> 셀 특이사항
                     </h4>
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                      {reportData.specialNotes || "내용 없음"}
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                      {reportData!.specialNotes || "내용 없음"}
                     </p>
                   </div>
                 </div>
               )}
-              {reportData?.attendances && reportData.attendances.length > 0 ? (
+
+              {reportData!.attendances.length > 0 && (
                 <div>
                   <h4 className="text-sm font-bold text-gray-800 mb-3 pl-2 border-l-4 border-indigo-500 flex items-center">
                     멤버별 출석 & 기도제목
                   </h4>
+
+                  {/* 모바일 뷰 */}
+                  <div className="md:hidden space-y-3">
+                    {reportData!.attendances.map((att) => (
+                      <div
+                        key={att.id}
+                        className="p-4 border border-gray-200 rounded-xl bg-white shadow-sm"
+                      >
+                        <div className="flex justify-between items-center mb-3 border-b border-gray-100 pb-2">
+                          <span className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                            <UserCircleIcon className="h-5 w-5 text-gray-300" />
+                            {formatNameWithBirthdate(att.member)}
+                          </span>
+                          <span
+                            className={`inline-flex px-2 py-0.5 text-[11px] font-bold rounded-full ${
+                              att.status === "PRESENT"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {att.status === "PRESENT" ? "출석" : "결석"}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-700">
+                          {att.prayerContent ? (
+                            <div className="bg-gray-50 p-3 rounded-lg text-xs leading-relaxed">
+                              {att.prayerContent}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-xs pl-1">
+                              기도제목 없음
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 데스크탑 뷰 */}
                   <div className="hidden md:block overflow-hidden border border-gray-200 rounded-xl shadow-sm">
                     <table className="min-w-full divide-y divide-gray-200 text-sm">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-4 py-3 text-left w-32 font-semibold text-gray-500">
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 w-32">
                             이름
                           </th>
-                          <th className="px-4 py-3 text-left w-24 font-semibold text-gray-500">
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 w-24">
                             출석
                           </th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-500">
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
                             기도제목
                           </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 bg-white">
-                        {reportData.attendances.map((att) => (
-                          <tr key={att.id}>
+                        {reportData!.attendances.map((att) => (
+                          <tr key={att.id} className="hover:bg-gray-50">
                             <td className="px-4 py-3 font-medium text-gray-900">
                               {formatNameWithBirthdate(att.member)}
                             </td>
@@ -343,17 +415,15 @@ const CellReportHistoryItem: React.FC<{
                               </span>
                             </td>
                             <td className="px-4 py-3 text-gray-600 whitespace-pre-wrap">
-                              {att.prayerContent || "-"}
+                              {att.prayerContent || (
+                                <span className="text-gray-300 text-xs">-</span>
+                              )}
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                </div>
-              ) : (
-                <div className="text-center py-4 text-sm text-gray-400">
-                  등록된 보고서 내용이 없습니다.
                 </div>
               )}
             </div>
@@ -364,7 +434,7 @@ const CellReportHistoryItem: React.FC<{
   );
 };
 
-// ───────────────── [컴포넌트] CellReportHistoryContainer (변경 없음) ─────────────────
+// ───────────────── [컴포넌트] CellReportHistoryContainer ─────────────────
 const CellReportHistoryContainer: React.FC<{
   cellId: number;
   startDate: string;
@@ -373,30 +443,38 @@ const CellReportHistoryContainer: React.FC<{
 }> = ({ cellId, startDate, endDate, attendances }) => {
   const writtenDates = useMemo(() => {
     const dates = new Set<string>();
-    attendances?.forEach((att) => att.date && dates.add(att.date));
+    if (attendances)
+      attendances.forEach((att) => att.date && dates.add(att.date));
     return dates;
   }, [attendances]);
+
   const sundayDates = useMemo(() => {
     if (!startDate || !endDate) return [];
     const dates: string[] = [];
     const start = new Date(startDate);
     const end = new Date(endDate);
     const current = new Date(start);
-    if (current.getDay() !== 0)
-      current.setDate(current.getDate() + (7 - current.getDay()));
+    const day = current.getDay();
+    if (day !== 0) current.setDate(current.getDate() + (7 - day));
+
     while (current <= end) {
-      dates.push(current.toISOString().slice(0, 10));
+      const y = current.getFullYear();
+      const m = String(current.getMonth() + 1).padStart(2, "0");
+      const d = String(current.getDate()).padStart(2, "0");
+      dates.push(`${y}-${m}-${d}`);
       current.setDate(current.getDate() + 7);
     }
     return dates.reverse();
   }, [startDate, endDate]);
+
   if (sundayDates.length === 0) return null;
+
   return (
     <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-2xl overflow-hidden mt-6">
       <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50">
         <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-          <InformationCircleIcon className="h-5 w-5 text-indigo-500" /> 주간
-          보고서 기록
+          <InformationCircleIcon className="h-5 w-5 text-indigo-500" />
+          주간 보고서 기록
         </h3>
       </div>
       <div className="p-4 sm:p-6 bg-white min-h-[200px]">
@@ -413,16 +491,13 @@ const CellReportHistoryContainer: React.FC<{
   );
 };
 
-// ───────────────── [컴포넌트] CellAttendanceMatrixCard (변경 없음) ─────────────────
+// ───────────────── [컴포넌트] CellAttendanceMatrixCard ─────────────────
 const CellAttendanceMatrixCard: React.FC<{
   cellId: number;
   sortedMembers: MemberDto[];
   semesters: SemesterDto[];
   activeSemester: SemesterDto | null;
   onSemesterChange: (id: number) => void;
-  availableYears: number[];
-  selectedYear: number;
-  onYearChange: (year: number) => void;
   unitType: "semester" | "month" | "year";
   onUnitTypeChange: (type: "semester" | "month" | "year") => void;
   selectedMonth: number | null;
@@ -436,15 +511,12 @@ const CellAttendanceMatrixCard: React.FC<{
   semesters,
   activeSemester,
   onSemesterChange,
-  availableYears,
-  selectedYear,
-  onYearChange,
   unitType,
   onUnitTypeChange,
   selectedMonth,
   onMonthSelect,
   matrixAttendances,
-  // periodSummary,
+  periodSummary,
   startDate,
   endDate,
 }) => {
@@ -462,39 +534,30 @@ const CellAttendanceMatrixCard: React.FC<{
     return months;
   }, [activeSemester]);
 
-  // 날짜 키 생성 헬퍼 함수 (로컬 시간 기준)
-  const toDateKey = (date: Date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  };
-
-  // 통계 계산 로직 (방학 제외 + 로컬 시간)
   const stats = useMemo(() => {
-    if (!startDate || !endDate || sortedMembers.length === 0)
+    if (!startDate || !endDate || sortedMembers.length === 0) {
       return { unchecked: 0, rate: 0 };
+    }
     const filterStart = new Date(startDate);
     const filterEnd = new Date(endDate);
+
+    // 🔸 [추가] 오늘 날짜 기준 설정 (미래 미체크 방지)
     const today = new Date();
     today.setHours(23, 59, 59, 999);
+
     filterStart.setHours(0, 0, 0, 0);
     filterEnd.setHours(23, 59, 59, 999);
+
+    // 🔸 [수정] 종료일이 오늘보다 미래면 오늘까지만 계산
     const effectiveEnd = filterEnd > today ? today : filterEnd;
-    if (filterStart > effectiveEnd) return { unchecked: 0, rate: 0 };
+
+    // 시작일조차 미래라면 미체크는 0
+    if (filterStart > effectiveEnd) {
+      // rate는 백엔드 값 그대로 사용 (백엔드는 이미 0이나 100으로 처리됨)
+      return { unchecked: 0, rate: periodSummary?.attendanceRate ?? 0 };
+    }
 
     let totalPossibleChecks = 0;
-    let calculatedTotalPresent = 0;
-    let calculatedTotalRecorded = 0;
-
-    const attendanceMap = new Map<string, string>();
-    matrixAttendances.forEach((att) => {
-      if (att.member?.id && att.date)
-        attendanceMap.set(
-          `${att.member.id}-${att.date.slice(0, 10)}`,
-          att.status
-        );
-    });
 
     sortedMembers.forEach((member) => {
       const joinDate = member.cellAssignmentDate
@@ -503,53 +566,31 @@ const CellAttendanceMatrixCard: React.FC<{
         ? new Date(member.createdAt)
         : new Date("2000-01-01");
       joinDate.setHours(0, 0, 0, 0);
+
       const effectiveStart = filterStart < joinDate ? joinDate : filterStart;
+
+      // 🔸 [수정] filterEnd -> effectiveEnd
       if (effectiveStart > effectiveEnd) return;
+
       const current = new Date(effectiveStart);
       current.setHours(0, 0, 0, 0);
-      if (current.getDay() !== 0)
-        current.setDate(current.getDate() + (7 - current.getDay()));
 
+      // 🔸 [수정] filterEnd -> effectiveEnd
       while (current <= effectiveEnd) {
-        let isValidDate = true;
-        const currentDateStr = toDateKey(current); // 로컬 시간 키 사용
-
-        // 연간 모드일 때만 학기 체크 (방학 제외)
-        if (unitType === "year" && semesters) {
-          const isInSemester = semesters.some(
-            (s) => currentDateStr >= s.startDate && currentDateStr <= s.endDate
-          );
-          if (!isInSemester) isValidDate = false;
-        }
-
-        if (isValidDate) {
-          totalPossibleChecks++;
-          const status = attendanceMap.get(`${member.id}-${currentDateStr}`);
-          if (status === "PRESENT") calculatedTotalPresent++;
-          if (status === "PRESENT" || status === "ABSENT")
-            calculatedTotalRecorded++;
-        }
-        current.setDate(current.getDate() + 7);
+        if (current.getDay() === 0) totalPossibleChecks++;
+        current.setDate(current.getDate() + 1);
       }
     });
 
-    const unchecked = Math.max(
-      0,
-      totalPossibleChecks - calculatedTotalRecorded
-    );
-    const rate =
-      totalPossibleChecks > 0
-        ? (calculatedTotalPresent / totalPossibleChecks) * 100
-        : 0;
+    const totalPresent = periodSummary?.totalPresent || 0;
+    const totalRecorded = totalPresent + (periodSummary?.totalAbsent || 0);
+
+    // 미체크 개수 계산 (음수 방지)
+    const unchecked = Math.max(0, totalPossibleChecks - totalRecorded);
+    const rate = periodSummary?.attendanceRate ?? 0;
+
     return { unchecked, rate };
-  }, [
-    startDate,
-    endDate,
-    sortedMembers,
-    matrixAttendances,
-    unitType,
-    semesters,
-  ]);
+  }, [startDate, endDate, sortedMembers, periodSummary]);
 
   const formatDate = (dateStr: string) => dateStr.replace(/-/g, ".");
   const matrixMembers = useMemo(
@@ -568,29 +609,21 @@ const CellAttendanceMatrixCard: React.FC<{
     <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-2xl overflow-hidden">
       <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
         <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-          <CheckCircleIcon className="h-5 w-5 text-indigo-500" /> 출석 현황
+          <CheckCircleIcon className="h-5 w-5 text-indigo-500" />
+          출석 현황
         </h3>
       </div>
+
       <div className="p-4 sm:p-6 space-y-6">
+        {/* Controls Container */}
         <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex flex-col gap-4">
           <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+            {/* Left: Selectors */}
             <div className="flex flex-col sm:flex-row gap-2 w-full xl:w-auto">
-              <div className="relative w-full sm:w-auto">
-                <div className="flex items-center bg-white px-3 py-2.5 rounded-lg border border-gray-200 shadow-sm w-full sm:w-auto hover:border-indigo-300 transition-colors">
-                  <FaCalendarAlt className="text-indigo-500 mr-2 text-sm flex-shrink-0" />
-                  {unitType === "year" ? (
-                    <select
-                      value={selectedYear}
-                      onChange={(e) => onYearChange(Number(e.target.value))}
-                      className="bg-transparent text-gray-700 font-semibold text-sm focus:outline-none cursor-pointer w-full sm:min-w-[160px]"
-                    >
-                      {availableYears.map((year) => (
-                        <option key={year} value={year}>
-                          {year}년 전체
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
+              {unitType !== "year" ? (
+                <div className="relative w-full sm:w-auto">
+                  <div className="flex items-center bg-white px-3 py-2.5 rounded-lg border border-gray-200 shadow-sm w-full sm:w-auto hover:border-indigo-300 transition-colors">
+                    <FaCalendarAlt className="text-indigo-500 mr-2 text-sm flex-shrink-0" />
                     <select
                       value={activeSemester?.id || ""}
                       onChange={(e) => onSemesterChange(Number(e.target.value))}
@@ -598,13 +631,22 @@ const CellAttendanceMatrixCard: React.FC<{
                     >
                       {semesters.map((s) => (
                         <option key={s.id} value={s.id}>
-                          {s.name} {s.isActive ? "(진행중)" : "(마감됨)"}
+                          {s.name}
                         </option>
                       ))}
                     </select>
-                  )}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex items-center bg-white px-4 py-2.5 rounded-lg border border-gray-200 shadow-sm w-full sm:w-auto justify-center sm:justify-start">
+                  <FaCalendarAlt className="text-indigo-500 mr-2 text-sm" />
+                  <span className="text-gray-900 font-bold text-sm">
+                    {new Date(startDate).getFullYear()}년
+                  </span>
+                </div>
+              )}
+
+              {/* Toggle Buttons */}
               <div className="flex bg-gray-200 p-1 rounded-lg w-full sm:w-auto">
                 {(["month", "semester", "year"] as const).map((type) => (
                   <button
@@ -625,19 +667,17 @@ const CellAttendanceMatrixCard: React.FC<{
                 ))}
               </div>
             </div>
+
+            {/* Right: Date Range Display */}
             <div className="flex items-center justify-end text-xs text-gray-500 bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm">
               <FaClock className="mr-1.5 text-gray-400" />
               <span className="font-mono text-gray-700">
                 {formatDate(startDate)} ~ {formatDate(endDate)}
-                {/* 방학 제외 안내 뱃지 */}
-                {unitType === "year" && (
-                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">
-                    방학 제외
-                  </span>
-                )}
               </span>
             </div>
           </div>
+
+          {/* Detailed Month Selector */}
           {unitType === "month" && activeSemester && (
             <div className="animate-fadeIn">
               <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x pt-1">
@@ -658,43 +698,55 @@ const CellAttendanceMatrixCard: React.FC<{
             </div>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="p-5 bg-gradient-to-br from-indigo-50 to-white rounded-2xl border border-indigo-100 shadow-sm text-center">
-            <p className="text-xs sm:text-sm font-bold text-indigo-600 uppercase tracking-wide">
-              출석률
-            </p>
-            <p className="mt-1 text-3xl sm:text-4xl font-extrabold text-indigo-700">
-              {stats.rate.toFixed(0)}
-              <span className="text-lg sm:text-xl ml-1 text-indigo-400">%</span>
-            </p>
-          </div>
-          <div
-            className={`p-5 rounded-2xl border shadow-sm text-center bg-gradient-to-br ${
-              stats.unchecked > 0
-                ? "from-red-50 to-white border-red-100"
-                : "from-gray-50 to-white border-gray-200"
-            }`}
-          >
-            <p
-              className={`text-xs sm:text-sm font-bold uppercase tracking-wide ${
-                stats.unchecked > 0 ? "text-red-600" : "text-gray-500"
+
+        {/* Stats Cards */}
+        {periodSummary ? (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-5 bg-gradient-to-br from-indigo-50 to-white rounded-2xl border border-indigo-100 shadow-sm text-center">
+              <p className="text-xs sm:text-sm font-bold text-indigo-600 uppercase tracking-wide">
+                출석률
+              </p>
+              <p className="mt-1 text-3xl sm:text-4xl font-extrabold text-indigo-700">
+                {stats.rate.toFixed(0)}
+                <span className="text-lg sm:text-xl ml-1 text-indigo-400">
+                  %
+                </span>
+              </p>
+            </div>
+            <div
+              className={`p-5 rounded-2xl border shadow-sm text-center bg-gradient-to-br ${
+                stats.unchecked > 0
+                  ? "from-red-50 to-white border-red-100"
+                  : "from-gray-50 to-white border-gray-200"
               }`}
             >
-              미체크
-            </p>
-            <p
-              className={`mt-1 text-3xl sm:text-4xl font-extrabold ${
-                stats.unchecked > 0 ? "text-red-600" : "text-gray-400"
-              }`}
-            >
-              {stats.unchecked}
-            </p>
+              <p
+                className={`text-xs sm:text-sm font-bold uppercase tracking-wide ${
+                  stats.unchecked > 0 ? "text-red-600" : "text-gray-500"
+                }`}
+              >
+                미체크
+              </p>
+              <p
+                className={`mt-1 text-3xl sm:text-4xl font-extrabold ${
+                  stats.unchecked > 0 ? "text-red-600" : "text-gray-400"
+                }`}
+              >
+                {stats.unchecked}
+              </p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="p-8 text-center text-sm text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+            선택된 기간에 대한 데이터가 없습니다.
+          </div>
+        )}
+
+        {/* Matrix Component Wrapper */}
         <div className="pt-2">
           <h4 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-            <div className="w-1 h-4 bg-indigo-500 rounded-full"></div> 상세
-            출석표
+            <div className="w-1 h-4 bg-indigo-500 rounded-full"></div>
+            상세 출석표
           </h4>
           <AttendanceMatrix
             mode={unitType}
@@ -715,12 +767,13 @@ const CellAttendanceMatrixCard: React.FC<{
   );
 };
 
-// ───────────────── [메인] CellDetailPage (✅ 수정됨: 활성 학기 필터링) ─────────────────
+// ... (메인 페이지 로직은 동일하되 UI만 아래 리턴문으로 교체) ...
+
 const CellDetailPage: React.FC = () => {
+  // ... (기존 로직 동일: Hooks, useEffect, handlers ...)
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const cellIdNum = useMemo(() => (id ? Number(id) : null), [id]);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -729,7 +782,6 @@ const CellDetailPage: React.FC = () => {
   const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
   const [isAddMemberModalOpen, setAddMemberModalOpen] = useState(false);
 
-  // Filter States
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const [activeSemester, setActiveSemester] = useState<SemesterDto | null>(
     null
@@ -738,10 +790,6 @@ const CellDetailPage: React.FC = () => {
     "semester"
   );
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
-  const [availableYears, setAvailableYears] = useState<number[]>([]);
-  const [selectedYear, setSelectedYear] = useState<number>(
-    new Date().getFullYear()
-  );
 
   const [matrixAttendances, setMatrixAttendances] = useState<AttendanceDto[]>(
     []
@@ -750,6 +798,8 @@ const CellDetailPage: React.FC = () => {
 
   const [exportStartDate, setExportStartDate] = useState("");
   const [exportEndDate, setExportEndDate] = useState("");
+
+  const cellIdNum = useMemo(() => (id ? Number(id) : null), [id]);
 
   const isDateInSemesterMonthRange = (date: Date, semester: SemesterDto) => {
     const targetYm = date.getFullYear() * 12 + date.getMonth();
@@ -760,10 +810,10 @@ const CellDetailPage: React.FC = () => {
     return targetYm >= sYm && targetYm <= eYm;
   };
 
+  // ... (useEffect 및 핸들러 로직들 - 위 코드와 동일하게 유지)
   useEffect(() => {
     const loadSemesters = async () => {
       try {
-        // ✅ [수정] 활성화된 학기만 불러오기 (true 전달)
         const data = await semesterService.getAllSemesters(true);
         const sortedData = data.sort(
           (a, b) =>
@@ -771,23 +821,16 @@ const CellDetailPage: React.FC = () => {
         );
         setSemesters(sortedData);
 
-        // ✅ [수정] 연도 데이터도 활성화된 학기 기준으로 추출
-        const years = Array.from(
-          new Set(sortedData.map((s) => new Date(s.startDate).getFullYear()))
-        ).sort((a, b) => b - a);
-        setAvailableYears(years);
-
         if (sortedData.length > 0) {
           const now = new Date();
           const currentSemester = sortedData.find((sem) =>
             isDateInSemesterMonthRange(now, sem)
           );
+
           if (currentSemester) {
             setActiveSemester(currentSemester);
-            setSelectedYear(new Date(currentSemester.startDate).getFullYear());
           } else {
             setActiveSemester(sortedData[0]);
-            setSelectedYear(new Date(sortedData[0].startDate).getFullYear());
           }
           setUnitType("semester");
           setSelectedMonth(null);
@@ -799,29 +842,44 @@ const CellDetailPage: React.FC = () => {
     loadSemesters();
   }, []);
 
+  // periodRange 계산 (연간, 학기, 월간)
   const periodRange = useMemo(() => {
-    if (unitType === "year")
+    if (unitType === "year") {
+      const targetYear = activeSemester
+        ? new Date(activeSemester.startDate).getFullYear()
+        : new Date().getFullYear();
+
       return {
-        startDate: `${selectedYear}-01-01`,
-        endDate: `${selectedYear}-12-31`,
+        startDate: `${targetYear}-01-01`,
+        endDate: `${targetYear}-12-31`,
       };
+    }
+
     if (!activeSemester) return { startDate: "", endDate: "" };
     const { startDate: semStart, endDate: semEnd } = activeSemester;
-    if (unitType === "semester" || selectedMonth === null)
+
+    if (unitType === "semester" || selectedMonth === null) {
       return { startDate: semStart, endDate: semEnd };
+    }
+
     let targetYear = new Date(semStart).getFullYear();
     const startMonthIndex = new Date(semStart).getMonth() + 1;
-    if (selectedMonth < startMonthIndex) targetYear += 1;
+    if (selectedMonth < startMonthIndex) {
+      targetYear += 1;
+    }
+
     const m = selectedMonth;
     const monthStartStr = `${targetYear}-${String(m).padStart(2, "0")}-01`;
     const lastDayObj = new Date(targetYear, m, 0);
     const monthEndStr = `${targetYear}-${String(m).padStart(2, "0")}-${String(
       lastDayObj.getDate()
     ).padStart(2, "0")}`;
+
     const finalStart = monthStartStr < semStart ? semStart : monthStartStr;
     const finalEnd = monthEndStr > semEnd ? semEnd : monthEndStr;
+
     return { startDate: finalStart, endDate: finalEnd };
-  }, [activeSemester, unitType, selectedMonth, selectedYear]);
+  }, [activeSemester, unitType, selectedMonth]);
 
   const fetchCellDetails = useCallback(async () => {
     try {
@@ -831,6 +889,7 @@ const CellDetailPage: React.FC = () => {
         return;
       }
       const fetchedCell = await cellService.getCellById(cellIdNum);
+
       if (
         user?.role !== "EXECUTIVE" &&
         !(user?.role === "CELL_LEADER" && user.cellId === cellIdNum)
@@ -850,16 +909,15 @@ const CellDetailPage: React.FC = () => {
 
   const fetchPeriodData = useCallback(async () => {
     if (!cellIdNum || !periodRange.startDate) return;
-    try {
-      console.log(
-        `[Fetch Data] Fetching for range: ${periodRange.startDate} ~ ${periodRange.endDate}`
-      );
 
+    try {
       const summary = await cellService.getCellAttendanceSummary(cellIdNum, {
         startDate: periodRange.startDate,
         endDate: periodRange.endDate,
       });
+
       setPeriodSummary(summary.totalSummary);
+
       const listData = await attendanceService.getAttendances({
         cellId: cellIdNum,
         startDate: periodRange.startDate,
@@ -869,16 +927,8 @@ const CellDetailPage: React.FC = () => {
         sort: "date,asc",
       });
       setMatrixAttendances(listData.content || []);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to fetch period attendance data:", err);
-      if (
-        err.response?.status === 403 &&
-        err.response?.data?.code === "ACCESS_001"
-      ) {
-        alert("행정이 마감되어 조회할 수 없는 기간입니다.");
-        setPeriodSummary(null);
-        setMatrixAttendances([]);
-      }
     }
   }, [cellIdNum, periodRange]);
 
@@ -887,6 +937,7 @@ const CellDetailPage: React.FC = () => {
       fetchCellDetails();
     }
   }, [user, fetchCellDetails]);
+
   useEffect(() => {
     if (cell) {
       fetchPeriodData();
@@ -899,30 +950,13 @@ const CellDetailPage: React.FC = () => {
       setActiveSemester(target);
       setSelectedMonth(null);
       setUnitType("semester");
-      setSelectedYear(new Date(target.startDate).getFullYear());
     }
   };
-  const handleYearChange = (year: number) => {
-    setSelectedYear(year);
-    const targetSem = semesters.find(
-      (s) => new Date(s.startDate).getFullYear() === year
-    );
-    if (targetSem) setActiveSemester(targetSem);
-  };
+
   const handleUnitTypeChange = (type: "semester" | "month" | "year") => {
     setUnitType(type);
-    if (type === "semester") {
+    if (type === "semester" || type === "year") {
       setSelectedMonth(null);
-      const targetSem = semesters.find(
-        (s) => new Date(s.startDate).getFullYear() === selectedYear
-      );
-      if (targetSem) setActiveSemester(targetSem);
-      return;
-    }
-    if (type === "year") {
-      setSelectedMonth(null);
-      if (activeSemester)
-        setSelectedYear(new Date(activeSemester.startDate).getFullYear());
       return;
     }
     if (activeSemester) {
@@ -950,6 +984,7 @@ const CellDetailPage: React.FC = () => {
       setDeleteModalOpen(false);
     }
   };
+
   const handleAddMemberToCell = async (memberIds: number[]) => {
     if (!cellIdNum) return;
     try {
@@ -963,8 +998,10 @@ const CellDetailPage: React.FC = () => {
       console.error("Failed to add members to cell:", error);
     }
   };
+
   const handleExportMembers = () =>
     cell && exportService.exportCellMembers(cell.id);
+
   const handleExportAttendances = () =>
     cell &&
     exportService.exportCellAttendances(
@@ -977,16 +1014,20 @@ const CellDetailPage: React.FC = () => {
     if (!cell?.members) return [];
     const leaderId = cell.leader?.id;
     const viceLeaderId = cell.viceLeader?.id;
+
     const leader = cell.members.find((m) => m.id === leaderId);
     const viceLeader = cell.members.find((m) => m.id === viceLeaderId);
     const others = cell.members.filter(
       (m) => m.id !== leaderId && m.id !== viceLeaderId
     );
+
     others.sort((a, b) => a.name.localeCompare(b.name));
+
     const list: MemberDto[] = [];
     if (leader) list.push(leader);
     if (viceLeader && viceLeader.id !== leaderId) list.push(viceLeader);
     list.push(...others);
+
     return list;
   }, [cell]);
 
@@ -1016,6 +1057,7 @@ const CellDetailPage: React.FC = () => {
       />
 
       <div className="container mx-auto max-w-6xl px-4 py-8">
+        {/* Top Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
@@ -1031,19 +1073,18 @@ const CellDetailPage: React.FC = () => {
           <div className="flex gap-2">
             {user?.role === "EXECUTIVE" && (
               <>
-                {" "}
                 <button
                   onClick={() => navigate(`/admin/cells/${id}/edit`)}
                   className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm font-medium transition-colors shadow-sm"
                 >
                   수정
-                </button>{" "}
+                </button>
                 <button
                   onClick={() => setDeleteModalOpen(true)}
                   className="bg-white border border-red-200 text-red-600 px-4 py-2 rounded-lg hover:bg-red-50 text-sm font-medium transition-colors shadow-sm"
                 >
                   삭제
-                </button>{" "}
+                </button>
               </>
             )}
             <button
@@ -1055,11 +1096,14 @@ const CellDetailPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Main Grid */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Left Column (Main Info & Charts) */}
           <div className="xl:col-span-2 space-y-6">
+            {/* Info Card */}
             <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-2xl p-6">
               <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-                <InformationCircleIcon className="h-5 w-5 text-indigo-500" />{" "}
+                <InformationCircleIcon className="h-5 w-5 text-indigo-500" />
                 기본 정보
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8">
@@ -1108,15 +1152,13 @@ const CellDetailPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Attendance Matrix */}
             <CellAttendanceMatrixCard
               cellId={cell.id}
               sortedMembers={sortedMembers}
               semesters={semesters}
               activeSemester={activeSemester}
               onSemesterChange={handleSemesterChange}
-              availableYears={availableYears}
-              selectedYear={selectedYear}
-              onYearChange={handleYearChange}
               unitType={unitType}
               onUnitTypeChange={handleUnitTypeChange}
               selectedMonth={selectedMonth}
@@ -1127,6 +1169,7 @@ const CellDetailPage: React.FC = () => {
               endDate={periodRange.endDate}
             />
 
+            {/* Reports */}
             {cell && periodRange.startDate && (
               <CellReportHistoryContainer
                 cellId={cell.id}
@@ -1137,11 +1180,14 @@ const CellDetailPage: React.FC = () => {
             )}
           </div>
 
+          {/* Right Column (Members & Exports) */}
           <div className="space-y-6">
+            {/* Members Card */}
             <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-2xl overflow-hidden">
               <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
                 <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <UsersIcon className="h-5 w-5 text-indigo-500" /> 셀원 목록{" "}
+                  <UsersIcon className="h-5 w-5 text-indigo-500" />
+                  셀원 목록
                   <span className="bg-indigo-100 text-indigo-700 text-xs py-0.5 px-2 rounded-full">
                     {cell.members.length}
                   </span>
@@ -1196,9 +1242,11 @@ const CellDetailPage: React.FC = () => {
                 )}
               </ul>
             </div>
+
+            {/* Export Card */}
             <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-2xl p-6">
               <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <DocumentArrowDownIcon className="h-5 w-5 text-green-600" />{" "}
+                <DocumentArrowDownIcon className="h-5 w-5 text-green-600" />
                 엑셀 다운로드
               </h3>
               <div className="space-y-4">
@@ -1208,6 +1256,7 @@ const CellDetailPage: React.FC = () => {
                 >
                   명단 다운로드 (.xlsx)
                 </button>
+
                 <div className="pt-4 border-t border-gray-100">
                   <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">
                     출석부 기간 설정

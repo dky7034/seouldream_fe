@@ -1,3 +1,4 @@
+// src/components/DemographicsSection.tsx
 import React, { useMemo } from "react";
 import {
   BarChart,
@@ -21,16 +22,17 @@ export const DemographicsSection: React.FC<Props> = ({
   data,
   onUnassignedClick,
 }) => {
-  // 1. 차트 너비 계산
-  const minChartWidth = Math.max(data.distribution.length * 40, 800);
+  // 1. 차트 너비 동적 계산 (데이터가 많으면 가로 스크롤 발생)
+  const minChartWidth = Math.max(data.distribution.length * 45, 800);
 
-  // ✅ [수정] 2. 미배정 인원 계산 (음수 방지 안전장치 추가)
+  // 2. 미배정 인원 계산 (음수 방지 안전장치)
+  // NOTE: 임원단이 셀에 소속된 경우 중복 차감될 수 있으므로 Math.max 필수
   const unassignedCount = Math.max(
     0,
     data.totalMemberCount - data.cellMemberCount - (data.executiveCount ?? 0)
   );
 
-  // 3. 연령대별 집계
+  // 3. 연령대별(2030) 집계 로직
   const stats = useMemo(() => {
     const currentYear = new Date().getFullYear();
     const result = {
@@ -39,7 +41,7 @@ export const DemographicsSection: React.FC<Props> = ({
     };
 
     data.distribution.forEach((item) => {
-      const age = currentYear - item.birthYear;
+      const age = currentYear - item.birthYear; // 한국식 나이/만 나이 여부에 따라 +1 조정 가능
       if (age >= 20 && age <= 29) {
         result.age20s.male += item.maleCount;
         result.age20s.female += item.femaleCount;
@@ -138,14 +140,14 @@ export const DemographicsSection: React.FC<Props> = ({
           </p>
         </div>
 
-        {/* 차트 영역 */}
+        {/* 차트 영역 (가로 스크롤 적용) */}
         <div className="w-full overflow-x-auto pb-2 scrollbar-hide">
           <div style={{ height: "400px", minWidth: `${minChartWidth}px` }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={data.distribution}
                 margin={{ top: 30, right: 10, left: 0, bottom: 5 }}
-                barSize={12}
+                barSize={16} // 막대 두께 조정
               >
                 <CartesianGrid
                   strokeDasharray="3 3"
@@ -173,20 +175,36 @@ export const DemographicsSection: React.FC<Props> = ({
                   }}
                 />
 
-                {/* 💡 [수정됨] 툴팁 포매터 수정 */}
                 <Tooltip
                   cursor={{ fill: "rgba(243, 244, 246, 0.6)" }}
                   contentStyle={{
-                    borderRadius: "8px",
+                    borderRadius: "12px",
                     border: "none",
-                    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
+                    padding: "12px",
                   }}
-                  // 변경 전: formatter={(value: number) => [`${value}명`, undefined]}
-                  // 변경 후: value만 리턴하면, Recharts가 자동으로 [Bar의 Name] : [Value] 형식으로 보여줍니다.
-                  formatter={(value: number) => `${value}명`}
+                  // 툴팁 포맷: 이름과 값을 명확하게 표시
+                  formatter={(value: number, name: string) => [
+                    `${value}명`,
+                    name,
+                  ]}
+                  labelStyle={{
+                    fontWeight: "bold",
+                    marginBottom: "8px",
+                    color: "#374151",
+                  }}
                 />
 
-                <Legend verticalAlign="top" height={36} />
+                <Legend
+                  verticalAlign="top"
+                  height={36}
+                  iconType="circle"
+                  formatter={(value) => (
+                    <span className="text-sm text-gray-600 font-medium ml-1">
+                      {value}
+                    </span>
+                  )}
+                />
                 <Bar
                   dataKey="maleCount"
                   name="남자"
@@ -199,7 +217,7 @@ export const DemographicsSection: React.FC<Props> = ({
                   name="여자"
                   stackId="a"
                   fill="#f472b6"
-                  radius={[4, 4, 0, 0]}
+                  radius={[4, 4, 0, 0]} // 상단 둥글게
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -210,7 +228,10 @@ export const DemographicsSection: React.FC<Props> = ({
   );
 };
 
-// ... (SummaryCard, DetailAgeCard 등 하단 컴포넌트는 기존과 동일) ...
+// ─────────────────────────────────────────────────────────────
+// Sub Components (디자인 유지)
+// ─────────────────────────────────────────────────────────────
+
 const SummaryCard = ({
   label,
   value,

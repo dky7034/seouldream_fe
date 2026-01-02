@@ -214,6 +214,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                   : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
               }`}
             >
+              {/* ✅ [수정] 활성 학기만 보여주므로 상태 텍스트 제거 */}
               {s.name}
             </button>
           ))}
@@ -234,6 +235,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
       setError(null);
 
       let params: GetAttendancesParams = {};
+
       if (filterType === "range") {
         params = {
           startDate: filters.startDate || undefined,
@@ -275,37 +277,48 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
           const overlappingSemesters = semesters.filter(
             (s) => s.startDate <= rangeEnd && s.endDate >= rangeStart
           );
-          if (overlappingSemesters.length === 0) {
-            setReport([]);
-            if (!opts?.skipLoading) setLoading(false);
-            return;
-          }
 
-          const minS = overlappingSemesters.reduce(
-            (m, s) => (s.startDate < m ? s.startDate : m),
-            overlappingSemesters[0].startDate
-          );
-          const maxE = overlappingSemesters.reduce(
-            (m, s) => (s.endDate > m ? s.endDate : m),
-            overlappingSemesters[0].endDate
-          );
-          params = {
-            startDate: rangeStart > minS ? rangeStart : minS,
-            endDate: rangeEnd < maxE ? rangeEnd : maxE,
-          };
+          if (overlappingSemesters.length > 0) {
+            const minS = overlappingSemesters.reduce(
+              (m, s) => (s.startDate < m ? s.startDate : m),
+              overlappingSemesters[0].startDate
+            );
+            const maxE = overlappingSemesters.reduce(
+              (m, s) => (s.endDate > m ? s.endDate : m),
+              overlappingSemesters[0].endDate
+            );
+            params = {
+              startDate: rangeStart > minS ? rangeStart : minS,
+              endDate: rangeEnd < maxE ? rangeEnd : maxE,
+            };
+          } else {
+            // 학기가 없으면 해당 연도/월 전체 조회
+            params = { startDate: rangeStart, endDate: rangeEnd };
+          }
         }
       }
 
+      // ✅ 날짜 Boundary Cutoff (Future Cap & Year End Cap)
       if (params.endDate) {
         const today = new Date();
         today.setHours(23, 59, 59, 999);
         const reqEnd = new Date(params.endDate);
         reqEnd.setHours(23, 59, 59, 999);
+
+        // A. 미래 날짜 제한
         if (reqEnd > today) {
           const y = today.getFullYear();
           const m = String(today.getMonth() + 1).padStart(2, "0");
           const d = String(today.getDate()).padStart(2, "0");
           params.endDate = `${y}-${m}-${d}`;
+        }
+
+        // B. 연말 날짜 제한 (연도 선택 시)
+        if (filters.year && filterType === "unit" && unitType === "year") {
+          const yearEnd = `${filters.year}-12-31`;
+          if (params.endDate > yearEnd) {
+            params.endDate = yearEnd;
+          }
         }
       }
 
@@ -328,7 +341,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
         if (!opts?.skipLoading) setLoading(false);
       }
     },
-    [user, filters, filterType, semesters]
+    [user, filters, filterType, semesters, unitType]
   );
 
   const fetchAvailableYears = useCallback(async () => {
@@ -338,9 +351,15 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
       setAvailableYears([]);
     }
   }, []);
+
   const fetchSemesters = useCallback(async () => {
     try {
-      setSemesters(await semesterService.getAllSemesters(true));
+      // ✅ [수정] 활성 학기만 조회 (true) -> 운영 목적상 적합
+      const data = await semesterService.getAllSemesters(true);
+      const sorted = data.sort((a, b) =>
+        b.startDate.localeCompare(a.startDate)
+      );
+      setSemesters(sorted);
     } catch {
       setSemesters([]);
     }
@@ -455,7 +474,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {/* ✅ 레이아웃 개선: items-start 적용 */}
               <div className="flex flex-col sm:flex-row items-start gap-4">
                 {/* 1. 연도 */}
                 <div className="sm:w-1/3">
@@ -480,7 +498,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                         </option>
                       ))}
                     </select>
-                    {/* ✅ 안내 문구 추가 */}
                     {unitType === "semester" && (
                       <p className="absolute left-0 top-full mt-1 text-[10px] text-gray-400 whitespace-nowrap">
                         * 학기는 연도 무관
@@ -494,7 +511,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                   <label className="text-xs font-bold text-gray-500 mb-1 block">
                     조회 단위
                   </label>
-                  {/* ✅ 스타일 개선: 개별 버튼 + gap-2 */}
                   <div className="flex flex-wrap gap-2">
                     {(
                       [
@@ -512,7 +528,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                             !isDisabled && handleUnitTypeClick(u.t)
                           }
                           disabled={isDisabled}
-                          // ✅ 스타일 개선: 버튼별 Border/Shadow
                           className={`flex-1 sm:flex-none px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all ${
                             isDisabled
                               ? "bg-gray-50 text-gray-400 border-gray-200 border-dashed cursor-not-allowed shadow-none"

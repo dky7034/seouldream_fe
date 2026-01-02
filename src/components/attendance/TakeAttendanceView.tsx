@@ -12,7 +12,6 @@ import type {
   SemesterDto,
   ProcessAttendanceWithPrayersRequest,
 } from "../../types";
-// StatusButton은 아래에서 인라인 스타일로 대체하여 디자인 완성도를 높였습니다.
 import ConfirmationModal from "./ConfirmationModal";
 import KoreanCalendarPicker from "../KoreanCalendarPicker";
 import {
@@ -26,7 +25,7 @@ import {
 } from "@heroicons/react/24/solid";
 
 // ─────────────────────────────────────────────────────────────
-// [Internal Component] 단순 알림 모달 (디자인 개선)
+// [Internal Component] 단순 알림 모달
 // ─────────────────────────────────────────────────────────────
 const AlertModal: React.FC<{
   isOpen: boolean;
@@ -113,7 +112,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [cellShare, setCellShare] = useState("");
   const [specialNotes, setSpecialNotes] = useState("");
-  const [isEditMode, setIsEditMode] = useState(false); // true면 수정 불가(이미 제출됨)
+  const [isEditMode, setIsEditMode] = useState(false); // true면 수정 불가
 
   // ── Status & Modal State ──
   const [loading, setLoading] = useState(false);
@@ -145,7 +144,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
     setAlertState((prev) => ({ ...prev, isOpen: false, onConfirm: undefined }));
   };
 
-  // ── 1. 학기 목록 로드 ──
+  // ── 1. 학기 목록 로드 (활성 학기만) ──
   useEffect(() => {
     const fetchSemesters = async () => {
       try {
@@ -170,6 +169,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
     if (isValidDate) {
       setSelectedDate(defaultSunday);
     } else {
+      // 학기 기간이 아니면 가장 최근 학기의 종료일로 설정
       const sortedSemesters = [...allSemesters].sort((a, b) =>
         b.endDate.localeCompare(a.endDate)
       );
@@ -318,6 +318,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
 
     if (!selectedDate) return setSubmitError("출석 날짜를 선택해 주세요.");
 
+    // 학기 기간 체크
     if (allSemesters.length > 0) {
       const belongsToAnySemester = allSemesters.some(
         (s) => selectedDate >= s.startDate && selectedDate <= s.endDate
@@ -475,7 +476,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                   멤버 출석 & 기도제목
                 </h3>
 
-                {/* 일괄 변경 (Mobile friendly) */}
+                {/* 일괄 변경 */}
                 <div className="flex gap-1.5 bg-gray-100 p-1 rounded-lg">
                   <button
                     type="button"
@@ -568,7 +569,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                           </label>
                           <textarea
                             required
-                            placeholder="이번 주 나눈 기도제목이나 특이사항을 입력해주세요."
+                            placeholder="기도제목 및 특이사항을 입력해 주세요."
                             value={attendance.prayerContent || ""}
                             onChange={(e) =>
                               handleAttendanceChange(
@@ -614,7 +615,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                     value={cellShare}
                     onChange={(e) => setCellShare(e.target.value)}
                     readOnly={isEditMode}
-                    placeholder="셀 모임에서 나눈 은혜와 감사한 점을 기록해주세요."
+                    placeholder="셀 모임에서 나눈 은혜를 기록해 주세요."
                     rows={4}
                     className={`w-full text-sm p-4 rounded-xl shadow-sm resize-y min-h-[120px] transition-colors
                     ${
@@ -634,7 +635,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                     value={specialNotes}
                     onChange={(e) => setSpecialNotes(e.target.value)}
                     readOnly={isEditMode}
-                    placeholder="셀원들의 특별한 상황이나 보고할 내용을 적어주세요."
+                    placeholder="셀 특이사항을 적어주세요."
                     rows={3}
                     className={`w-full text-sm p-4 rounded-xl shadow-sm resize-y min-h-[100px] transition-colors
                     ${

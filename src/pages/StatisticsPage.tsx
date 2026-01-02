@@ -347,18 +347,23 @@ const StatisticsPage: React.FC = () => {
     []
   );
 
-  // 1. 학기 목록 로딩
+  // 1. 학기 목록 로딩 (모든 학기 조회)
   useEffect(() => {
     semesterService.getAllSemesters().then((list) => {
-      const activeSemesters = list.filter((s) => s.isActive);
-      setSemesters(activeSemesters);
+      // ✅ [수정] filter 제거 (모든 학기 표시), 최신순 정렬
+      const sortedList = list.sort(
+        (a, b) =>
+          new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+      );
+      setSemesters(sortedList);
 
-      if (activeSemesters.length > 0) {
+      if (sortedList.length > 0) {
+        // 현재 날짜가 포함된 학기를 찾거나, 없으면 최신 학기를 선택
         const today = new Date();
         const currentMonthTotal =
           today.getFullYear() * 12 + (today.getMonth() + 1);
 
-        const currentSemester = activeSemesters.find((s) => {
+        const currentSemester = sortedList.find((s) => {
           const start = new Date(s.startDate);
           const end = new Date(s.endDate);
           const startMonthTotal =
@@ -373,7 +378,7 @@ const StatisticsPage: React.FC = () => {
 
         const targetId = currentSemester
           ? currentSemester.id
-          : activeSemesters[0].id;
+          : sortedList[0].id;
         setSelectedSemesterId(targetId);
       } else {
         setIsInitialLoading(false);
@@ -393,8 +398,7 @@ const StatisticsPage: React.FC = () => {
         const semester = semesters.find((s) => s.id === selectedSemesterId);
         if (!semester) return;
 
-        // 🔹 [수정] 미래 날짜 제한 로직 (Today Cap)
-        // 그래프가 미래 날짜(빈 데이터)까지 그려져서 증감률이 -100%로 곤두박질치는 것을 방지
+        // 🔹 [유지] 미래 날짜 제한 로직 (Today Cap)
         const { startDate, endDate } = semester;
         const today = new Date();
         const endObj = new Date(endDate);
@@ -413,14 +417,12 @@ const StatisticsPage: React.FC = () => {
 
         const [newcomers, summary, dashboardData, unassigned] =
           await Promise.all([
-            // ✅ 수정된 effectiveEndDate 사용
             statisticsService.getNewcomerStats(
               "MONTH",
               startDate,
               effectiveEndDate
             ),
             statisticsService.getSemesterSummary(selectedSemesterId),
-            // ✅ 수정된 effectiveEndDate 사용
             dashboardService.getDashboardData("SEMESTER", {
               startDate,
               endDate: effectiveEndDate,
@@ -490,7 +492,7 @@ const StatisticsPage: React.FC = () => {
   if (!isInitialLoading && semesters.length === 0) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-50 text-gray-500">
-        활성화된 학기 정보가 없습니다. 관리자에게 문의하세요.
+        등록된 학기 정보가 없습니다. 관리자에게 문의하세요.
       </div>
     );
   }
@@ -514,8 +516,9 @@ const StatisticsPage: React.FC = () => {
               onChange={(e) => setSelectedSemesterId(Number(e.target.value))}
             >
               {semesters.map((s) => (
+                // ✅ [수정] 진행중/마감됨 상태 표시
                 <option key={s.id} value={s.id}>
-                  {s.name}
+                  {s.name} {s.isActive ? "(진행중)" : "(마감됨)"}
                 </option>
               ))}
             </select>
@@ -533,7 +536,7 @@ const StatisticsPage: React.FC = () => {
             <SectionHeader
               icon={<FaChartLine size={20} />}
               title="변화 리포트"
-              description="이번 학기 월별 등록 추이와 전월 대비 성장률을 분석하여 공동체의 양적 성장 흐름을 파악합니다."
+              description="선택하신 학기의 월별 등록 추이와 전월 대비 성장률을 분석하여 공동체의 양적 성장 흐름을 파악합니다."
               colorClass="bg-indigo-100 text-indigo-600"
             />
 

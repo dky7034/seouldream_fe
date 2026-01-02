@@ -2,8 +2,11 @@
 import React, { useMemo } from "react";
 import type { AggregatedTrendDto, AttendanceSummaryGroupBy } from "../../types";
 
+// ✅ [수정] 안전한 로컬 날짜 파싱 및 포맷팅
 const formatDateKorean = (dateStr: string) => {
-  const [y, m, d] = dateStr.split("-").map((v) => Number(v));
+  if (!dateStr) return "-";
+  // YYYY-MM-DD 형식만 처리
+  const [y, m, d] = dateStr.slice(0, 10).split("-").map(Number);
   if (!y || !m || !d) return dateStr;
   return `${y}년 ${m}월 ${d}일`;
 };
@@ -14,7 +17,17 @@ const formatDateGroupLabel = (
 ): string => {
   if (!raw) return raw;
 
+  // ✅ [수정] 학기 포맷팅 추가 (ex: "2025-1" -> "2025년 1학기")
   if (groupBy === "SEMESTER") {
+    const match = raw.match(/^(\d{4})-(\d{1})$/); // 혹은 백엔드 포맷에 맞게 조정
+    if (match) {
+      return `${match[1]}년 ${match[2]}학기`;
+    }
+    // "2025-1" 처럼 단순 하이픈 연결일 경우 대비
+    if (raw.includes("-")) {
+      const [y, s] = raw.split("-");
+      return `${y}년 ${s}학기`;
+    }
     return raw;
   }
 
@@ -97,6 +110,7 @@ const AttendanceTrend: React.FC<AttendanceTrendProps> = ({
 }) => {
   if (data.length === 0) return null;
 
+  // 그래프가 너무 길어지지 않게 최근 데이터만 보여줌 (일간/주간)
   const shouldLimitItems =
     selectedGroupBy === "DAY" || selectedGroupBy === "WEEK";
   const MAX_ITEMS = 12;
@@ -104,6 +118,7 @@ const AttendanceTrend: React.FC<AttendanceTrendProps> = ({
   const slicedData = useMemo(() => {
     const base = data.filter((item) => typeof item.attendanceRate === "number");
     if (!shouldLimitItems) return base;
+    // 최근 데이터가 뒤에 있다고 가정하고 뒤에서 자름 (Trend이므로)
     return base.length > MAX_ITEMS ? base.slice(-MAX_ITEMS) : base;
   }, [data, shouldLimitItems]);
 

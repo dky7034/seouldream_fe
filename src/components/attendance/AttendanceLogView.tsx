@@ -35,18 +35,17 @@ type UnitType = "month" | "semester";
  * Helpers (Timezone Safe Version)
  * ----------------------------- */
 
-const safeFormatDate = (
-  dateStr: string | null | undefined,
-  separator = "-"
-) => {
-  if (!dateStr) return "";
-  const targetStr =
-    dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
-  const date = new Date(targetStr);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
+const toDateKey = (d: Date | string) => {
+  const date = typeof d === "string" ? new Date(d) : d;
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
-  return `${year}${separator}${month}${separator}${day}`;
+  return `${y}-${m}-${day}`;
+};
+
+const parseLocal = (dateStr: string) => {
+  const [y, m, d] = dateStr.slice(0, 10).split("-").map(Number);
+  return new Date(y, m - 1, d);
 };
 
 const getAttendanceMemberId = (att: any): number | null => {
@@ -95,64 +94,62 @@ const AttendanceMatrixView: React.FC<{
   allMembers,
   userRole,
 }) => {
+  // 미체크(누락) 계산 로직 (Future Cap 적용)
   const uncheckedCount = useMemo(() => {
     if (!startDate || !endDate || members.length === 0) return 0;
 
-    const startStr = safeFormatDate(startDate, "-");
-    const endStr = safeFormatDate(endDate, "-");
-    const start = new Date(startStr);
-    const end = new Date(endStr);
-
-    // 🔹 [추가] 오늘 날짜 기준 설정 (미래 미체크 방지)
+    const start = parseLocal(startDate);
+    const end = parseLocal(endDate);
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
 
     start.setHours(0, 0, 0, 0);
     end.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
 
-    // 🔹 [수정] 종료일이 오늘보다 미래라면 오늘까지만 계산
+    // Future Cap
     const effectiveEnd = end > today ? today : end;
 
-    // 시작일조차 미래라면 미체크는 0
     if (start > effectiveEnd) return 0;
 
     const targetSundays: string[] = [];
     const cur = new Date(start);
 
-    // 🔹 [수정] end -> effectiveEnd
+    if (cur.getDay() !== 0) {
+      cur.setDate(cur.getDate() + (7 - cur.getDay()));
+    }
+
     while (cur <= effectiveEnd) {
-      if (cur.getDay() === 0) {
-        targetSundays.push(safeFormatDate(cur.toISOString(), "-"));
-      }
-      cur.setDate(cur.getDate() + 1);
+      targetSundays.push(toDateKey(cur));
+      cur.setDate(cur.getDate() + 7);
     }
 
     const attendanceSet = new Set<string>();
     for (const a of attendances) {
       const mId = getAttendanceMemberId(a);
-      const dateKey = safeFormatDate(a.date, "-");
+      const dateKey = toDateKey(a.date);
       if (mId === null || !dateKey) continue;
-      if (!["PRESENT", "ABSENT"].includes(a.status)) continue;
-      attendanceSet.add(`${mId}-${dateKey}`);
+      if (["PRESENT", "ABSENT"].includes(a.status)) {
+        attendanceSet.add(`${mId}-${dateKey}`);
+      }
     }
 
     let incompleteWeeks = 0;
     for (const sundayStr of targetSundays) {
-      const sundayDate = new Date(sundayStr);
-      sundayDate.setHours(0, 0, 0, 0);
+      const sundayDate = parseLocal(sundayStr);
 
       const activeMembers = members.filter((m) => {
         if (!m.cellAssignmentDate) return true;
-        const assignDate = new Date(m.cellAssignmentDate);
-        assignDate.setHours(0, 0, 0, 0);
+        const assignDate = parseLocal(m.cellAssignmentDate);
         return assignDate <= sundayDate;
       });
 
       if (activeMembers.length === 0) continue;
+
       const isWeekIncomplete = activeMembers.some((m) => {
         const key = `${m.id}-${sundayStr}`;
         return !attendanceSet.has(key);
       });
+
       if (isWeekIncomplete) incompleteWeeks++;
     }
     return incompleteWeeks;
@@ -165,6 +162,8 @@ const AttendanceMatrixView: React.FC<{
         return {
           memberId: m.id,
           memberName: found ? formatDisplayName(found, allMembers) : m.name,
+          cellAssignmentDate: m.cellAssignmentDate,
+          joinYear: m.joinYear,
         };
       }),
     [members, allMembers]
@@ -189,7 +188,7 @@ const AttendanceMatrixView: React.FC<{
               <p className="text-xs text-red-600 mt-0.5">
                 총{" "}
                 <strong className="font-extrabold">{uncheckedCount}개</strong>의
-                주일에 기록이 없습니다.
+                주일에 기록이 비어있습니다.
               </p>
             </div>
           </div>
@@ -280,10 +279,11 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
 
   const isDateInSemesterOrSameMonth = useCallback(
     (date: Date, semester: SemesterDto) => {
-      const start = new Date(semester.startDate);
-      const end = new Date(semester.endDate);
+      const start = parseLocal(semester.startDate);
+      const end = parseLocal(semester.endDate);
       const inRange = date >= start && date <= end;
       if (inRange) return true;
+
       return (
         (date.getFullYear() === end.getFullYear() &&
           date.getMonth() === end.getMonth()) ||
@@ -301,11 +301,13 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
 
   const semesterMonths = useMemo(() => {
     if (!selectedSemester) return [];
-    const start = new Date(selectedSemester.startDate);
-    const end = new Date(selectedSemester.endDate);
+    const start = parseLocal(selectedSemester.startDate);
+    const end = parseLocal(selectedSemester.endDate);
+
     const list: { year: number; month: number; label: string }[] = [];
     const cur = new Date(start.getFullYear(), start.getMonth(), 1);
     const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+
     while (cur <= endMonth) {
       list.push({
         year: cur.getFullYear(),
@@ -337,8 +339,12 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
 
   const fetchSemesters = useCallback(async () => {
     try {
+      // ✅ [수정] 셀 리더 전용: 활성 학기만 조회 (true)
       const data = await semesterService.getAllSemesters(true);
-      setSemesters(data ?? []);
+      const sorted = data.sort((a, b) =>
+        b.startDate.localeCompare(a.startDate)
+      );
+      setSemesters(sorted);
     } catch {
       setSemesters([]);
     }
@@ -347,6 +353,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
   useEffect(() => {
     if (semesters.length === 0 || isInitialized) return;
     const today = new Date();
+
     const currentSem = semesters.find((s) =>
       isDateInSemesterOrSameMonth(today, s)
     );
@@ -453,6 +460,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
     const today = new Date();
     const todayYear = today.getFullYear();
     const todayMonth = today.getMonth() + 1;
+
     if (type === "month") {
       if (semesterMonths.length > 0) {
         const isCurrentMonthInSemester = semesterMonths.some(
@@ -522,24 +530,26 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
     if (unitType === "semester") {
       const sem = semesters.find((s) => s.id === filters.semesterId);
       return {
-        sDate: safeFormatDate(sem?.startDate, "-"),
-        eDate: safeFormatDate(sem?.endDate, "-"),
+        sDate: sem?.startDate || "",
+        eDate: sem?.endDate || "",
       };
     }
     const y = filters.year;
     const m = filters.month;
     let startObj = new Date(y, m - 1, 1);
     let endObj = new Date(y, m, 0);
+
     if (selectedSemester) {
-      const semStart = new Date(selectedSemester.startDate);
-      const semEnd = new Date(selectedSemester.endDate);
+      const semStart = parseLocal(selectedSemester.startDate);
+      const semEnd = parseLocal(selectedSemester.endDate);
       if (semStart > startObj) startObj = semStart;
       if (semEnd < endObj) endObj = semEnd;
     }
     if (startObj > endObj) return { sDate: "", eDate: "" };
+
     return {
-      sDate: safeFormatDate(startObj.toISOString(), "-"),
-      eDate: safeFormatDate(endObj.toISOString(), "-"),
+      sDate: toDateKey(startObj),
+      eDate: toDateKey(endObj),
     };
   }, [filterMode, unitType, filters, semesters, selectedSemester]);
 
@@ -653,6 +663,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
                   >
                     {semesters.map((s) => (
                       <option key={s.id} value={s.id}>
+                        {/* ✅ [수정] 심플한 학기 이름만 표시 */}
                         {s.name}
                       </option>
                     ))}

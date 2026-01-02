@@ -1,3 +1,4 @@
+// src/pages/CellLeaderDashboard.tsx
 import React, {
   useState,
   useEffect,
@@ -5,7 +6,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import { useNavigate } from "react-router-dom"; // ✅ [추가] 페이지 이동을 위한 훅
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { cellService } from "../services/cellService";
 import { attendanceService } from "../services/attendanceService";
@@ -110,7 +111,9 @@ const calculateMemberStats = (
 
   if (!pStart || !pEnd) return { present: 0, absent: 0, unchecked: 0 };
 
+  // Future Cap: 미래 날짜는 통계에서 제외
   const effectiveEnd = pEnd < today ? pEnd : today;
+
   const baseDateStr = normalizeISODate(
     member.cellAssignmentDate || `${member.joinYear}-01-01`
   );
@@ -229,7 +232,6 @@ const CellMemberList: React.FC<{
   displayNameMap: Map<number, string>;
 }> = React.memo(
   ({ members, attendances, startDate, endDate, displayNameMap }) => {
-    // ✅ [추가] 상세 페이지 이동을 위한 네비게이션 훅
     const navigate = useNavigate();
 
     const sortedMembers = useMemo(
@@ -271,7 +273,6 @@ const CellMemberList: React.FC<{
       return statsMap;
     }, [sortedMembers, attendanceMap, startDate, endDate]);
 
-    // ✅ [추가] 멤버 클릭 핸들러
     const handleMemberClick = (memberId: number) => {
       navigate(`/admin/users/${memberId}`);
     };
@@ -287,7 +288,6 @@ const CellMemberList: React.FC<{
     const formatGender = (gender: "MALE" | "FEMALE") =>
       gender === "MALE" ? "남" : "여";
 
-    // ✅ [신규] 모바일용 카드 아이템 컴포넌트
     const MobileMemberCard = ({
       member,
     }: {
@@ -303,7 +303,6 @@ const CellMemberList: React.FC<{
 
       return (
         <div
-          // ✅ [수정] 클릭 이벤트 및 커서 추가
           onClick={() => handleMemberClick(member.memberId)}
           className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-3 cursor-pointer hover:bg-gray-50 transition-colors"
         >
@@ -370,7 +369,6 @@ const CellMemberList: React.FC<{
 
     return (
       <div className="mt-6">
-        {/* 헤더 영역 */}
         <div className="flex items-center justify-between mb-3 px-1">
           <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
             <FaUsers className="text-indigo-500" />
@@ -381,14 +379,14 @@ const CellMemberList: React.FC<{
           </span>
         </div>
 
-        {/* 1. 모바일 뷰 (sm 미만에서만 보임) */}
+        {/* 1. 모바일 뷰 */}
         <div className="flex flex-col gap-3 sm:hidden">
           {sortedMembers.map((m) => (
             <MobileMemberCard key={m.memberId} member={m} />
           ))}
         </div>
 
-        {/* 2. 데스크탑 뷰 (sm 이상에서만 보임 - 기존 테이블) */}
+        {/* 2. 데스크탑 뷰 */}
         <div className="hidden sm:block border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
@@ -427,7 +425,6 @@ const CellMemberList: React.FC<{
                   return (
                     <tr
                       key={m.memberId}
-                      // ✅ [수정] 클릭 이벤트 및 커서 추가
                       onClick={() => handleMemberClick(m.memberId)}
                       className="hover:bg-gray-50/80 transition-colors cursor-pointer"
                     >
@@ -489,7 +486,7 @@ const CellLeaderDashboard: React.FC = () => {
   const [members, setMembers] = useState<CellMemberAttendanceSummaryDto[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
 
-  // [최적화] 동명이인 처리를 위한 맵 (ID -> 포맷팅된 이름)
+  // 동명이인 처리를 위한 맵
   const [displayNameMap, setDisplayNameMap] = useState<Map<number, string>>(
     new Map()
   );
@@ -516,11 +513,12 @@ const CellLeaderDashboard: React.FC = () => {
   const monthButtonsContainerRef = useRef<HTMLDivElement | null>(null);
   const monthButtonRefs = useRef<Record<number, HTMLButtonElement | null>>({});
 
-  // 1) 학기 로딩
+  // 1) 학기 로딩 (활성 학기만)
   useEffect(() => {
     const loadSemesters = async () => {
       try {
         const data = await semesterService.getAllSemesters(true);
+        // ✅ 최신순 정렬 (내림차순)
         const sortedData = [...data].sort(
           (a, b) =>
             new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
@@ -542,7 +540,7 @@ const CellLeaderDashboard: React.FC = () => {
     loadSemesters();
   }, []);
 
-  // [최적화] 전체 멤버 목록 로딩 및 Map 생성 (한 번만 실행)
+  // 전체 멤버 목록 로딩 및 Map 생성
   useEffect(() => {
     if (!user) return;
     const fetchAllMembersAndBuildMap = async () => {
@@ -553,11 +551,9 @@ const CellLeaderDashboard: React.FC = () => {
           sort: "id,asc",
         });
 
-        // 데이터를 받자마자 Map으로 변환
         const allList = res.content;
         const map = new Map<number, string>();
 
-        // 동명이인 포맷팅을 여기서 일괄 처리
         allList.forEach((m) => {
           const formattedName = formatDisplayName(
             { id: m.id, name: m.name, birthDate: m.birthDate },
@@ -662,9 +658,16 @@ const CellLeaderDashboard: React.FC = () => {
         endDate: periodRange.endDate,
       });
       setDashboardSummary(summary as CellLeaderDashboardDto);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError("데이터 로딩 실패");
+      if (
+        err.response?.status === 403 &&
+        err.response?.data?.code === "ACCESS_001"
+      ) {
+        setError("행정이 마감되어 조회할 수 없는 기간입니다.");
+      } else {
+        setError("데이터를 불러오는 중 오류가 발생했습니다.");
+      }
     } finally {
       setLoading(false);
     }
@@ -863,7 +866,6 @@ const CellLeaderDashboard: React.FC = () => {
     return months;
   }, [activeSemester]);
 
-  // ✅ [수정] 실제 출석 체크 누락 횟수 계산 (미래 날짜 제외 적용)
   const realIncompleteCheckCount = useMemo(() => {
     if (!periodRange.startDate || !periodRange.endDate) return 0;
     if (!members || members.length === 0) return 0;
@@ -872,7 +874,6 @@ const CellLeaderDashboard: React.FC = () => {
     const end = parseLocal(periodRange.endDate);
     if (!start || !end || start > end) return 0;
 
-    // 🔸 [추가] 오늘 날짜 기준 (시간 초기화)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -882,22 +883,19 @@ const CellLeaderDashboard: React.FC = () => {
     const endCopy = new Date(end);
     endCopy.setHours(0, 0, 0, 0);
 
-    // 🔸 [수정] 종료일이 오늘보다 미래라면 오늘까지만 검사
+    // Future Cap: 종료일이 오늘보다 미래라면 오늘까지만 검사
     const effectiveEnd = endCopy > today ? today : endCopy;
 
-    // 시작일조차 미래라면 누락 0
     if (cur > effectiveEnd) return 0;
 
     const sundays: string[] = [];
 
-    // 🔸 [수정] endCopy -> effectiveEnd
     while (cur <= effectiveEnd) {
       if (cur.getDay() === 0) sundays.push(toLocalISODate(cur));
       cur.setDate(cur.getDate() + 1);
     }
     if (sundays.length === 0) return 0;
 
-    // 2. 출석 데이터를 Set으로 변환
     const attendanceSet = new Set<string>();
     for (const att of matrixAttendances) {
       const mId = getAttendanceMemberId(att);
@@ -933,7 +931,6 @@ const CellLeaderDashboard: React.FC = () => {
     return incompleteWeeks;
   }, [periodRange.startDate, periodRange.endDate, members, matrixAttendances]);
 
-  // Render
   if (!user) return <div className="p-4">로그인 정보가 없습니다.</div>;
 
   if (user && !user.cellId) {

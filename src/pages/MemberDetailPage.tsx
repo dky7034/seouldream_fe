@@ -75,16 +75,16 @@ const displayValue = (val: string | number | null | undefined) => {
   return val;
 };
 
-// ✅ 출석률 색상 헬퍼 (AdminUsersPage와 통일)
-const getRateColorClass = (rate: number | undefined | null) => {
-  if (rate === undefined || rate === null) return "bg-gray-100 text-gray-500";
-  if (rate >= 80) return "bg-green-100 text-green-700 border-green-200";
-  if (rate >= 50) return "bg-indigo-100 text-indigo-700 border-indigo-200";
-  return "bg-red-100 text-red-700 border-red-200";
-};
+// ✅ 출석률 색상 헬퍼
+// const getRateColorClass = (rate: number | undefined | null) => {
+//   if (rate === undefined || rate === null) return "bg-gray-100 text-gray-500";
+//   if (rate >= 80) return "bg-green-100 text-green-700 border-green-200";
+//   if (rate >= 50) return "bg-indigo-100 text-indigo-700 border-indigo-200";
+//   return "bg-red-100 text-red-700 border-red-200";
+// };
 
 // ─────────────────────────────────────────────────────────────
-// [Components] UI Cards
+// [Components] UI Cards (기존과 동일)
 // ─────────────────────────────────────────────────────────────
 
 const InfoRow: React.FC<{
@@ -457,8 +457,9 @@ const AttendanceSummaryCard: React.FC<{
                   className="bg-transparent text-gray-700 font-bold text-sm focus:outline-none cursor-pointer w-full sm:min-w-[140px]"
                 >
                   {semesters.map((s) => (
+                    // ✅ [수정] 학기 상태 표시 (진행중/마감됨)
                     <option key={s.id} value={s.id}>
-                      {s.name}
+                      {s.name} {s.isActive ? "(진행중)" : "(마감됨)"}
                     </option>
                   ))}
                 </select>
@@ -516,7 +517,7 @@ const AttendanceSummaryCard: React.FC<{
             {isExecutive && (
               <div className="p-5 bg-gradient-to-br from-indigo-50 to-white rounded-2xl border border-indigo-100 shadow-sm text-center">
                 <p className="text-xs font-bold text-indigo-600 uppercase tracking-wide">
-                  출석률
+                  {activeSemester?.name || "기간"} 출석률
                 </p>
                 <p className="mt-1 text-4xl font-extrabold text-indigo-700">
                   {totalSummary.attendanceRate.toFixed(0)}
@@ -760,7 +761,9 @@ const MemberDetailPage: React.FC = () => {
   useEffect(() => {
     const loadSemesters = async () => {
       try {
-        const data = await semesterService.getAllSemesters(true);
+        // ✅ [수정] 모든 학기 조회 (true 제거)
+        // 이유: 멤버의 과거 활동 이력을 조회할 수 있어야 함 (Inactive 학기 포함)
+        const data = await semesterService.getAllSemesters();
         const sortedData = data.sort(
           (a, b) =>
             new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
@@ -1016,10 +1019,11 @@ const MemberDetailPage: React.FC = () => {
 
   const isExecutive = user?.role === "EXECUTIVE";
 
-  // ✅ [Header] 출석률 표시 준비
-  const hasAttendanceRate =
-    member.attendanceRate !== undefined && member.attendanceRate !== null;
-  const rateColorClass = getRateColorClass(member.attendanceRate);
+  // ✅ [Header] 출석률 표시 준비 (헤더에서는 제거하거나, 아래 카드와 연동되는지 확인 필요)
+  // 현재 정책상 헤더에는 '현재 상태'만 보여주는 것이 깔끔하므로 일단 숨김 처리 또는 '올해' 기준임을 명시
+  // const hasAttendanceRate =
+  //   member.attendanceRate !== undefined && member.attendanceRate !== null;
+  // const rateColorClass = getRateColorClass(member.attendanceRate);
 
   return (
     <div className="bg-gray-50 min-h-screen pb-20">
@@ -1034,14 +1038,6 @@ const MemberDetailPage: React.FC = () => {
                   상세 정보
                 </span>
               </h1>
-              {/* ✅ [추가] 임원에게만 보이는 출석률 뱃지 (데이터가 null이면 안 보임) */}
-              {hasAttendanceRate && (
-                <span
-                  className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${rateColorClass}`}
-                >
-                  출석률 {member.attendanceRate!.toFixed(0)}%
-                </span>
-              )}
             </div>
           </div>
           <div className="flex gap-2 w-full sm:w-auto">
