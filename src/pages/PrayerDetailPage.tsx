@@ -304,7 +304,7 @@ const PrayerDetailPage: React.FC = () => {
             </h2>
             <p className="text-sm text-gray-600 mb-6 leading-relaxed break-keep">
               정말로 이 기도제목을 삭제하시겠습니까?
-              <br className="hidden sm:block" /> 복구할 수 없는 작업입니다.
+              <br className="hidden sm:block" />
             </p>
 
             {deleteError && (

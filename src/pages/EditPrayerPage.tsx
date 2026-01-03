@@ -8,6 +8,8 @@ import type {
 } from "../types";
 import { useAuth } from "../hooks/useAuth";
 import { format } from "date-fns";
+// ✅ KoreanCalendarPicker import
+import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
 
 const EditPrayerPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -22,7 +24,7 @@ const EditPrayerPage: React.FC = () => {
   const [formData, setFormData] = useState<UpdatePrayerRequest>({});
   const [formErrors, setFormErrors] = useState<PrayerFormErrors>({});
 
-  // ✅ 표시용이 아닌 '수정용' State로 변경
+  // 수정용 날짜 State
   const [selectedDate, setSelectedDate] = useState<string>("");
 
   useEffect(() => {
@@ -57,8 +59,7 @@ const EditPrayerPage: React.FC = () => {
           visibility: prayerData.visibility,
         });
 
-        // ✅ [수정] meetingDate를 초기값으로 설정 (없으면 createdAt Fallback)
-        // 백엔드에서 meetingDate는 YYYY-MM-DD 스트링으로 옴
+        // meetingDate를 초기값으로 설정 (없으면 createdAt Fallback)
         setSelectedDate(
           prayerData.meetingDate ||
             format(new Date(prayerData.createdAt), "yyyy-MM-dd")
@@ -89,7 +90,6 @@ const EditPrayerPage: React.FC = () => {
     if (!formData.content?.trim()) {
       newErrors.content = "기도제목 내용은 필수입니다.";
     }
-    // 날짜 필수 체크
     if (!selectedDate) {
       newErrors.createdAt = "날짜는 필수입니다.";
     }
@@ -111,7 +111,7 @@ const EditPrayerPage: React.FC = () => {
     try {
       const payload: UpdatePrayerRequest = {
         ...formData,
-        meetingDate: selectedDate, // ✅ [수정] 수정된 날짜 전송
+        meetingDate: selectedDate, // 수정된 날짜 전송
       };
 
       await prayerService.updatePrayer(prayer.id, payload);
@@ -168,23 +168,25 @@ const EditPrayerPage: React.FC = () => {
           />
         </div>
 
-        {/* ✅ [수정] 날짜 수정 가능하도록 변경 */}
+        {/* ✅ 모임 날짜 (KoreanCalendarPicker 적용) */}
         <div>
           <label className="block text-sm font-medium text-gray-700">
-            모임(기도) 날짜 <span className="text-red-500">*</span>
+            모임(기도제목 작성) 날짜 <span className="text-red-500">*</span>
           </label>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-          />
+          <div className="mt-1">
+            <KoreanCalendarPicker
+              value={selectedDate}
+              onChange={setSelectedDate}
+              placeholder="날짜를 선택하세요"
+              // 필요하다면 미래 날짜 선택 방지: maxDate={new Date()}
+            />
+          </div>
           {formErrors.createdAt && (
             <p className="mt-1 text-sm text-red-600">{formErrors.createdAt}</p>
           )}
-          <p className="mt-1 text-xs text-gray-500">
+          {/* <p className="mt-1 text-xs text-gray-500">
             실제 셀모임을 진행한 날짜로 수정할 수 있습니다.
-          </p>
+          </p> */}
         </div>
 
         {/* 기도제목 내용 */}

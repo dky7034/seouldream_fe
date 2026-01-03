@@ -959,7 +959,7 @@ const AdminAttendancesPage: React.FC = () => {
                         학기 선택
                       </label>
                       <span className="text-[10px] text-gray-400 font-normal sm:hidden">
-                        좌우로 스크롤하여 선택
+                        좌우로 스크롤
                       </span>
                     </div>
 

@@ -272,24 +272,12 @@ const CellPrayersPage: React.FC = () => {
   // ✅ 렌더링
   // ─────────────────────────────────────────────────────────────
 
+  // ✅ [수정] 복잡한 Suffix 제거 -> 깔끔한 제목만 반환
   const titleText = useMemo(() => {
-    const base =
-      cellName != null ? `${cellName} 기도제목` : `셀 ID ${cellId} 기도제목`;
-
-    let rangeSuffix = "";
-    if (filterType === "week") rangeSuffix = " (이번 주)";
-    else if (filterType === "all") rangeSuffix = " (전체 기간)";
-    else if (filterType === "unit") {
-      if (unitType === "month") rangeSuffix = ` (${filters.month}월)`;
-      if (unitType === "semester") {
-        const sem = semesters.find((s) => s.id === filters.semesterId);
-        rangeSuffix = sem ? ` (${sem.name})` : " (학기별)";
-      }
-      if (unitType === "year") rangeSuffix = ` (${filters.year}년)`;
-    } else if (filterType === "range") rangeSuffix = " (지정 기간)";
-
-    return base + rangeSuffix;
-  }, [cellName, cellId, filterType, unitType, filters, semesters]);
+    return cellName != null
+      ? `${cellName} 기도제목`
+      : `셀 ID ${cellId} 기도제목`;
+  }, [cellName, cellId]);
 
   if (!user)
     return (
@@ -365,8 +353,8 @@ const CellPrayersPage: React.FC = () => {
             {(filterType === "week" || filterType === "all") && (
               <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-xl border border-gray-100 text-center">
                 {filterType === "week"
-                  ? "이번 주(일~토)에 등록된 기도제목을 조회합니다."
-                  : "기간 제한 없이 모든 기도제목을 조회합니다."}
+                  ? "이번 주(일~토)에 등록된 기도제목 조회"
+                  : "전체 기간의 모든 기도제목 조회"}
               </p>
             )}
 

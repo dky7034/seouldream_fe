@@ -309,7 +309,7 @@ const AttendanceAlertsPage: React.FC = () => {
                   ) : (
                     <>
                       <div className="sm:hidden mb-1 text-[10px] text-gray-400 font-normal text-right">
-                        좌우로 스크롤하여 선택
+                        좌우로 스크롤
                       </div>
                       <div
                         className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap scrollbar-hide"

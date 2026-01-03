@@ -245,34 +245,25 @@ const MemberPrayersPage: React.FC = () => {
   }, [fetchPrayers]);
 
   const displayTitle = useMemo(() => {
+    // 1. 이름 찾기 로직은 그대로 유지
     let namePart = `멤버 ID ${memberId}`;
+
+    // memberMap(전체 목록)에서 이름 찾기
     if (memberId && memberMap.has(Number(memberId))) {
       namePart = memberMap.get(Number(memberId))!;
-    } else if (targetMemberName) {
+    }
+    // 혹은 API 응답 결과에서 이름 가져오기 (fallback)
+    else if (targetMemberName) {
       namePart = targetMemberName;
     }
 
-    let rangeSuffix = "";
-    if (filterType === "week") rangeSuffix = " (이번 주)";
-    else if (filterType === "all") rangeSuffix = " (전체 기간)";
-    else if (filterType === "unit") {
-      if (unitType === "month") rangeSuffix = ` (${filters.month}월)`;
-      if (unitType === "semester") {
-        const sem = semesters.find((s) => s.id === filters.semesterId);
-        rangeSuffix = sem ? ` (${sem.name})` : " (학기별)";
-      }
-      if (unitType === "year") rangeSuffix = ` (${filters.year}년)`;
-    } else if (filterType === "range") rangeSuffix = " (지정 기간)";
-
-    return `${namePart}님의 기도제목${rangeSuffix}`;
+    // 2. 기간(Suffix) 붙이는 로직 제거 -> 깔끔하게 이름만 반환
+    return `${namePart}님의 기도제목`;
   }, [
     memberId,
     memberMap,
     targetMemberName,
-    filterType,
-    unitType,
-    filters,
-    semesters,
+    // filterType, unitType, filters, semesters -> 이제 의존성 불필요
   ]);
 
   if (!user)
@@ -349,8 +340,8 @@ const MemberPrayersPage: React.FC = () => {
             {(filterType === "week" || filterType === "all") && (
               <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-xl border border-gray-100 text-center">
                 {filterType === "week"
-                  ? "이번 주(일~토)에 등록된 기도제목을 조회합니다."
-                  : "기간 제한 없이 모든 기도제목을 조회합니다."}
+                  ? "이번 주(일~토)에 등록된 기도제목 조회"
+                  : "전체 기간의 모든 기도제목 조회"}
               </p>
             )}
 
