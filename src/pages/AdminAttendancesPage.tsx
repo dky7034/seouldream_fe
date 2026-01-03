@@ -449,6 +449,16 @@ const AdminAttendancesPage: React.FC = () => {
   const isExecutive = useMemo(() => user?.role === "EXECUTIVE", [user]);
   const isCellLeader = useMemo(() => user?.role === "CELL_LEADER", [user]);
 
+  // ✅ [추가] 1. availableYears와 현재 filters.year 불일치 시 자동 보정
+  useEffect(() => {
+    if (availableYears.length > 0 && filters.year) {
+      if (!availableYears.includes(filters.year as number)) {
+        // 목록에 없는 연도라면 가장 최신 연도(index 0)로 강제 변경
+        setFilters((prev) => ({ ...prev, year: availableYears[0] }));
+      }
+    }
+  }, [availableYears, filters.year]);
+
   useEffect(() => {
     if (semesters.length > 0 && !hasAutoSelectedSemester) {
       const today = new Date();
@@ -620,7 +630,8 @@ const AdminAttendancesPage: React.FC = () => {
     if (user && ["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
       attendanceService
         .getAvailableYears()
-        .then(setAvailableYears)
+        // ✅ [추가] 2. 연도 목록 정렬 (큰 숫자 = 최신 연도 순)
+        .then((data) => setAvailableYears(data.sort((a, b) => b - a)))
         .catch(() => setAvailableYears([]));
 
       semesterService
@@ -669,12 +680,23 @@ const AdminAttendancesPage: React.FC = () => {
     setUnitType("year");
   };
 
+  // ✅ [수정] 3. 학기 -> 연간/월간 전환 시 해당 학기의 연도를 유지하도록 로직 개선
   const handleUnitTypeClick = useCallback(
     (type: UnitType) => {
       setUnitType(type);
       setFilters((prev) => {
-        const baseYear =
-          typeof prev.year === "number" ? prev.year : currentYear;
+        let baseYear = typeof prev.year === "number" ? prev.year : currentYear;
+
+        // 학기 모드에서 다른 모드로 갈 때, 선택된 학기의 연도를 가져옴
+        if (unitType === "semester" && prev.semesterId) {
+          const currentSemester = semesters.find(
+            (s) => s.id === prev.semesterId
+          );
+          if (currentSemester) {
+            baseYear = new Date(currentSemester.startDate).getFullYear();
+          }
+        }
+
         const next: Filters = { ...prev };
         if (type === "year") {
           next.year = baseYear || currentYear;
@@ -704,7 +726,7 @@ const AdminAttendancesPage: React.FC = () => {
         return next;
       });
     },
-    [semesters, currentYear, currentMonth]
+    [semesters, currentYear, currentMonth, unitType]
   );
 
   const handleUnitValueClick = (value: number) => {
@@ -796,7 +818,7 @@ const AdminAttendancesPage: React.FC = () => {
 
         {/* Filter Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6">
-          {/* 1. 제목 영역 (justify-between 제거 및 단독 배치) */}
+          {/* 1. 제목 영역 */}
           <div className="flex items-center gap-2 mb-4">
             <FunnelIcon className="h-5 w-5 text-gray-400" />
             <h3 className="font-bold text-gray-700 whitespace-nowrap">
@@ -804,7 +826,7 @@ const AdminAttendancesPage: React.FC = () => {
             </h3>
           </div>
 
-          {/* 2. 모드 변경 버튼 (제목 아래로 이동 & 가로 꽉 채움) */}
+          {/* 2. 모드 변경 버튼 */}
           <div className="bg-gray-100 p-1 rounded-xl flex text-xs sm:text-sm font-bold mb-5">
             <button
               onClick={() => setFilterType("unit")}
@@ -887,7 +909,6 @@ const AdminAttendancesPage: React.FC = () => {
                     <label className="text-xs font-bold text-gray-500 mb-1 block">
                       조회 단위
                     </label>
-                    {/* ✅ [수정] whitespace-nowrap 추가: 버튼 글자 꺾임 방지 */}
                     <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => handleUnitTypeClick("month")}

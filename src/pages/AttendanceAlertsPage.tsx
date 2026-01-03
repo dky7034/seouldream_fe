@@ -49,6 +49,16 @@ const AttendanceAlertsPage: React.FC = () => {
   const [selectedSemesterId, setSelectedSemesterId] = useState<number | "">("");
   const [hasAutoSelectedSemester, setHasAutoSelectedSemester] = useState(false);
 
+  // ✅ [추가] 1. availableYears와 현재 selectedYear 불일치 시 자동 보정
+  useEffect(() => {
+    if (availableYears.length > 0 && selectedYear) {
+      if (!availableYears.includes(selectedYear)) {
+        // 목록에 없는 연도라면 가장 최신 연도(index 0)로 강제 변경
+        setSelectedYear(availableYears[0]);
+      }
+    }
+  }, [availableYears, selectedYear]);
+
   // 날짜 포맷터
   const safeFormatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return "-";
@@ -78,7 +88,9 @@ const AttendanceAlertsPage: React.FC = () => {
 
   const fetchAvailableYears = useCallback(async () => {
     try {
-      setAvailableYears(await attendanceService.getAvailableYears());
+      // ✅ [수정] 2. 연도 목록 정렬 (최신순)
+      const years = await attendanceService.getAvailableYears();
+      setAvailableYears(years.sort((a, b) => b - a));
     } catch (err) {
       console.error(err);
       setAvailableYears([new Date().getFullYear()]);
@@ -205,14 +217,47 @@ const AttendanceAlertsPage: React.FC = () => {
     selectedYear,
   ]);
 
-  // 핸들러
+  // ✅ [수정] 3. 학기 -> 연도 전환 시, 학기의 연도를 가져와서 설정
   const handleUnitTypeClick = (type: UnitType) => {
     setUnitType(type);
-    if (type === "year" && !selectedYear)
-      setSelectedYear(
-        availableYears.length > 0 ? availableYears[0] : new Date().getFullYear()
-      );
+
+    if (type === "year") {
+      let targetYear = selectedYear;
+
+      // 학기 모드에서 왔다면 해당 학기의 시작 연도 추출
+      if (unitType === "semester" && selectedSemesterId) {
+        const currentSemester = semesters.find(
+          (s) => s.id === selectedSemesterId
+        );
+        if (currentSemester) {
+          targetYear = new Date(currentSemester.startDate).getFullYear();
+        }
+      }
+
+      // 만약 targetYear가 availableYears에 없다면 최신 연도로 (보정)
+      if (availableYears.length > 0 && !availableYears.includes(targetYear)) {
+        targetYear = availableYears[0];
+      }
+
+      setSelectedYear(targetYear);
+    } else {
+      // 연도 -> 학기: 가장 최신 학기 또는 현재 날짜 기준 학기 선택
+      if (semesters.length > 0 && !selectedSemesterId) {
+        const now = new Date();
+        const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
+          2,
+          "0"
+        )}`;
+        let target = semesters.find(
+          (s) =>
+            s.startDate.substring(0, 7) <= ym && s.endDate.substring(0, 7) >= ym
+        );
+        if (!target) target = semesters[0];
+        setSelectedSemesterId(target.id);
+      }
+    }
   };
+
   const handleSearchClick = () => void fetchAlerts();
   const handleBlur = () => {
     if (Number(consecutiveAbsences) < 1) setConsecutiveAbsences("3");
@@ -373,7 +418,7 @@ const AttendanceAlertsPage: React.FC = () => {
               <button
                 onClick={handleSearchClick}
                 disabled={loading}
-                className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50 shadow-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] whitespace-nowrap"
+                className="w-full sm:w-auto bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50 shadow-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] whitespace-nowrap"
               >
                 {loading ? (
                   <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />

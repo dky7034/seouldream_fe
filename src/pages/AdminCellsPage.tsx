@@ -42,15 +42,15 @@ type Filters = {
   active: "all" | "true" | "false";
   startDate: string;
   endDate: string;
-  year: number | "";
+  year: number;
   month: number | "";
   semesterId: number | "";
 };
 
-// 스크롤바 숨김 스타일 (인라인 적용용)
+// 스크롤바 숨김 스타일
 const scrollbarHideStyle: React.CSSProperties = {
-  msOverflowStyle: "none" /* IE and Edge */,
-  scrollbarWidth: "none" /* Firefox */,
+  msOverflowStyle: "none",
+  scrollbarWidth: "none",
 };
 
 const AdminCellsPage: React.FC = () => {
@@ -83,17 +83,19 @@ const AdminCellsPage: React.FC = () => {
   );
   const debouncedSearchName = useDebounce(localSearchName, 500);
 
-  // 필터 상태
+  // 필터 상태 초기화
   const [filters, setFilters] = useState<Filters>(() => {
     const name = searchParams.get("name") || "";
     const active = (searchParams.get("active") as Filters["active"]) || "all";
     const startDate = searchParams.get("startDate") || "";
     const endDate = searchParams.get("endDate") || "";
+
     const yearParam = searchParams.get("year");
     const monthParam = searchParams.get("month");
     const semesterIdParam = searchParams.get("semesterId");
 
-    let initialYear: number | "" = "";
+    // 초기값: 파라미터 없으면 현재 연도 (나중에 useEffect로 보정됨)
+    let initialYear = new Date().getFullYear();
     if (yearParam && yearParam !== "all") {
       const parsed = Number(yearParam);
       if (!isNaN(parsed)) initialYear = parsed;
@@ -199,13 +201,18 @@ const AdminCellsPage: React.FC = () => {
     if (urlUnitType) setUnitType(urlUnitType);
     if (urlFilterType) setFilterType(urlFilterType);
 
+    const yearParam = searchParams.get("year");
+    const currentYear = yearParam
+      ? Number(yearParam)
+      : new Date().getFullYear();
+
     setFilters((prev) => ({
       ...prev,
       name: searchParams.get("name") || "",
       active: (searchParams.get("active") as Filters["active"]) || "all",
       startDate: searchParams.get("startDate") || "",
       endDate: searchParams.get("endDate") || "",
-      year: searchParams.get("year") ? Number(searchParams.get("year")) : "",
+      year: currentYear,
       month: searchParams.get("month") ? Number(searchParams.get("month")) : "",
       semesterId: searchParams.get("semesterId")
         ? Number(searchParams.get("semesterId"))
@@ -213,14 +220,28 @@ const AdminCellsPage: React.FC = () => {
     }));
   }, [searchParams]);
 
+  // ✅ [핵심 수정] 연도 목록(availableYears) 로드 시, 현재 선택된 연도가 목록에 없으면 자동으로 맞춰줌
+  useEffect(() => {
+    if (availableYears.length > 0 && filters.year) {
+      // 예: 선택된 연도가 2026인데, 목록에는 [2025, 2024]만 있는 경우
+      if (!availableYears.includes(filters.year)) {
+        // 목록의 첫 번째(가장 최신) 연도인 2025로 강제 변경 -> 데이터 재요청됨
+        updateQueryParams({ year: availableYears[0] });
+      }
+    }
+  }, [availableYears, filters.year, updateQueryParams]);
+
   const fetchAvailableYears = useCallback(async () => {
     try {
       const years = await cellService.getAvailableYears();
-      setAvailableYears(
-        years.length === 0
-          ? [new Date().getFullYear()]
-          : years.sort((a, b) => b - a)
-      );
+
+      // 강제로 올해를 넣지 말고, 서버가 준 연도 목록만 사용합니다.
+      if (years && years.length > 0) {
+        setAvailableYears(years.sort((a, b) => b - a));
+      } else {
+        // 데이터가 정말 아예 없는 초기 상태라면 '올해' 하나만 보여줍니다.
+        setAvailableYears([new Date().getFullYear()]);
+      }
     } catch (err) {
       setAvailableYears([new Date().getFullYear()]);
     }
@@ -244,30 +265,61 @@ const AdminCellsPage: React.FC = () => {
     startDate: string;
     endDate: string;
   } | null => {
+    let startStr = "";
+    let endStr = "";
+
+    // 1. 기간 직접 설정 (CalendarPicker)
     if (filterType === "range") {
       if (!filters.startDate || !filters.endDate) return null;
-      return { startDate: filters.startDate, endDate: filters.endDate };
+      startStr = filters.startDate;
+      endStr = filters.endDate;
     }
-    if (filters.semesterId) {
+    // 2. 학기 선택
+    else if (filters.semesterId) {
       const semester = semesters.find((s) => s.id === filters.semesterId);
-      if (semester)
-        return { startDate: semester.startDate, endDate: semester.endDate };
+      if (semester) {
+        startStr = semester.startDate;
+        endStr = semester.endDate;
+      }
+    }
+    // 3. 연도/월 단위 선택
+    else {
+      const year = filters.year;
+      const { month } = filters;
+
+      if (month) {
+        // 월간
+        const m = month as number;
+        const last = lastDayOfMonth(year, m);
+        startStr = `${year}-${pad(m)}-01`;
+        endStr = `${year}-${pad(m)}-${pad(last)}`;
+      } else {
+        // 연간
+        const last = lastDayOfMonth(year, 12);
+        startStr = `${year}-01-01`;
+        endStr = `${year}-12-${pad(last)}`;
+      }
     }
 
-    const year = filters.year ? Number(filters.year) : undefined;
-    if (!year) return null;
+    // -----------------------------------------------------------------------
+    // ✅ [핵심 수정] 미래 날짜 제한 로직
+    // -----------------------------------------------------------------------
+    if (startStr && endStr) {
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${pad(
+        today.getMonth() + 1
+      )}-${pad(today.getDate())}`;
 
-    const { month } = filters;
-    if (month) {
-      const m = month as number;
-      const last = lastDayOfMonth(year, m);
-      return {
-        startDate: `${year}-${pad(m)}-01`,
-        endDate: `${year}-${pad(m)}-${pad(last)}`,
-      };
+      // 종료일이 오늘보다 미래라면 '오늘'로 제한 (출석률 계산 분모 정상화)
+      if (endStr > todayStr && startStr <= todayStr) {
+        endStr = todayStr;
+      }
     }
-    const last = lastDayOfMonth(year, 12);
-    return { startDate: `${year}-01-01`, endDate: `${year}-12-${pad(last)}` };
+
+    // 수정된 최종 기간 확인용 로그
+    console.log("최종 서버 요청 기간:", startStr, "~", endStr);
+
+    return { startDate: startStr, endDate: endStr };
   }, [filterType, filters, semesters]);
 
   const fetchCells = useCallback(async () => {
@@ -375,7 +427,7 @@ const AdminCellsPage: React.FC = () => {
       updateQueryParams({
         unitType: "semester",
         semesterId: target.id,
-        year: "",
+        year: now.getFullYear(),
         month: "",
         active: "all",
       });
@@ -435,6 +487,7 @@ const AdminCellsPage: React.FC = () => {
 
   const handleFilterChange = (field: keyof Filters, value: any) =>
     updateQueryParams({ [field]: value });
+
   const handleSemesterClick = (id: number) =>
     updateQueryParams({ semesterId: filters.semesterId === id ? "" : id });
 
@@ -453,7 +506,6 @@ const AdminCellsPage: React.FC = () => {
       updates.month = filters.month || now.getMonth() + 1;
       updates.semesterId = "";
     } else if (type === "semester") {
-      updates.year = "";
       updates.month = "";
       if (semesters.length > 0 && !filters.semesterId)
         updates.semesterId = semesters[0].id;
@@ -471,9 +523,7 @@ const AdminCellsPage: React.FC = () => {
     return sortConfig.direction === "ascending" ? " ▲" : " ▼";
   };
 
-  // ✅ 모바일 최적화된 렌더링 함수
   const renderUnitButtons = () => {
-    // 1. 월 선택 (그리드 유지, 모바일 터치 최적화)
     if (unitType === "month") {
       return (
         <div className="pt-3 border-t border-gray-200/50 mt-3 animate-fadeIn">
@@ -499,7 +549,6 @@ const AdminCellsPage: React.FC = () => {
       );
     }
 
-    // 2. 학기 선택 (가로 스크롤 칩 UI 적용)
     if (unitType === "semester") {
       if (semesters.length === 0)
         return (
@@ -516,7 +565,6 @@ const AdminCellsPage: React.FC = () => {
             </span>
           </div>
 
-          {/* 가로 스크롤 컨테이너: -mx-4 px-4로 모바일에서 전체 폭 활용 */}
           <div
             className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap scrollbar-hide"
             style={scrollbarHideStyle}
@@ -534,7 +582,6 @@ const AdminCellsPage: React.FC = () => {
                   }
                 `}
               >
-                {/* 텍스트 대신 점(Dot)으로 상태 표시 */}
                 <span
                   className={`w-1.5 h-1.5 rounded-full ${
                     s.isActive ? "bg-green-400" : "bg-gray-300"
@@ -636,12 +683,17 @@ const AdminCellsPage: React.FC = () => {
                       className="w-full py-2 px-1 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-100 shadow-sm disabled:bg-gray-50 disabled:text-gray-400"
                       disabled={unitType === "semester"}
                     >
-                      <option value="">전체 연도</option>
                       {yearOptions.map((o) => (
                         <option key={o.value} value={o.value}>
                           {o.label}년
                         </option>
                       ))}
+                      {/* 데이터 로딩 전 fallback */}
+                      {yearOptions.length === 0 && (
+                        <option value={new Date().getFullYear()}>
+                          {new Date().getFullYear()}년
+                        </option>
+                      )}
                     </select>
                     {unitType === "semester" && (
                       <p className="absolute left-0 top-full mt-1 text-[10px] text-gray-400 whitespace-nowrap">

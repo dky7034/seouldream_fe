@@ -129,6 +129,16 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
 
   const hasActiveSemesters = semesters.length > 0;
 
+  // ✅ [추가] 1. availableYears와 현재 filters.year 불일치 시 자동 보정
+  useEffect(() => {
+    if (availableYears.length > 0 && filters.year) {
+      if (!availableYears.includes(Number(filters.year))) {
+        // 목록에 없는 연도라면 가장 최신 연도(index 0)로 강제 변경
+        setFilters((prev) => ({ ...prev, year: availableYears[0] }));
+      }
+    }
+  }, [availableYears, filters.year]);
+
   const [sortConfig, setSortConfig] = useState<{
     key: SortKey;
     direction: SortDirection;
@@ -154,7 +164,11 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
   const fetchSemesters = useCallback(async () => {
     try {
       const data = await semesterService.getAllSemesters(true);
-      setSemesters(data);
+      // 최신 학기 순 정렬
+      const sorted = data.sort((a, b) =>
+        b.startDate.localeCompare(a.startDate)
+      );
+      setSemesters(sorted);
     } catch (err) {
       console.error("학기 목록 로딩 실패:", err);
       setSemesters([]);
@@ -164,7 +178,8 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
   const fetchAvailableYears = useCallback(async () => {
     try {
       const years = await prayerService.getAvailableYears();
-      setAvailableYears(years);
+      // ✅ [수정] 2. 연도 목록 정렬 (최신순)
+      setAvailableYears(years.sort((a, b) => b - a));
     } catch (err) {
       console.error("Failed to fetch available years for prayers:", err);
       setAvailableYears([]);
@@ -218,6 +233,7 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     }
 
     if (!target) {
+      // 이미 정렬되어 있다고 가정하지만 안전하게 재정렬
       const sorted = [...semesterList].sort((a, b) => b.id - a.id);
       target = sorted[0];
     }
@@ -336,19 +352,35 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     setCurrentPage(0);
   };
 
+  // ✅ [수정] 3. 학기 -> 연간/월간 전환 시 해당 학기의 연도를 유지하도록 로직 개선
   const handleUnitTypeClick = (type: UnitType) => {
     setUnitType(type);
     setFilters((prev) => {
+      let baseYear =
+        typeof prev.year === "number" ? prev.year : new Date().getFullYear();
+
+      // 학기 모드에서 다른 모드로 갈 때, 선택된 학기의 연도를 가져옴
+      if (unitType === "semester" && prev.semesterId) {
+        const curSem = semesters.find((s) => s.id === prev.semesterId);
+        if (curSem) {
+          baseYear = new Date(curSem.startDate).getFullYear();
+        }
+      }
+
+      // availableYears에 해당 연도가 없다면 최신 연도로 보정
+      if (availableYears.length > 0 && !availableYears.includes(baseYear)) {
+        baseYear = availableYears[0];
+      }
+
       const next = { ...prev };
       const now = new Date();
-      const currentYear = now.getFullYear();
 
       if (type === "year") {
-        next.year = next.year || currentYear;
+        next.year = baseYear;
         next.month = "";
         next.semesterId = "";
       } else if (type === "month") {
-        next.year = next.year || currentYear;
+        next.year = baseYear;
         next.month = next.month || now.getMonth() + 1;
         next.semesterId = "";
       } else if (type === "semester") {
@@ -402,7 +434,6 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
     }));
   }, [availableYears]);
 
-  // 렌더링 함수 수정: 컨테이너 포함하여 리턴
   const renderUnitButtons = () => {
     // 1. 월 선택
     if (unitType === "month") {
@@ -430,7 +461,7 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
       );
     }
 
-    // 2. 학기 선택 (가로 스크롤 칩 UI 적용)
+    // 2. 학기 선택
     if (unitType === "semester") {
       if (semesters.length === 0) {
         return (

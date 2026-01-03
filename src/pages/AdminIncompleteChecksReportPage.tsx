@@ -64,6 +64,16 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
   const [filterType, setFilterType] = useState<FilterType>("unit");
   const [unitType, setUnitType] = useState<UnitType>("semester");
 
+  // ✅ [추가] 1. availableYears와 현재 filters.year 불일치 시 자동 보정
+  useEffect(() => {
+    if (availableYears.length > 0 && filters.year) {
+      if (!availableYears.includes(filters.year as number)) {
+        // 목록에 없는 연도라면 가장 최신 연도(index 0)로 강제 변경
+        setFilters((prev) => ({ ...prev, year: availableYears[0] }));
+      }
+    }
+  }, [availableYears, filters.year]);
+
   const yearOptions = useMemo(() => {
     if (availableYears.length === 0)
       return [{ value: currentYear, label: `${currentYear}년` }];
@@ -135,10 +145,20 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
     }
   }, [semesters, hasAutoSelectedSemester, currentYear, currentMonth]);
 
+  // ✅ [수정] 2. 학기 -> 연간/월간 전환 시 해당 학기의 연도를 유지하도록 로직 개선
   const handleUnitTypeClick = (type: UnitType) => {
     setUnitType(type);
     setFilters((prev) => {
-      const baseYear = typeof prev.year === "number" ? prev.year : currentYear;
+      let baseYear = typeof prev.year === "number" ? prev.year : currentYear;
+
+      // 학기 모드에서 다른 모드로 갈 때, 선택된 학기의 연도를 가져옴
+      if (unitType === "semester" && prev.semesterId) {
+        const currentSemester = semesters.find((s) => s.id === prev.semesterId);
+        if (currentSemester) {
+          baseYear = new Date(currentSemester.startDate).getFullYear();
+        }
+      }
+
       const next: Filters = { ...prev };
       if (type === "year") {
         next.year = baseYear;
@@ -388,7 +408,9 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
 
   const fetchAvailableYears = useCallback(async () => {
     try {
-      setAvailableYears(await reportService.getAvailableYearsForReports());
+      // ✅ [수정] 3. 연도 목록 정렬 (최신순)
+      const years = await reportService.getAvailableYearsForReports();
+      setAvailableYears(years.sort((a, b) => b - a));
     } catch {
       setAvailableYears([]);
     }
