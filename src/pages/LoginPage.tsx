@@ -89,7 +89,8 @@ const LoginPage: React.FC = () => {
           {/* 로고 이미지 영역 변경됨 */}
           <div className="flex justify-center mb-4">
             <img
-              src="../../public/seouldream_logo_upscaled_1280.jpg"
+              // public을 빼고 절대 경로(/)로 시작하세요
+              src="/seouldream_logo_upscaled_1280.jpg"
               alt="서울드림 로고"
               className="h-20 w-auto object-contain"
             />

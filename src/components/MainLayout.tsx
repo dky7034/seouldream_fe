@@ -231,7 +231,7 @@ const MainLayout: React.FC = () => {
               >
                 {/* 로고 이미지 추가 */}
                 <img
-                  src="../../public/seouldream_logo_upscaled_1280.jpg"
+                  src="/seouldream_logo_upscaled_1280.jpg"
                   alt="서울드림교회 로고"
                   className="h-10 w-auto object-contain"
                 />
