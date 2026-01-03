@@ -90,7 +90,8 @@ const LoginPage: React.FC = () => {
           <div className="flex justify-center mb-4">
             <img
               // public을 빼고 절대 경로(/)로 시작하세요
-              src="/seouldream_logo_upscaled_1280.jpg"
+              // src="/seouldream_logo_upscaled_1280.jpg"
+              src="/seouldream_logo_upscaled_1280_cut.png"
               alt="서울드림 로고"
               className="h-20 w-auto object-contain"
             />
