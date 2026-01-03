@@ -599,7 +599,7 @@ const AdminActionsCard: React.FC<{
       <ShieldExclamationIcon className="h-5 w-5" /> 관리자 도구
     </h3>
     <p className="text-sm text-red-600 mb-4 break-keep">
-      사용자의 비밀번호를 강제로 초기화합니다.
+      멤버의 비밀번호를 강제로 초기화합니다.
     </p>
     <button
       onClick={onResetPassword}
@@ -698,9 +698,9 @@ const TempPasswordModal: React.FC<{
           임시 비밀번호 생성 완료
         </h2>
         <p className="text-sm text-gray-600 mb-6 break-keep leading-relaxed">
-          사용자에게 아래 비밀번호를 전달해주세요.
-          <br />
-          로그인 후 즉시 변경하도록 안내가 필요합니다.
+          멤버에게 아래 비밀번호를 전달해주세요.
+          {/* <br />
+          로그인 후 즉시 변경하도록 안내가 필요합니다. */}
         </p>
         <div className="p-4 bg-gray-100 rounded-xl mb-6 border border-gray-200">
           <p className="text-2xl font-mono font-bold text-indigo-600 tracking-wider break-all select-all">
@@ -1176,7 +1176,7 @@ const MemberDetailPage: React.FC = () => {
           onClose={() => setShowConfirmResetModal(false)}
           onConfirm={handleResetPassword}
           title="비밀번호 초기화 확인"
-          message={`정말로 ${member.name}님의 비밀번호를 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
+          message={`정말로 ${member.name}님의 비밀번호를 초기화하시겠습니까?`}
         />
         <TempPasswordModal
           isOpen={showTempPasswordModal}

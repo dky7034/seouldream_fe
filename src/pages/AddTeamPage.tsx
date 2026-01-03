@@ -31,7 +31,7 @@ const AddTeamPage: React.FC = () => {
     return (
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 text-sm sm:text-base text-gray-600">
-          사용자 정보를 불러오는 중입니다...
+          멤버 정보를 불러오는 중입니다...
         </div>
       </div>
     );

@@ -570,6 +570,14 @@ const CellLeaderDashboard: React.FC = () => {
     loadSemesters();
   }, []);
 
+  const cellDashboardTitle = useMemo(() => {
+    const raw = user?.cellName?.trim();
+    if (!raw) return "내 셀 대시보드";
+
+    const name = raw.includes("셀") ? raw : `${raw}셀`;
+    return `${name} 대시보드`;
+  }, [user?.cellName]);
+
   // 전체 멤버 목록 로딩 및 Map 생성
   useEffect(() => {
     if (!user) return;
@@ -1004,7 +1012,7 @@ const CellLeaderDashboard: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
-              내 셀 대시보드
+              {cellDashboardTitle}
             </h2>
             <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500 mt-2">
               {user.cellName && (

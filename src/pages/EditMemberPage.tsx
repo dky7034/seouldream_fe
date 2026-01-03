@@ -58,7 +58,7 @@ const EditMemberPage: React.FC = () => {
       }
 
       if (!isExecutive && user.memberId !== memberIdNum) {
-        setError("사용자 정보를 수정할 권한이 없습니다.");
+        setError("멤버 정보를 수정할 권한이 없습니다.");
         setIsFetching(false);
         return;
       }

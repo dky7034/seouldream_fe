@@ -92,7 +92,7 @@ const AdminUsersPage: React.FC = () => {
   const fetchMembers = useCallback(async () => {
     if (!user || user.role !== "EXECUTIVE") {
       setLoading(false);
-      setError("사용자 관리 페이지에 접근할 권한이 없습니다.");
+      setError("멤버 관리 페이지에 접근할 권한이 없습니다.");
       return;
     }
 
@@ -157,7 +157,7 @@ const AdminUsersPage: React.FC = () => {
     if (user?.role === "EXECUTIVE") {
       fetchMembers();
     } else if (user) {
-      setError("사용자 관리 페이지에 접근할 권한이 없습니다.");
+      setError("멤버 관리 페이지에 접근할 권한이 없습니다.");
       setLoading(false);
     } else {
       setLoading(false);
@@ -276,7 +276,7 @@ const AdminUsersPage: React.FC = () => {
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
               <UsersIcon className="h-8 w-8 text-indigo-500" />
-              사용자 관리
+              멤버 관리
             </h1>
             <p className="mt-1 text-sm text-gray-600">
               전체 멤버를 조회하고, 셀·역할·연도별로 필터링하거나 상세 정보를
