@@ -225,6 +225,7 @@ const MatrixStatusLegend: React.FC<{ label: string }> = React.memo(
   )
 );
 
+// ───────────────── [컴포넌트] CellMemberList (수정됨: 본인만 클릭 허용) ─────────────────
 const CellMemberList: React.FC<{
   members: CellMemberAttendanceSummaryDto[];
   attendances: AttendanceDto[];
@@ -234,6 +235,7 @@ const CellMemberList: React.FC<{
 }> = React.memo(
   ({ members, attendances, startDate, endDate, displayNameMap }) => {
     const navigate = useNavigate();
+    const { user } = useAuth(); // ✅ 유저 정보 가져오기
 
     const sortedMembers = useMemo(
       () =>
@@ -274,8 +276,11 @@ const CellMemberList: React.FC<{
       return statsMap;
     }, [sortedMembers, attendanceMap, startDate, endDate]);
 
+    // ✅ [수정] 클릭 핸들러: 본인만 이동 가능
     const handleMemberClick = (memberId: number) => {
-      navigate(`/admin/users/${memberId}`);
+      if (user?.memberId === memberId) {
+        navigate(`/admin/users/${memberId}`);
+      }
     };
 
     if (!sortedMembers || sortedMembers.length === 0) {
@@ -289,6 +294,7 @@ const CellMemberList: React.FC<{
     const formatGender = (gender: "MALE" | "FEMALE") =>
       gender === "MALE" ? "남" : "여";
 
+    // ---------------- Mobile Card ----------------
     const MobileMemberCard = ({
       member,
     }: {
@@ -302,10 +308,16 @@ const CellMemberList: React.FC<{
         unchecked: 0,
       };
 
+      const isMe = user?.memberId === member.memberId; // ✅ 본인 확인
+
       return (
         <div
           onClick={() => handleMemberClick(member.memberId)}
-          className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-3 cursor-pointer hover:bg-gray-50 transition-colors"
+          className={`bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-3 transition-colors ${
+            isMe
+              ? "cursor-pointer hover:bg-gray-50 active:scale-[0.99]"
+              : "cursor-default"
+          }`}
         >
           {/* 상단: 이름 및 기본 정보 */}
           <div className="flex justify-between items-start">
@@ -314,6 +326,11 @@ const CellMemberList: React.FC<{
                 <span className="text-base font-bold text-gray-900">
                   {displayName}
                 </span>
+                {isMe && (
+                  <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">
+                    나
+                  </span>
+                )}
                 <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] font-medium">
                   {formatGender(member.gender)}
                 </span>
@@ -337,7 +354,7 @@ const CellMemberList: React.FC<{
                 }`}
               >
                 {member.lastAttendanceDate
-                  ? formatDateKorean(member.lastAttendanceDate).slice(5) // 연도 제외하고 월/일만 표시
+                  ? formatDateKorean(member.lastAttendanceDate).slice(5)
                   : "-"}
               </span>
             </div>
@@ -422,15 +439,27 @@ const CellMemberList: React.FC<{
                     absent: 0,
                     unchecked: 0,
                   };
+                  const isMe = user?.memberId === m.memberId; // ✅ 본인 확인
 
                   return (
                     <tr
                       key={m.memberId}
                       onClick={() => handleMemberClick(m.memberId)}
-                      className="hover:bg-gray-50/80 transition-colors cursor-pointer"
+                      className={`transition-colors ${
+                        isMe
+                          ? "hover:bg-gray-50/80 cursor-pointer"
+                          : "cursor-default"
+                      }`}
                     >
                       <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
-                        {displayName}
+                        <div className="flex items-center gap-1.5">
+                          {displayName}
+                          {isMe && (
+                            <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">
+                              나
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-center text-gray-600">
                         {formatGender(m.gender)}
@@ -1119,9 +1148,13 @@ const CellLeaderDashboard: React.FC = () => {
                   endDate={periodRange.endDate}
                   year={matrixDate.getFullYear()}
                   month={matrixDate.getMonth() + 1}
+                  // ✅ [수정] 여기서 cellAssignmentDate와 joinYear를 꼭 넘겨줘야 합니다!
                   members={members.map((m) => ({
                     memberId: m.memberId,
                     memberName: displayNameMap.get(m.memberId) || m.memberName,
+                    // 👇 이 두 줄이 추가되어야 Matrix가 "배정 전"을 판단합니다.
+                    cellAssignmentDate: m.cellAssignmentDate,
+                    joinYear: m.joinYear,
                   }))}
                   attendances={matrixAttendances}
                   loading={matrixLoading}

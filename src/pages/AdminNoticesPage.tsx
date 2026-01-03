@@ -476,6 +476,7 @@ const AdminNoticesPage: React.FC = () => {
   }, [availableYears]);
 
   // ✅ [수정] 가로 스크롤 칩 UI 적용 (renderUnitButtons)
+  // ✅ [수정] 학기 버튼에 활성 상태 점(Green Dot) 추가
   const renderUnitButtons = () => {
     switch (unitType) {
       case "month":
@@ -538,8 +539,9 @@ const AdminNoticesPage: React.FC = () => {
                   key={s.id}
                   type="button"
                   onClick={() => handleSemesterClick(s.id)}
+                  // ✅ [변경] flex, items-center, gap-1.5 추가 (점과 텍스트 정렬)
                   className={`
-                    flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all shadow-sm whitespace-nowrap
+                    flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all shadow-sm whitespace-nowrap
                     ${
                       filters.semesterId === s.id
                         ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-1 ring-indigo-600"
@@ -547,7 +549,13 @@ const AdminNoticesPage: React.FC = () => {
                     }
                   `}
                 >
-                  {s.name}
+                  {/* ✅ [추가] 활성 상태 점 (Green Dot) */}
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      s.isActive ? "bg-green-400" : "bg-gray-300"
+                    }`}
+                  ></span>
+                  <span>{s.name}</span>
                 </button>
               ))}
             </div>

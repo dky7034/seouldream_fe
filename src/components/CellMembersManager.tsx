@@ -10,6 +10,7 @@ import {
   CakeIcon,
   CalendarDaysIcon,
   ClockIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/24/solid";
 
 type SortConfig = {
@@ -22,7 +23,6 @@ interface CellMembersManagerProps {
   allMembers: { id: number; name: string; birthDate?: string }[];
 }
 
-// ✅ 날짜 포맷팅 함수 (KST 적용)
 const safeFormatDate = (dateStr: string | null | undefined) => {
   if (!dateStr) return "";
   const targetStr =
@@ -116,6 +116,22 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
     );
   };
 
+  // ✅ [수정] 접근 가능 여부 체크 함수 (단순 boolean 반환)
+  const canAccessDetail = (memberId: number) => {
+    if (user.role === "EXECUTIVE") return true; // 임원은 모두 가능
+    if (user.role === "CELL_LEADER") {
+      return memberId === user.memberId; // 셀장은 본인만 가능
+    }
+    return memberId === user.memberId; // 일반 멤버는 본인만 가능
+  };
+
+  // ✅ [수정] 클릭 핸들러 (권한 없으면 무반응)
+  const handleRowClick = (memberId: number) => {
+    if (canAccessDetail(memberId)) {
+      navigate(`/admin/users/${memberId}`);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* 헤더 영역 */}
@@ -148,10 +164,11 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
 
       {!loading && !error && (
         <>
-          {/* ✅ [수정됨] 모바일: 카드형 리스트 (정보 잘림 방지) */}
+          {/* 모바일: 카드형 리스트 */}
           <div className="sm:hidden space-y-3 px-1">
             {sortedMembers.map((member) => {
               const isMe = user.memberId === member.id;
+              const hasAccess = canAccessDetail(member.id);
               const found = allMembers.find((am) => am.id === member.id);
               const displayName = found
                 ? formatDisplayName(found, allMembers)
@@ -165,15 +182,18 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
               return (
                 <div
                   key={member.id}
-                  onClick={() => navigate(`/admin/users/${member.id}`)}
-                  className={`relative w-full text-left bg-white rounded-2xl shadow-sm p-4 border border-gray-100 active:scale-[0.98] transition-all ${
+                  onClick={() => handleRowClick(member.id)}
+                  className={`relative w-full text-left bg-white rounded-2xl shadow-sm p-4 border border-gray-100 transition-all ${
                     !member.active ? "opacity-75 bg-gray-50" : ""
+                  } ${
+                    hasAccess
+                      ? "active:scale-[0.98] cursor-pointer hover:border-indigo-200"
+                      : "cursor-default"
                   }`}
                 >
                   {/* 상단: 이름 + 역할 뱃지 */}
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      {/* 프로필 아바타 */}
                       <div
                         className={`h-11 w-11 flex-shrink-0 rounded-full flex items-center justify-center text-lg font-bold border ${
                           isMe
@@ -215,9 +235,13 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                         </div>
                       </div>
                     </div>
+                    {/* 접근 가능할 때만 화살표 아이콘 표시 */}
+                    {hasAccess && (
+                      <ChevronRightIcon className="h-5 w-5 text-gray-300" />
+                    )}
                   </div>
 
-                  {/* 하단: 정보 그리드 (줄바꿈 허용으로 잘림 방지) */}
+                  {/* 하단: 정보 그리드 */}
                   <div className="grid grid-cols-1 gap-y-2 text-xs text-gray-600 border-t border-gray-50 pt-3">
                     <div className="flex items-center gap-2">
                       <CakeIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
@@ -253,7 +277,7 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
             )}
           </div>
 
-          {/* ✅ 데스크톱: 테이블 뷰 (기존 유지) */}
+          {/* 데스크톱: 테이블 뷰 */}
           <div className="hidden sm:block bg-white shadow-sm rounded-b-2xl border-x border-b border-gray-200 overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead className="bg-gray-50/50">
@@ -281,6 +305,8 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {sortedMembers.map((member) => {
+                  const isMe = user.memberId === member.id;
+                  const hasAccess = canAccessDetail(member.id); // 권한 체크
                   const found = allMembers.find((am) => am.id === member.id);
                   const displayName = found
                     ? formatDisplayName(found, allMembers)
@@ -297,17 +323,27 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                   return (
                     <tr
                       key={member.id}
-                      className={`hover:bg-gray-50 transition-colors cursor-pointer group ${
+                      onClick={() => handleRowClick(member.id)} // ✅ 핸들러 교체
+                      className={`transition-colors group ${
                         !member.active ? "bg-gray-50 text-gray-400" : ""
+                      } ${
+                        hasAccess
+                          ? "hover:bg-gray-50 cursor-pointer"
+                          : "cursor-default"
                       }`}
-                      onClick={() => navigate(`/admin/users/${member.id}`)}
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                          <div
+                            className={`font-bold transition-colors ${
+                              hasAccess
+                                ? "text-gray-900 group-hover:text-indigo-600"
+                                : "text-gray-700"
+                            }`}
+                          >
                             {displayName}
                           </div>
-                          {user.memberId === member.id && (
+                          {isMe && (
                             <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600 border border-indigo-100">
                               나
                             </span>
@@ -340,9 +376,12 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                         {displayAssignedDate || "-"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <span className="text-indigo-600 hover:text-indigo-900 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-                          상세보기 &rarr;
-                        </span>
+                        {/* ✅ 접근 권한이 있을 때만 '상세보기' 텍스트 표시 */}
+                        {hasAccess && (
+                          <span className="text-indigo-600 hover:text-indigo-900 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                            상세보기 &rarr;
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );

@@ -1,3 +1,5 @@
+// src/pages/MemberDetailPage.tsx
+
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { memberService } from "../services/memberService";
@@ -73,8 +75,16 @@ const displayValue = (val: string | number | null | undefined) => {
   return val;
 };
 
+// ✅ 출석률 색상 헬퍼
+// const getRateColorClass = (rate: number | undefined | null) => {
+//   if (rate === undefined || rate === null) return "bg-gray-100 text-gray-500";
+//   if (rate >= 80) return "bg-green-100 text-green-700 border-green-200";
+//   if (rate >= 50) return "bg-indigo-100 text-indigo-700 border-indigo-200";
+//   return "bg-red-100 text-red-700 border-red-200";
+// };
+
 // ─────────────────────────────────────────────────────────────
-// [Components] UI Cards
+// [Components] UI Cards (기존과 동일)
 // ─────────────────────────────────────────────────────────────
 
 const InfoRow: React.FC<{
@@ -330,8 +340,7 @@ const AttendanceSummaryCard: React.FC<{
   onMatrixMonthChange: (increment: number) => void;
   startDate: string;
   endDate: string;
-  limitStartDate?: string;
-  userRole?: string; // 👈 ✅ [수정] 여기에 이 줄을 추가해야 에러가 사라집니다!
+  userRole?: string;
 }> = ({
   summary,
   memberId,
@@ -349,16 +358,10 @@ const AttendanceSummaryCard: React.FC<{
   onMonthSelect,
   startDate,
   endDate,
-  limitStartDate,
-  // userRole, // 👈 ✅ 여기서도 구조 분해 할당으로 받아주세요 (필요하다면 사용)
+  userRole,
 }) => {
   const totalSummary = summary?.totalSummary;
-
-  // limitStartDate가 있으면 그 이전의 학기는 선택할 수 없도록 필터링
-  const availableSemesters = useMemo(() => {
-    if (!limitStartDate) return semesters;
-    return semesters.filter((s) => s.endDate >= limitStartDate);
-  }, [semesters, limitStartDate]);
+  const isExecutive = userRole === "EXECUTIVE";
 
   const semesterMonths = useMemo(() => {
     if (!activeSemester) return [];
@@ -374,47 +377,31 @@ const AttendanceSummaryCard: React.FC<{
     return months;
   }, [activeSemester]);
 
-  // 미체크 계산 (미래 날짜 및 limitStartDate 적용)
+  // ✅ [수정] 미체크 계산 (미래 날짜 제외)
   const uncheckedCount = useMemo(() => {
     if (!startDate || !endDate) return 0;
     if (!cellAssignmentDate) return 0;
 
     const filterStart = new Date(startDate);
     const filterEnd = new Date(endDate);
+
     const today = new Date();
     today.setHours(23, 59, 59, 999);
+
     filterStart.setHours(0, 0, 0, 0);
     filterEnd.setHours(23, 59, 59, 999);
 
     const effectiveEnd = filterEnd > today ? today : filterEnd;
 
-    // 배정일
-    const assignDateObj = new Date(
-      cellAssignmentDate.includes("T")
-        ? cellAssignmentDate
-        : `${cellAssignmentDate}T00:00:00`
-    );
-    assignDateObj.setHours(0, 0, 0, 0);
+    const getSafeDateObj = (dateStr: string) => {
+      const safeStr = dateStr.includes("T") ? dateStr : `${dateStr}T00:00:00`;
+      const d = new Date(safeStr);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    };
 
-    // 권한 제한일 (limitStartDate)
-    let restrictionDate = new Date("1900-01-01");
-    if (limitStartDate) {
-      restrictionDate = new Date(
-        limitStartDate.includes("T")
-          ? limitStartDate
-          : `${limitStartDate}T00:00:00`
-      );
-      restrictionDate.setHours(0, 0, 0, 0);
-    }
-
-    // 최종 유효 시작일 = MAX(필터시작, 배정일, 권한제한일)
-    const effectiveStart = new Date(
-      Math.max(
-        filterStart.getTime(),
-        assignDateObj.getTime(),
-        restrictionDate.getTime()
-      )
-    );
+    const baseDate = getSafeDateObj(cellAssignmentDate);
+    const effectiveStart = filterStart < baseDate ? baseDate : filterStart;
 
     if (effectiveStart > effectiveEnd) return 0;
 
@@ -445,7 +432,7 @@ const AttendanceSummaryCard: React.FC<{
     });
 
     return missingCount;
-  }, [startDate, endDate, cellAssignmentDate, attendances, limitStartDate]);
+  }, [startDate, endDate, cellAssignmentDate, attendances]);
 
   const formatDate = (dateStr: string) => dateStr.replace(/-/g, ".");
 
@@ -469,7 +456,8 @@ const AttendanceSummaryCard: React.FC<{
                   onChange={(e) => onSemesterChange(Number(e.target.value))}
                   className="bg-transparent text-gray-700 font-bold text-sm focus:outline-none cursor-pointer w-full sm:min-w-[140px]"
                 >
-                  {availableSemesters.map((s) => (
+                  {semesters.map((s) => (
+                    // ✅ [수정] 학기 상태 표시 (진행중/마감됨)
                     <option key={s.id} value={s.id}>
                       {s.name} {s.isActive ? "(진행중)" : "(마감됨)"}
                     </option>
@@ -526,16 +514,24 @@ const AttendanceSummaryCard: React.FC<{
         {/* Stats Grid */}
         {totalSummary ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-5 bg-gradient-to-br from-indigo-50 to-white rounded-2xl border border-indigo-100 shadow-sm text-center">
-              <p className="text-xs font-bold text-indigo-600 uppercase tracking-wide">
-                {activeSemester?.name || "기간"} 출석률
-              </p>
-              <p className="mt-1 text-4xl font-extrabold text-indigo-700">
-                {totalSummary.attendanceRate.toFixed(0)}
-                <span className="text-xl ml-1 text-indigo-400">%</span>
-              </p>
-            </div>
-            <div className="p-5 rounded-2xl border border-gray-200 shadow-sm text-center bg-gradient-to-br from-gray-50 to-white">
+            {isExecutive && (
+              <div className="p-5 bg-gradient-to-br from-indigo-50 to-white rounded-2xl border border-indigo-100 shadow-sm text-center">
+                <p className="text-xs font-bold text-indigo-600 uppercase tracking-wide">
+                  {activeSemester?.name || "기간"} 출석률
+                </p>
+                <p className="mt-1 text-4xl font-extrabold text-indigo-700">
+                  {totalSummary.attendanceRate.toFixed(0)}
+                  <span className="text-xl ml-1 text-indigo-400">%</span>
+                </p>
+              </div>
+            )}
+            <div
+              className={`p-5 rounded-2xl border shadow-sm text-center bg-gradient-to-br ${
+                uncheckedCount > 0
+                  ? "from-red-50 to-white border-red-100"
+                  : "from-gray-50 to-white border-gray-200"
+              } ${!isExecutive ? "sm:col-span-2" : ""}`}
+            >
               <p
                 className={`text-xs font-bold uppercase tracking-wide ${
                   uncheckedCount > 0 ? "text-red-600" : "text-gray-500"
@@ -581,8 +577,9 @@ const AttendanceSummaryCard: React.FC<{
             ]}
             attendances={attendances}
             loading={false}
-            limitStartDate={limitStartDate}
-            showAttendanceRate={false}
+            limitStartDate={activeSemester?.startDate}
+            limitEndDate={activeSemester?.endDate}
+            showAttendanceRate={isExecutive}
           />
         </div>
       </div>
@@ -590,6 +587,7 @@ const AttendanceSummaryCard: React.FC<{
   );
 };
 
+// ... (AdminActionsCard, TeamManagementModal, TempPasswordModal 생략 - 기존과 동일) ...
 const AdminActionsCard: React.FC<{
   onResetPassword: () => void;
   isResetting: boolean;
@@ -760,27 +758,11 @@ const MemberDetailPage: React.FC = () => {
     return Number.isNaN(num) ? null : num;
   }, [id]);
 
-  // ✅ [추가] 보안 방어 로직: 권한 없는 접근 차단 (URL 직접 접근 시)
-  useEffect(() => {
-    if (!user || !memberIdNum) return;
-
-    // 셀장인데 본인 페이지가 아니면 쫓아냄
-    if (user.role === "CELL_LEADER" && user.memberId !== memberIdNum) {
-      alert("접근 권한이 없습니다.");
-      navigate("/", { replace: true });
-    }
-
-    // 일반 멤버인데 본인 페이지가 아니면 쫓아냄
-    if (user.role === "MEMBER" && user.memberId !== memberIdNum) {
-      alert("접근 권한이 없습니다.");
-      navigate("/", { replace: true });
-    }
-  }, [user, memberIdNum, navigate]);
-
   useEffect(() => {
     const loadSemesters = async () => {
       try {
-        // 모든 학기 조회
+        // ✅ [수정] 모든 학기 조회 (true 제거)
+        // 이유: 멤버의 과거 활동 이력을 조회할 수 있어야 함 (Inactive 학기 포함)
         const data = await semesterService.getAllSemesters();
         const sortedData = data.sort(
           (a, b) =>
@@ -809,65 +791,37 @@ const MemberDetailPage: React.FC = () => {
     loadSemesters();
   }, []);
 
-  // ✅ [핵심] 조회 권한에 따른 시작일 제한 계산 (본인 포함)
-  // 셀장이나 멤버가 '본인'을 조회할 때도, '배정일' 이전의 기록은 안 보이게 할 것인가?
-  // -> 보통 본인은 전체 기록을 볼 수 있어야 함.
-  // -> 하지만 요청 사항은 "셀장은... 과거 이력을 보면 안 된다" 였으므로
-  // -> 여기서는 셀장 본인이라도 일단은 '배정일' 기준을 적용해 둠.
-  // -> (만약 본인은 다 보여야 한다면, user.memberId === memberIdNum 조건을 추가하여 return undefined 처리하면 됨)
-  const viewableStartDate = useMemo(() => {
-    if (!user || !member) return undefined;
-    // 임원은 제한 없음
-    if (user.role === "EXECUTIVE") return undefined;
-
-    // 셀장은 멤버가 현재 셀에 배정된 날짜부터만 조회 가능
-    if (user.role === "CELL_LEADER") {
-      // 본인이라도 제한을 걸지, 아닐지 결정 필요.
-      // 현재 로직: 본인이어도 배정일 기준 제한 (요청의 취지에 맞춤)
-      if (member.cellAssignmentDate) {
-        return member.cellAssignmentDate;
-      }
-      return `${new Date().getFullYear()}-01-01`;
-    }
-    return undefined;
-  }, [user, member]);
-
-  // 기간 계산 (viewableStartDate 적용)
   const periodRange = useMemo(() => {
     if (!activeSemester) return { startDate: "", endDate: "" };
 
     const { startDate: semStart, endDate: semEnd } = activeSemester;
 
-    let targetStart = semStart;
-    let targetEnd = semEnd;
-
-    if (unitType === "month" && selectedMonth !== null) {
-      let targetYear = new Date(semStart).getFullYear();
-      const startMonthIndex = new Date(semStart).getMonth() + 1;
-      if (selectedMonth < startMonthIndex) {
-        targetYear += 1;
-      }
-      const m = selectedMonth;
-      const monthStartStr = `${targetYear}-${String(m).padStart(2, "0")}-01`;
-      const lastDayObj = new Date(targetYear, m, 0);
-      const monthEndStr = `${targetYear}-${String(m).padStart(2, "0")}-${String(
-        lastDayObj.getDate()
-      ).padStart(2, "0")}`;
-
-      targetStart = monthStartStr < semStart ? semStart : monthStartStr;
-      targetEnd = monthEndStr > semEnd ? semEnd : monthEndStr;
+    if (unitType === "semester" || selectedMonth === null) {
+      return { startDate: semStart, endDate: semEnd };
     }
 
-    // ✅ [핵심] 제한일(viewableStartDate)보다 이전 날짜는 조회 불가하도록 조정
-    if (viewableStartDate && targetStart < viewableStartDate) {
-      targetStart = viewableStartDate;
+    let targetYear = new Date(semStart).getFullYear();
+    const startMonthIndex = new Date(semStart).getMonth() + 1;
+
+    if (selectedMonth < startMonthIndex) {
+      targetYear += 1;
     }
+
+    const m = selectedMonth;
+    const monthStartStr = `${targetYear}-${String(m).padStart(2, "0")}-01`;
+    const lastDayObj = new Date(targetYear, m, 0);
+    const monthEndStr = `${targetYear}-${String(m).padStart(2, "0")}-${String(
+      lastDayObj.getDate()
+    ).padStart(2, "0")}`;
+
+    const finalStart = monthStartStr < semStart ? semStart : monthStartStr;
+    const finalEnd = monthEndStr > semEnd ? semEnd : monthEndStr;
 
     return {
-      startDate: targetStart,
-      endDate: targetEnd,
+      startDate: finalStart,
+      endDate: finalEnd,
     };
-  }, [activeSemester, unitType, selectedMonth, viewableStartDate]);
+  }, [activeSemester, unitType, selectedMonth]);
 
   const handleSemesterChange = (semesterId: number) => {
     const target = semesters.find((s) => s.id === semesterId);
@@ -941,10 +895,8 @@ const MemberDetailPage: React.FC = () => {
       ) {
         throw new Error("권한이 없습니다.");
       }
-      // 셀장은 자신의 셀 멤버가 아니면 조회 불가 (물론 위 useEffect에서 본인 아니면 튕겨내지만, API단 방어도 중요)
-      // 하지만 현재 로직은 "본인"만 허용하므로 아래 조건은 사실상 user.memberId === memberData.id 만 통과됨.
-      if (user.role === "CELL_LEADER" && user.memberId !== memberData.id) {
-        throw new Error("접근 권한이 없습니다.");
+      if (user.role === "CELL_LEADER" && user.cellId !== memberData.cell?.id) {
+        throw new Error("자신이 속한 셀의 멤버 정보만 조회할 수 있습니다.");
       }
 
       setMember(memberData);
@@ -960,13 +912,7 @@ const MemberDetailPage: React.FC = () => {
   }, [memberIdNum, user]);
 
   const fetchAttendanceSummary = useCallback(async () => {
-    if (!memberIdNum || !periodRange.startDate || !periodRange.endDate) return;
-
-    if (periodRange.startDate > periodRange.endDate) {
-      setAttendanceSummary(null);
-      setAttendanceList([]);
-      return;
-    }
+    if (!memberIdNum || !periodRange.startDate) return;
 
     try {
       const summaryData = await attendanceService.getMemberAttendanceSummary(
@@ -1073,6 +1019,12 @@ const MemberDetailPage: React.FC = () => {
 
   const isExecutive = user?.role === "EXECUTIVE";
 
+  // ✅ [Header] 출석률 표시 준비 (헤더에서는 제거하거나, 아래 카드와 연동되는지 확인 필요)
+  // 현재 정책상 헤더에는 '현재 상태'만 보여주는 것이 깔끔하므로 일단 숨김 처리 또는 '올해' 기준임을 명시
+  // const hasAttendanceRate =
+  //   member.attendanceRate !== undefined && member.attendanceRate !== null;
+  // const rateColorClass = getRateColorClass(member.attendanceRate);
+
   return (
     <div className="bg-gray-50 min-h-screen pb-20">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -1120,7 +1072,6 @@ const MemberDetailPage: React.FC = () => {
               isCurrentUser={user?.memberId === member.id && !!isExecutive}
               onEditProfile={() => navigate("/my-profile")}
             />
-            {/* ✅ AttendanceSummaryCard에 limitStartDate 전달 */}
             <AttendanceSummaryCard
               summary={attendanceSummary}
               memberId={member.id}
@@ -1139,8 +1090,7 @@ const MemberDetailPage: React.FC = () => {
               onMatrixMonthChange={handleMatrixMonthChange}
               startDate={periodRange.startDate}
               endDate={periodRange.endDate}
-              limitStartDate={viewableStartDate} // 추가
-              userRole={user?.role} // 추가
+              userRole={user?.role}
             />
           </div>
 

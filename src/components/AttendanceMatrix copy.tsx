@@ -1,3 +1,4 @@
+// src/components/AttendanceMatrix.tsx
 import React, { useMemo } from "react";
 import type { AttendanceDto, SemesterDto } from "../types";
 
@@ -55,71 +56,60 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
   const today = new Date();
   const todayStr = toDateKey(today);
 
-  // 1. 테이블 헤더 날짜 계산 (학기 필터링 + 권한별 기간 제한 적용)
+  // 1. 테이블 헤더 날짜 계산 (학기 필터링 적용)
   const targetDays = useMemo(() => {
     const days: Date[] = [];
 
-    // [기간 범위 설정]
-    let start: Date;
-    let end: Date;
-
     if ((mode === "semester" || mode === "year") && startDate && endDate) {
-      start = new Date(startDate);
-      end = new Date(endDate);
-    } else {
-      // 월간 모드
-      start = new Date(year, month - 1, 1);
-      end = new Date(year, month, 0);
-    }
+      const start = new Date(startDate);
+      const end = new Date(endDate);
 
-    start.setHours(0, 0, 0, 0);
-    end.setHours(0, 0, 0, 0);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
 
-    // [권한별 제한 적용] limitStartDate가 있으면 그 이전 날짜는 제외
-    if (limitStartDate) {
-      const limitStart = new Date(limitStartDate);
-      limitStart.setHours(0, 0, 0, 0);
-      if (start < limitStart) {
-        start = limitStart;
+      const current = new Date(start);
+      if (current.getDay() !== 0) {
+        current.setDate(current.getDate() + (7 - current.getDay()));
       }
-    }
 
-    if (limitEndDate) {
-      const limitEnd = new Date(limitEndDate);
-      limitEnd.setHours(0, 0, 0, 0);
-      if (end > limitEnd) {
-        end = limitEnd;
+      while (current <= end) {
+        const currentDateStr = toDateKey(current);
+        let isValid = true;
+
+        // ✅ [수정] 연간 모드일 때: 방학 기간(학기 범위 밖)은 제외 (교집합만 표시)
+        if (mode === "year" && semesters && semesters.length > 0) {
+          const isInAnySemester = semesters.some(
+            (sem) =>
+              currentDateStr >= sem.startDate && currentDateStr <= sem.endDate
+          );
+          if (!isInAnySemester) {
+            isValid = false; // 학기 중이 아니면 숨김
+          }
+        }
+
+        if (isValid) {
+          days.push(new Date(current));
+        }
+        current.setDate(current.getDate() + 7);
       }
+      return days;
     }
 
-    // 시작일이 종료일보다 늦어지면 빈 배열 반환
-    if (start > end) return [];
+    // 월간 모드
+    const date = new Date(year, month - 1, 1);
+    while (date.getMonth() === month - 1) {
+      if (date.getDay() === 0) {
+        const dateString = toDateKey(date);
+        let isWithinRange = true;
+        if (limitStartDate && dateString < limitStartDate)
+          isWithinRange = false;
+        if (limitEndDate && dateString > limitEndDate) isWithinRange = false;
 
-    // [날짜 순회] 시작일 이후 첫 번째 일요일 찾기
-    const current = new Date(start);
-    if (current.getDay() !== 0) {
-      current.setDate(current.getDate() + (7 - current.getDay()));
-    }
-
-    while (current <= end) {
-      const currentDateStr = toDateKey(current);
-      let isValid = true;
-
-      // [학기 필터링] 연간 모드일 때 방학 기간 제외
-      if (mode === "year" && semesters && semesters.length > 0) {
-        const isInAnySemester = semesters.some(
-          (sem) =>
-            currentDateStr >= sem.startDate && currentDateStr <= sem.endDate
-        );
-        if (!isInAnySemester) {
-          isValid = false;
+        if (isWithinRange) {
+          days.push(new Date(date));
         }
       }
-
-      if (isValid) {
-        days.push(new Date(current));
-      }
-      current.setDate(current.getDate() + 7);
+      date.setDate(date.getDate() + 1);
     }
     return days;
   }, [
@@ -151,8 +141,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
 
   return (
     <div className="bg-white rounded-2xl">
-      {/* 헤더 타이틀 표시 (필요 시 주석 해제하여 사용) */}
-      {/* <div className="flex items-center justify-between mb-4 px-2">
+      <div className="flex items-center justify-between mb-4 px-2">
         {mode === "year" ? (
           <h3 className="text-lg sm:text-xl font-bold text-gray-800">
             {year}년 전체 (학기 중)
@@ -166,7 +155,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
             {year}년 {month}월
           </h3>
         )}
-      </div> */}
+      </div>
 
       {loading && (
         <div className="h-40 flex flex-col items-center justify-center text-gray-400">
@@ -196,11 +185,11 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                     </th>
                   ))
                 ) : (
-                  <th className="p-4 text-gray-400 font-normal border-b border-gray-100 text-center min-w-[200px]">
-                    표시할 출석 데이터가 없습니다. (조회 기간 확인 필요)
+                  <th className="p-2 text-gray-400 font-normal border-b border-gray-100">
+                    일정 없음
                   </th>
                 )}
-                {showAttendanceRate && targetDays.length > 0 && (
+                {showAttendanceRate && (
                   <th className="sticky right-0 z-20 bg-gray-50 p-2 min-w-[60px] text-center font-medium text-gray-500 border-b border-l border-gray-200 shadow-[-1px_0_3px_rgba(0,0,0,0.05)]">
                     출석률
                   </th>
@@ -271,7 +260,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                         } else if (isBeforeJoin) {
                           content = (
                             <div
-                              className="mx-auto w-1.5 h-1.5 rounded-full bg-gray-200"
+                              className="mx-auto w-2 h-2 rounded-full bg-gray-200"
                               title="배정 전"
                             />
                           );
@@ -290,7 +279,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                         } else {
                           content = (
                             <div
-                              className="mx-auto w-2.5 h-2.5 rounded-full bg-gray-300 border border-gray-400"
+                              className="mx-auto w-3 h-3 rounded-full bg-gray-300 border border-gray-400"
                               title="미체크"
                             />
                           );
@@ -307,7 +296,7 @@ const AttendanceMatrix: React.FC<AttendanceMatrixProps> = ({
                     ) : (
                       <td className="p-2 border-b border-gray-50"></td>
                     )}
-                    {showAttendanceRate && targetDays.length > 0 && (
+                    {showAttendanceRate && (
                       <td className="sticky right-0 z-20 bg-white p-2 text-center border-b border-l border-gray-100 font-bold text-indigo-600 shadow-[-1px_0_3px_rgba(0,0,0,0.05)]">
                         {attendanceRate}%
                       </td>

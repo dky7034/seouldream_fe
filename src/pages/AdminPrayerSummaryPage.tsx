@@ -446,7 +446,7 @@ const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
           <div className="flex justify-between items-end mb-2">
             <label className="text-xs font-bold text-gray-500">학기 선택</label>
             <span className="text-[10px] text-gray-400 font-normal sm:hidden">
-              좌우로 스크롤하여 선택
+              좌우로 스크롤
             </span>
           </div>
 
