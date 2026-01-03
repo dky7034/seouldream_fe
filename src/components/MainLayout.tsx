@@ -226,10 +226,18 @@ const MainLayout: React.FC = () => {
             <div className="flex items-center space-x-4">
               <Link
                 to="/dashboard"
-                className="inline-flex items-center px-1 py-1 rounded-md hover:bg-gray-50"
+                // gap-2 추가: 로고와 텍스트 사이 간격 확보
+                className="inline-flex items-center gap-2 px-1 py-1 rounded-md hover:bg-gray-50"
               >
+                {/* 로고 이미지 추가 */}
+                <img
+                  src="/public/seouldream_logo_upscaled_1280.jpg"
+                  alt="서울드림 로고"
+                  className="h-10 w-auto object-contain"
+                />
                 <h1 className="text-xl font-bold text-gray-900">NEXTDREAM</h1>
               </Link>
+
               <nav className="hidden md:flex space-x-4 lg:space-x-6 text-xs lg:text-sm">
                 {renderNavLinks("desktop")}
               </nav>

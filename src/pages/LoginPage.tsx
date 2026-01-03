@@ -86,9 +86,15 @@ const LoginPage: React.FC = () => {
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg px-6 py-8 sm:px-8 sm:py-10 space-y-6">
         {/* 상단 로고/타이틀 영역 */}
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 mb-3 rounded-full bg-indigo-600 text-white font-bold text-lg">
-            D
+          {/* 로고 이미지 영역 변경됨 */}
+          <div className="flex justify-center mb-4">
+            <img
+              src="/public/seouldream_logo_upscaled_1280.jpg"
+              alt="서울드림 로고"
+              className="h-20 w-auto object-contain"
+            />
           </div>
+
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
             넥스트드림 출석 관리
           </h1>
