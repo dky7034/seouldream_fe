@@ -174,40 +174,31 @@ const computeIncompleteRange = (
   }
 
   // ✅ 4) 핵심: startDate > endDate 역전 방지
-  // clamp 결과가 역전되면, "해당 학기 범위"로 강제하거나 최소한 swap/고정
   if (requestedRange.startDate && requestedRange.endDate) {
     if (requestedRange.startDate > requestedRange.endDate) {
-      // 우선순위: 선택 학기 범위로 강제
       if (selectedSemester) {
         requestedRange = {
           startDate: selectedSemester.startDate,
           endDate: selectedSemester.endDate,
         };
       } else {
-        // selectedSemester가 없으면 최소한 swap
         const tmp = requestedRange.startDate;
         requestedRange.startDate = requestedRange.endDate;
         requestedRange.endDate = tmp;
       }
 
-      // 그래도 혹시 endDate가 오늘 이후면 다시 cap
       const fixedEnd = new Date(requestedRange.endDate);
       fixedEnd.setHours(23, 59, 59, 999);
       if (fixedEnd > today) {
         requestedRange.endDate = toISODateString(new Date());
       }
 
-      // 마지막 안전장치: 그래도 역전이면 end를 start로 맞춤
       if (requestedRange.startDate > requestedRange.endDate) {
         requestedRange.endDate = requestedRange.startDate;
       }
     }
   }
-  console.log("[Dashboard] incompleteRange", {
-    filter,
-    selectedSemesterId,
-    requestedRange,
-  });
+
   return requestedRange;
 };
 
@@ -387,24 +378,18 @@ const OverallAttendanceSummaryCard: React.FC<{
   let present: number | undefined;
   let possible: number | undefined;
 
+  // 1) SummaryDto (periodSummaries + totalSummary) 형태
   if ("totalSummary" in summary && summary.totalSummary) {
     rate = summary.totalSummary.attendanceRate;
     present = summary.totalSummary.totalPresent;
-    possible = summary.totalSummary.totalPossible;
-  } else if ("attendanceRate" in summary) {
-    rate = summary.attendanceRate;
-    present = (summary as any).totalPresent;
-    possible = (summary as any).totalPossible ?? summary.totalRecords;
+    possible = summary.totalSummary.totalPossible ?? undefined;
   }
-
-  // ✅ 카드가 최종적으로 쓰는 값 로그
-  console.log("[SummaryCard]", {
-    label,
-    rate,
-    present,
-    possible,
-    raw: summary,
-  });
+  // 2) StatDto 형태: 출석률만 표시(분자/분모는 표시하지 않음)
+  else if ("attendanceRate" in summary) {
+    rate = summary.attendanceRate;
+    present = undefined;
+    possible = undefined;
+  }
 
   const rateColor = (rate || 0) < 10 ? "text-red-500" : "text-indigo-600";
 
@@ -423,9 +408,11 @@ const OverallAttendanceSummaryCard: React.FC<{
             </div>
           </div>
         </div>
+
         <p className={`mt-1 text-2xl sm:text-3xl font-semibold ${rateColor}`}>
           {typeof rate === "number" ? `${rate.toFixed(0)}%` : "-"}
         </p>
+
         {typeof present === "number" && typeof possible === "number" && (
           <p className="text-xs text-gray-500 mt-1 whitespace-nowrap">
             ({present}명 출석 / 총 {possible}명 대상)
@@ -444,12 +431,6 @@ const AttendanceTrend: React.FC<{
 }> = ({ data, selectedGroupBy, title, dateRange }) => {
   const items = data ?? [];
 
-  // ✅ 트렌드 마지막 값(69/100 같은 값) 로그
-  console.log(
-    "[Trend] lastItem",
-    items.length ? items[items.length - 1] : null
-  );
-
   if (items.length === 0) {
     return (
       <div className="mt-4 h-24 flex items-center justify-center text-sm text-gray-500">
@@ -457,10 +438,12 @@ const AttendanceTrend: React.FC<{
       </div>
     );
   }
+
   const shouldLimit = selectedGroupBy === "DAY" || selectedGroupBy === "WEEK";
   const MAX_ITEMS = 12;
   const slicedData =
     shouldLimit && items.length > MAX_ITEMS ? items.slice(-MAX_ITEMS) : items;
+
   return (
     <div className="mt-4">
       <div className="flex justify-between items-center mb-2">
@@ -474,6 +457,7 @@ const AttendanceTrend: React.FC<{
           </span>
         )}
       </div>
+
       <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
         {slicedData.map((item) => (
           <div key={item.dateGroup} className="space-y-1">
@@ -708,7 +692,6 @@ const DashboardPage: React.FC = () => {
     setIncompleteFilter(filter);
   };
 
-  // DashboardPage.tsx 내부
   const fetchData = useCallback(async () => {
     if (!user) return;
     if (isExecutive && semesters.length === 0) return;
@@ -724,28 +707,11 @@ const DashboardPage: React.FC = () => {
       new Date().getFullYear()
     );
 
-    // ✅ 1) 트렌드 기간 로그
-    console.log("[Dashboard] trendRange", {
-      isExecutive,
-      summaryMode,
-      period,
-      groupBy,
-      selectedSemesterId,
-      startDate,
-      endDate,
-    });
-
     try {
       const mainData = await dashboardService.getDashboardData(period, {
         startDate,
         endDate,
       });
-
-      // ✅ mainData 요약값 확인
-      console.log(
-        "[Dashboard] mainData.overallAttendanceSummary",
-        mainData.overallAttendanceSummary
-      );
 
       setLoadingCharts(true);
       const chartPromise = statisticsService.getAttendanceTrend({
@@ -765,16 +731,9 @@ const DashboardPage: React.FC = () => {
 
           const sm = semesters.find((s) => s.id === selectedSemesterId);
           if (sm) {
-            // ✅ endDate future cap (오늘 이후면 오늘로)
             const todayIso = toISODateString(new Date());
             const cappedEnd =
               sm.endDate && sm.endDate > todayIso ? todayIso : sm.endDate;
-
-            console.log("[Dashboard] summaryRange(SEMESTER CAPPED)", {
-              smStart: sm.startDate,
-              smEndRaw: sm.endDate,
-              smEndCapped: cappedEnd,
-            });
 
             return await statisticsService.getOverallAttendance({
               startDate: sm.startDate,
@@ -791,14 +750,6 @@ const DashboardPage: React.FC = () => {
         summaryPromise,
       ]);
 
-      // ✅ 3) 실제로 내려온 트렌드/요약 로그
-      console.log(
-        "[Dashboard] trendData last",
-        trendData?.slice?.(-1)?.[0] ?? trendData
-      );
-      console.log("[Dashboard] finalSummary", finalSummary);
-
-      // 이하 원래 코드 그대로
       setLoadingSub(true);
       const [noticesPage, prayersPage, unassignedData] = await Promise.all([
         noticeService.getAllNotices({ size: 1 }),
@@ -822,34 +773,6 @@ const DashboardPage: React.FC = () => {
           finalSummary ?? mainData.overallAttendanceSummary,
         attendanceTrend: trendData,
         unassignedMemberCount: filteredUnassigned.length,
-      });
-
-      console.log("[Dashboard] cellAttendanceSummaries sample", {
-        count: mainData.cellAttendanceSummaries?.length ?? 0,
-        first: mainData.cellAttendanceSummaries?.[0],
-        firstKeys: mainData.cellAttendanceSummaries?.[0]
-          ? Object.keys(mainData.cellAttendanceSummaries[0] as any)
-          : [],
-        firstTotalSummaryKeys: (mainData.cellAttendanceSummaries?.[0] as any)
-          ?.totalSummary
-          ? Object.keys(
-              (mainData.cellAttendanceSummaries?.[0] as any).totalSummary
-            )
-          : [],
-        min: Math.min(
-          ...(mainData.cellAttendanceSummaries ?? []).map((x: any) =>
-            typeof x?.totalSummary?.attendanceRate === "number"
-              ? x.totalSummary.attendanceRate
-              : 999
-          )
-        ),
-        max: Math.max(
-          ...(mainData.cellAttendanceSummaries ?? []).map((x: any) =>
-            typeof x?.totalSummary?.attendanceRate === "number"
-              ? x.totalSummary.attendanceRate
-              : -1
-          )
-        ),
       });
 
       setLoadingMain(false);
@@ -1057,7 +980,7 @@ const DashboardPage: React.FC = () => {
                     </div>
                   ) : (
                     <>
-                      {/* 모바일 뷰: 카드 레이아웃 최적화 */}
+                      {/* 모바일 뷰 */}
                       <div className="block md:hidden bg-gray-50 p-3 space-y-3 rounded-lg">
                         {unassignedList.slice(0, 5).map((member) => {
                           return (
@@ -1143,7 +1066,7 @@ const DashboardPage: React.FC = () => {
                         )}
                       </div>
 
-                      {/* 데스크탑 뷰: 테이블 */}
+                      {/* 데스크탑 뷰 */}
                       <div className="hidden md:block overflow-x-auto border border-gray-100 rounded-lg">
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50">
