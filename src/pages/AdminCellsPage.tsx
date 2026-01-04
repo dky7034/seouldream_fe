@@ -317,7 +317,7 @@ const AdminCellsPage: React.FC = () => {
     }
 
     // 수정된 최종 기간 확인용 로그
-    console.log("최종 서버 요청 기간:", startStr, "~", endStr);
+    // console.log("최종 서버 요청 기간:", startStr, "~", endStr);
 
     return { startDate: startStr, endDate: endStr };
   }, [filterType, filters, semesters]);

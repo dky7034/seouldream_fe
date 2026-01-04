@@ -853,9 +853,9 @@ const CellDetailPage: React.FC = () => {
   const fetchPeriodData = useCallback(async () => {
     if (!cellIdNum || !periodRange.startDate) return;
     try {
-      console.log(
-        `[Fetch Data] Fetching for range: ${periodRange.startDate} ~ ${periodRange.endDate}`
-      );
+      // console.log(
+      //   `[Fetch Data] Fetching for range: ${periodRange.startDate} ~ ${periodRange.endDate}`
+      // );
 
       const summary = await cellService.getCellAttendanceSummary(cellIdNum, {
         startDate: periodRange.startDate,
