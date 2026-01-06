@@ -213,6 +213,19 @@ const LoginPage: React.FC = () => {
             </button>
           </div>
         </form>
+
+        {/* 하단 회원가입/안내 영역 */}
+        <div className="pt-4 mt-2 border-t border-gray-100">
+          <p className="text-xs sm:text-sm text-center text-gray-600">
+            계정이 없으신가요?{" "}
+            <Link
+              to="/register"
+              className="font-medium text-indigo-600 hover:text-indigo-500"
+            >
+              회원가입 (추후 삭제 예정)
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

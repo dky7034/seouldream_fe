@@ -12,7 +12,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import "./styles/datepicker-tailwind.css";
 
 // ✅ 페이지들을 lazy import로 변경 (필요할 때만 로딩)
-const LoginPage = lazy(() => import("./pages/LoginPage"));
+// const LoginPage = lazy(() => import("./pages/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/RegisterPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
@@ -70,7 +70,7 @@ function App() {
       <Suspense fallback={<LoadingFallback />}>
         <Routes>
           {/* Public routes */}
-          <Route path="/" element={<LoginPage />} />
+          {/* <Route path="/" element={<LoginPage />} /> */}
           <Route path="/register" element={<RegisterPage />} />
 
           {/* Protected routes (로그인한 모든 사용자) */}
