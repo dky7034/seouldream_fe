@@ -331,7 +331,7 @@ const AttendanceSummaryCard: React.FC<{
   startDate: string;
   endDate: string;
   limitStartDate?: string;
-  userRole?: string; // 👈 타입 정의
+  userRole?: string;
 }> = ({
   summary,
   memberId,
@@ -350,7 +350,7 @@ const AttendanceSummaryCard: React.FC<{
   startDate,
   endDate,
   limitStartDate,
-  userRole, // 👈 ✅ 주석 해제 및 사용
+  userRole,
 }) => {
   const totalSummary = summary?.totalSummary;
 
