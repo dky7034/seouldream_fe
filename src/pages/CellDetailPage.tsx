@@ -762,18 +762,29 @@ const CellDetailPage: React.FC = () => {
     return targetYm >= sYm && targetYm <= eYm;
   };
 
+  // ✅ [수정됨] 학기 목록 로딩 로직
   useEffect(() => {
     const loadSemesters = async () => {
+      // 유저 정보가 로딩되기 전이면 실행하지 않음
+      if (!user) return;
+
       try {
-        // ✅ [수정] 활성화된 학기만 불러오기 (true 전달)
-        const data = await semesterService.getAllSemesters(true);
+        // 💡 핵심 변경 사항:
+        // 1. 임원(EXECUTIVE): undefined 전달 -> 필터 없이 '전체' 조회
+        // 2. 셀장/그 외: true 전달 -> '활성(Active)' 학기만 조회
+        // (기존에는 false를 보내서 '비활성(Inactive)' 학기만 조회되었던 것임)
+        const activeFilter = user.role === "EXECUTIVE" ? undefined : true;
+
+        // semesterService.getAllSemesters 정의가 (isActive?: boolean) 형태여야 합니다.
+        const data = await semesterService.getAllSemesters(activeFilter);
+
         const sortedData = data.sort(
           (a, b) =>
             new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
         );
         setSemesters(sortedData);
 
-        // ✅ [수정] 연도 데이터도 활성화된 학기 기준으로 추출
+        // 연도 데이터 추출
         const years = Array.from(
           new Set(sortedData.map((s) => new Date(s.startDate).getFullYear()))
         ).sort((a, b) => b - a);
@@ -791,6 +802,7 @@ const CellDetailPage: React.FC = () => {
             setActiveSemester(sortedData[0]);
             setSelectedYear(new Date(sortedData[0].startDate).getFullYear());
           }
+          // 기본값 설정
           setUnitType("semester");
           setSelectedMonth(null);
         }
@@ -798,8 +810,9 @@ const CellDetailPage: React.FC = () => {
         console.error("학기 로딩 실패", err);
       }
     };
+
     loadSemesters();
-  }, []);
+  }, [user]);
 
   const periodRange = useMemo(() => {
     if (unitType === "year")

@@ -263,8 +263,8 @@ const DashboardFilterToolbar: React.FC<{
           >
             {semesters.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name} ({s.startDate.substring(0, 4)}){" "}
-                {s.isActive ? "(진행중)" : "(마감됨)"}
+                {/* {s.name} ({s.startDate.substring(0, 4)}){" "} */}
+                {s.name} {s.isActive ? "(진행중)" : "(마감됨)"}
               </option>
             ))}
           </select>
