@@ -1,19 +1,19 @@
-// src/App.tsx
-import { Suspense, lazy } from "react"; // ✅ Suspense, lazy 추가
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Suspense, lazy } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"; // ✅ Navigate 추가 (비정상 접근 방지용)
 
-// 레이아웃과 라우트 가드는 보통 바로 뜨는 게 좋아서 그대로 둡니다 (취향에 따라 이것도 lazy 가능)
 import MainLayout from "./components/MainLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ExecOnlyRoute from "./components/ExecOnlyRoute";
 
-// CSS는 그대로 유지
 import "react-datepicker/dist/react-datepicker.css";
 import "./styles/datepicker-tailwind.css";
 
-// ✅ 페이지들을 lazy import로 변경 (필요할 때만 로딩)
-// const LoginPage = lazy(() => import("./pages/LoginPage"));
-const RegisterPage = lazy(() => import("./pages/RegisterPage"));
+// ✅ 1. [수정됨] 로그인 페이지 활성화 (주석 해제)
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+
+// ✅ 2. [수정됨] 회원가입 페이지 비활성화 (주석 처리)
+// const RegisterPage = lazy(() => import("./pages/RegisterPage"));
+
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
 const AddUserPage = lazy(() => import("./pages/AddUserPage"));
@@ -56,7 +56,6 @@ const AdminPrayerSummaryPage = lazy(
 const CellLeaderDashboard = lazy(() => import("./pages/CellLeaderDashboard"));
 const StatisticsPage = lazy(() => import("./pages/StatisticsPage"));
 
-// ✅ 로딩 중에 보여줄 간단한 컴포넌트
 const LoadingFallback = () => (
   <div className="flex items-center justify-center min-h-screen">
     <div className="text-lg font-semibold text-gray-500">페이지 로딩 중...</div>
@@ -66,21 +65,22 @@ const LoadingFallback = () => (
 function App() {
   return (
     <BrowserRouter>
-      {/* ✅ Suspense로 감싸야 lazy 로딩이 작동합니다. 페이지 전환 시 fallback 컴포넌트가 잠시 뜸 */}
       <Suspense fallback={<LoadingFallback />}>
         <Routes>
           {/* Public routes */}
-          {/* <Route path="/" element={<LoginPage />} /> */}
-          <Route path="/register" element={<RegisterPage />} />
+
+          {/* ✅ 3. [수정됨] 로그인 경로 활성화 */}
+          <Route path="/" element={<LoginPage />} />
+
+          {/* ✅ 4. [수정됨] 회원가입 경로 막기 (접속 시 로그인 화면으로 튕기게 설정) */}
+          {/* <Route path="/register" element={<RegisterPage />} /> */}
+          <Route path="/register" element={<Navigate to="/" replace />} />
 
           {/* Protected routes (로그인한 모든 사용자) */}
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
-              {/* --- [공통 접근 가능] --- */}
               <Route path="/dashboard" element={<DashboardPage />} />
-
               <Route path="/my-cell" element={<MyCellPage />} />
-
               <Route path="/cell-dashboard" element={<CellLeaderDashboard />} />
 
               {/* 멤버 상세 및 출석 기록 */}
