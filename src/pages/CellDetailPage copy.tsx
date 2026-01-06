@@ -1067,7 +1067,7 @@ const CellDetailPage: React.FC = () => {
               </span>
             </h1>
             <p className="mt-2 text-sm text-gray-600">
-              셀의 정보를 관리하고 출석 및 보고서 데이터를 확인합니다.
+              셀의 정보를 관리하고 출석 기록 데이터를 확인합니다.
             </p>
           </div>
           <div className="flex gap-2">

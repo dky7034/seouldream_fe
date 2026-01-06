@@ -125,7 +125,7 @@ const MyCellPage: React.FC = () => {
           )}
 
           <p className="mt-2 text-sm sm:text-base text-gray-600">
-            셀 보고서 작성 및 셀원 정보를 관리할 수 있습니다.
+            출석 기록 작성 및 셀원 정보를 관리할 수 있습니다.
           </p>
         </div>
 
@@ -136,10 +136,10 @@ const MyCellPage: React.FC = () => {
             role="tablist"
             aria-label="내 셀 관리 탭"
           >
-            {/* 1. 출석 및 보고서 */}
+            {/* 1. 출석 기록 */}
             {renderTabButton(
               "attendance",
-              "출석 및 보고서", // 명칭 변경
+              "출석 기록", // 명칭 변경
               CalendarDaysIcon,
               "tab-attendance",
               "panel-attendance"

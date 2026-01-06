@@ -382,13 +382,9 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
       setSuccessMessage(null);
       setIsEditMode(true);
 
-      showAlert(
-        "저장 완료",
-        "출석 및 보고서가 성공적으로 저장되었습니다.",
-        () => {
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }
-      );
+      showAlert("저장 완료", "출석 기록이 성공적으로 저장되었습니다.", () => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
     } catch (err: any) {
       const errorMsg = err.response?.data?.message || "오류가 발생했습니다.";
       setSubmitError(errorMsg);
@@ -658,7 +654,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                     className="w-full bg-indigo-600 text-white text-base font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 active:scale-[0.98] transition-all disabled:bg-gray-300 disabled:shadow-none whitespace-nowrap"
                     disabled={loading || memberAttendances.length === 0}
                   >
-                    {loading ? "저장 중..." : "출석 및 보고서 제출하기"}
+                    {loading ? "저장 중..." : "출석 기록 제출하기"}
                   </button>
                 ) : (
                   <div className="w-full bg-gray-100 text-gray-500 text-sm font-bold py-3.5 rounded-xl border border-gray-200 text-center flex items-center justify-center gap-2 whitespace-nowrap">
