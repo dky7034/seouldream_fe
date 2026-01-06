@@ -331,7 +331,7 @@ const AttendanceSummaryCard: React.FC<{
   startDate: string;
   endDate: string;
   limitStartDate?: string;
-  userRole?: string; // 👈 ✅ [수정] 여기에 이 줄을 추가해야 에러가 사라집니다!
+  userRole?: string; // 👈 타입 정의
 }> = ({
   summary,
   memberId,
@@ -350,18 +350,30 @@ const AttendanceSummaryCard: React.FC<{
   startDate,
   endDate,
   limitStartDate,
-  // userRole, // 👈 ✅ 여기서도 구조 분해 할당으로 받아주세요 (필요하다면 사용)
+  userRole, // 👈 ✅ 주석 해제 및 사용
 }) => {
   const totalSummary = summary?.totalSummary;
 
-  // limitStartDate가 있으면 그 이전의 학기는 선택할 수 없도록 필터링
+  // ✅ [수정됨] 권한 및 날짜 제한에 따른 학기 필터링
   const availableSemesters = useMemo(() => {
-    if (!limitStartDate) return semesters;
-    return semesters.filter((s) => s.endDate >= limitStartDate);
-  }, [semesters, limitStartDate]);
+    let filtered = semesters;
+
+    // 1. 셀장(CELL_LEADER)은 오직 '활성화된(isActive)' 학기만 조회 가능
+    if (userRole === "CELL_LEADER") {
+      filtered = filtered.filter((s) => s.isActive);
+    }
+
+    // 2. limitStartDate(배정일 등)가 있으면 그 이전 학기는 제외
+    if (limitStartDate) {
+      filtered = filtered.filter((s) => s.endDate >= limitStartDate);
+    }
+
+    return filtered;
+  }, [semesters, limitStartDate, userRole]);
 
   const semesterMonths = useMemo(() => {
     if (!activeSemester) return [];
+    // ... (기존 로직 동일)
     const s = new Date(activeSemester.startDate);
     const e = new Date(activeSemester.endDate);
     const months: number[] = [];
