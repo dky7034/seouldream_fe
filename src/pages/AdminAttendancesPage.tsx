@@ -32,7 +32,6 @@ import {
   MinusIcon,
   CalendarDaysIcon,
   FunnelIcon,
-  MagnifyingGlassIcon,
 } from "@heroicons/react/24/solid";
 import { FaTh } from "react-icons/fa";
 
@@ -41,7 +40,7 @@ import { FaTh } from "react-icons/fa";
 // ─────────────────────────────────────────────────────────────
 
 type UnitType = "year" | "semester";
-type SortOrder = "name" | "age";
+type SortDirection = "asc" | "desc"; // 정렬 방향 타입
 
 type Filters = {
   member: SelectOption | null;
@@ -51,9 +50,6 @@ type Filters = {
   includeExecutive: boolean;
 };
 
-// ✅ [삭제됨] pad 함수 제거 완료
-
-// 스크롤바 숨김 스타일
 const scrollbarHideStyle: React.CSSProperties = {
   msOverflowStyle: "none",
   scrollbarWidth: "none",
@@ -196,7 +192,8 @@ const AttendanceMatrixView = memo(
     isLoading,
     includeExecutive,
     semesters,
-    sortOrder,
+    nameSort, // ✅ 이름 정렬 상태
+    ageSort, // ✅ 나이 정렬 상태
   }: {
     members: MemberDto[];
     attendances: AttendanceDto[];
@@ -206,7 +203,8 @@ const AttendanceMatrixView = memo(
     isLoading: boolean;
     includeExecutive: boolean;
     semesters: SemesterDto[];
-    sortOrder: SortOrder;
+    nameSort: SortDirection | null;
+    ageSort: SortDirection | null;
   }) => {
     const attendanceMap = useMemo(() => {
       const map = new Map<string, string>();
@@ -303,14 +301,25 @@ const AttendanceMatrixView = memo(
         members
           .filter((m) => includeExecutive || m.role !== "EXECUTIVE")
           .sort((a, b) => {
-            if (sortOrder === "age") {
-              const birthA = a.birthDate || "9999-99-99";
-              const birthB = b.birthDate || "9999-99-99";
+            const birthA = a.birthDate || "9999-99-99";
+            const birthB = b.birthDate || "9999-99-99";
+
+            // ✅ 1순위: 나이 정렬 (ageSort가 있을 때)
+            if (ageSort) {
               if (birthA !== birthB) {
-                return birthA.localeCompare(birthB);
+                // age 'asc' = 나이 적은 순 = 생일 늦은 순 (내림차순)
+                // age 'desc' = 나이 많은 순 = 생일 빠른 순 (오름차순)
+                return ageSort === "asc"
+                  ? birthB.localeCompare(birthA)
+                  : birthA.localeCompare(birthB);
               }
-              return a.name.localeCompare(b.name);
             }
+
+            // ✅ 2순위: 이름 정렬 (nameSort가 있거나, 기본값)
+            if (nameSort === "desc") {
+              return b.name.localeCompare(a.name);
+            }
+            // 기본값: 이름 오름차순 (nameSort === 'asc' 또는 null일 때도 가나다순)
             return a.name.localeCompare(b.name);
           })
           .map((m) => ({
@@ -320,7 +329,7 @@ const AttendanceMatrixView = memo(
             createdAt: m.createdAt,
             joinYear: m.joinYear,
           })),
-      [members, includeExecutive, sortOrder]
+      [members, includeExecutive, nameSort, ageSort] // 의존성 업데이트
     );
 
     const matrixMode = "semester";
@@ -429,7 +438,10 @@ const AdminAttendancesPage: React.FC = () => {
   });
 
   const [unitType, setUnitType] = useState<UnitType>("semester");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("name");
+
+  // ✅ [수정] 독립적인 정렬 상태 관리 (기본: 이름 오름차순, 나이 없음)
+  const [nameSort, setNameSort] = useState<SortDirection | null>("asc");
+  const [ageSort, setAgeSort] = useState<SortDirection | null>(null);
 
   const isExecutive = useMemo(() => user?.role === "EXECUTIVE", [user]);
   const isCellLeader = useMemo(() => user?.role === "CELL_LEADER", [user]);
@@ -567,12 +579,25 @@ const AdminAttendancesPage: React.FC = () => {
     }
   }, [getCleanedParams]);
 
+  // 필터 변경 시 자동 조회
+  useEffect(() => {
+    if (semesters.length > 0 && !hasAutoSelectedSemester) return;
+
+    if (user && ["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
+      fetchAttendances();
+      fetchOverallStats();
+    }
+  }, [
+    fetchAttendances,
+    fetchOverallStats,
+    user,
+    semesters.length,
+    hasAutoSelectedSemester,
+  ]);
+
+  // 멤버 목록 로드
   useEffect(() => {
     if (user && ["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
-      if (semesters.length > 0 || hasActiveSemesters === false) {
-        fetchAttendances();
-        fetchOverallStats();
-      }
       (async () => {
         try {
           const res = await memberService.getAllMembers({ size: 1000 });
@@ -582,14 +607,9 @@ const AdminAttendancesPage: React.FC = () => {
         }
       })();
     }
-  }, [
-    user,
-    fetchOverallStats,
-    fetchAttendances,
-    semesters.length,
-    hasActiveSemesters,
-  ]);
+  }, [user]);
 
+  // 연도/학기/셀 데이터 로드
   useEffect(() => {
     if (user && ["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
       attendanceService
@@ -619,11 +639,6 @@ const AdminAttendancesPage: React.FC = () => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleSearch = () => {
-    fetchAttendances();
-    fetchOverallStats();
-  };
-
   const resetFilters = () => {
     if (!user) return;
     setFilters({
@@ -637,7 +652,8 @@ const AdminAttendancesPage: React.FC = () => {
       includeExecutive: false,
     });
     setUnitType("year");
-    setSortOrder("name");
+    setNameSort("asc");
+    setAgeSort(null);
   };
 
   const handleUnitTypeClick = useCallback(
@@ -719,9 +735,15 @@ const AdminAttendancesPage: React.FC = () => {
     return allMembers;
   }, [allMembers, filters.member, filters.cell, isCellLeader, user]);
 
-  const sortOptions = [
-    { value: "name", label: "이름순 (가나다)" },
-    { value: "age", label: "나이순 (연장자순)" },
+  // ✅ [수정] 정렬 옵션 정의
+  const nameSortOptions = [
+    { value: "asc", label: "이름 오름차순" },
+    { value: "desc", label: "이름 내림차순" },
+  ];
+
+  const ageSortOptions = [
+    { value: "asc", label: "나이 적은순" },
+    { value: "desc", label: "나이 많은순" },
   ];
 
   if (!user || !["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
@@ -880,8 +902,8 @@ const AdminAttendancesPage: React.FC = () => {
               )}
             </div>
 
-            {/* 필터 입력 필드 (3열 구조: 셀 / 멤버 / 정렬) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* ✅ [수정] 4열 구조: 소속 셀 / 멤버 / 이름 정렬 / 나이 정렬 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <label className="text-xs font-bold text-gray-500 mb-1 block">
                   소속 셀
@@ -907,6 +929,7 @@ const AdminAttendancesPage: React.FC = () => {
                   </div>
                 )}
               </div>
+
               <div>
                 <label className="text-xs font-bold text-gray-500 mb-1 block">
                   멤버 검색
@@ -928,27 +951,52 @@ const AdminAttendancesPage: React.FC = () => {
                   />
                 </div>
               </div>
-              {/* ✅ 정렬 기준 선택 (UI 통일 + 검색 비활성화) */}
+
+              {/* ✅ 이름 정렬 (독립) */}
               <div>
                 <label className="text-xs font-bold text-gray-500 mb-1 block">
-                  정렬 기준
+                  이름 정렬
                 </label>
                 <div className="h-[46px]">
                   <SimpleSearchableSelect
-                    options={sortOptions}
-                    value={sortOrder}
-                    onChange={(value) => {
-                      if (value) setSortOrder(value as SortOrder);
-                    }}
-                    placeholder="정렬 기준"
-                    isClearable={false}
-                    isSearchable={false} // ✅ 이제 오류가 발생하지 않습니다.
+                    options={nameSortOptions}
+                    value={nameSort}
+                    onChange={(value) => setNameSort(value as SortDirection)}
+                    placeholder="이름순"
+                    isClearable={true}
+                    isSearchable={false}
+                  />
+                </div>
+              </div>
+
+              {/* ✅ 나이 정렬 (독립) */}
+              <div>
+                <label className="text-xs font-bold text-gray-500 mb-1 block">
+                  나이 정렬
+                </label>
+                <div className="h-[46px]">
+                  <SimpleSearchableSelect
+                    options={ageSortOptions}
+                    value={ageSort}
+                    onChange={(value) => setAgeSort(value as SortDirection)}
+                    placeholder="나이순"
+                    isClearable={true}
+                    isSearchable={false}
                   />
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-end py-2">
+            {/* 하단 옵션바 (초기화 + 임원 포함) */}
+            <div className="flex items-center justify-between py-3 mt-1 border-t border-gray-50">
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="text-xs font-bold text-gray-400 hover:text-gray-700 underline decoration-gray-300 underline-offset-2 whitespace-nowrap transition-colors"
+              >
+                필터 초기화
+              </button>
+
               <label className="flex items-center gap-2 cursor-pointer select-none group">
                 <div className="relative">
                   <input
@@ -962,28 +1010,9 @@ const AdminAttendancesPage: React.FC = () => {
                   <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
                 </div>
                 <span className="text-sm font-bold text-gray-500 group-hover:text-gray-800 transition-colors whitespace-nowrap">
-                  임원단 포함하여 보기
+                  임원단 포함
                 </span>
               </label>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between pt-2 border-t border-gray-50">
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="text-xs font-bold text-gray-500 hover:text-gray-800 underline decoration-gray-300 underline-offset-2 whitespace-nowrap"
-              >
-                필터 초기화
-              </button>
-              <button
-                type="button"
-                onClick={handleSearch}
-                disabled={loading}
-                className="flex items-center justify-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed transition-all whitespace-nowrap"
-              >
-                <MagnifyingGlassIcon className="h-4 w-4" />
-                {loading ? "조회 중..." : "조회하기"}
-              </button>
             </div>
           </div>
         </div>
@@ -1008,7 +1037,8 @@ const AdminAttendancesPage: React.FC = () => {
             isLoading={loading}
             includeExecutive={filters.includeExecutive}
             semesters={semesters}
-            sortOrder={sortOrder}
+            nameSort={nameSort}
+            ageSort={ageSort}
           />
         )}
       </div>
