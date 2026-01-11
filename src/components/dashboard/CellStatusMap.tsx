@@ -23,12 +23,12 @@ const CellStatusMap: React.FC<CellStatusMapProps> = ({ cellSummaries }) => {
     return "bg-rose-50 text-rose-700 border-rose-200";
   };
 
-  const getStatusLabel = (rate: number) => {
-    if (rate >= 90) return "안정";
-    if (rate >= 80) return "양호";
-    if (rate >= 70) return "보통";
-    return "관심";
-  };
+  // const getStatusLabel = (rate: number) => {
+  //   if (rate >= 90) return "안정";
+  //   if (rate >= 80) return "양호";
+  //   if (rate >= 70) return "보통";
+  //   return "관심";
+  // };
 
   if (!cellSummaries || cellSummaries.length === 0) return null;
 
@@ -82,7 +82,8 @@ const CellStatusMap: React.FC<CellStatusMapProps> = ({ cellSummaries }) => {
 
               <div className="flex justify-between items-end mt-auto">
                 <span className="text-[10px] opacity-80">
-                  {getStatusLabel(rate)}
+                  {/* {getStatusLabel(rate)} */}
+                  출석률
                 </span>
                 <span className="text-sm font-extrabold">
                   {rate.toFixed(0)}%
