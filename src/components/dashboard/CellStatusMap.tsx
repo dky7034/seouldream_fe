@@ -44,19 +44,19 @@ const CellStatusMap: React.FC<CellStatusMapProps> = ({ cellSummaries }) => {
         <div className="flex items-center gap-2 text-xs">
           <span className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-            안정(90%↑)
+            90%↑
           </span>
           <span className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-            양호(80%↑)
+            80%↑
           </span>
           <span className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-yellow-400"></span>
-            보통(70%↑)
+            70%↑
           </span>
           <span className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-rose-400"></span>
-            관심(70%↓)
+            70%↓
           </span>
         </div>
       </div>
