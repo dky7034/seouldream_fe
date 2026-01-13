@@ -926,20 +926,51 @@ const CellDetailPage: React.FC = () => {
   };
   const handleUnitTypeChange = (type: "semester" | "month" | "year") => {
     setUnitType(type);
+
     if (type === "semester") {
       setSelectedMonth(null);
-      const targetSem = semesters.find(
+
+      // [수정 로직 시작]
+      const now = new Date();
+
+      // 1. 현재 선택된 연도('selectedYear')에 해당하는 학기들을 먼저 추려냅니다.
+      const currentYearSemesters = semesters.filter(
         (s) => new Date(s.startDate).getFullYear() === selectedYear
       );
-      if (targetSem) setActiveSemester(targetSem);
+
+      // 2. 그 학기들 중에서 '오늘 날짜'를 포함하고 있는 학기가 있는지 확인합니다. (가장 우선순위)
+      let targetSem = currentYearSemesters.find((s) =>
+        isDateInSemesterMonthRange(now, s)
+      );
+
+      // 3. 만약 오늘 날짜에 해당하는 학기가 없다면(과거 연도를 보고 있거나 방학 등),
+      //    해당 연도의 학기 목록 중 가장 첫 번째(보통 최신) 학기를 선택합니다.
+      if (!targetSem && currentYearSemesters.length > 0) {
+        targetSem = currentYearSemesters[0];
+      }
+
+      // 4. 만약 위에서도 찾지 못했다면(연도가 변경된 경우 등), 전체 목록 중 가장 최신 학기를 선택합니다.
+      if (!targetSem && semesters.length > 0) {
+        targetSem = semesters[0];
+        // 이 경우, 선택된 학기에 맞춰 연도 상태도 업데이트해줍니다.
+        setSelectedYear(new Date(targetSem.startDate).getFullYear());
+      }
+
+      if (targetSem) {
+        setActiveSemester(targetSem);
+      }
+      // [수정 로직 끝]
+
       return;
     }
+
     if (type === "year") {
       setSelectedMonth(null);
       if (activeSemester)
         setSelectedYear(new Date(activeSemester.startDate).getFullYear());
       return;
     }
+
     if (activeSemester) {
       const now = new Date();
       if (isDateInSemesterMonthRange(now, activeSemester)) {
