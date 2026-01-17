@@ -354,7 +354,7 @@ const EditCellPage: React.FC = () => {
                 )
               }
               placeholder="셀장을 선택하세요..."
-              isDisabled={user?.role !== "EXECUTIVE"}
+              disabled={user?.role !== "EXECUTIVE"}
             />
           </div>
           {formErrors.leaderId && (

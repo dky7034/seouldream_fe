@@ -1,10 +1,9 @@
 // src/pages/AdminPrayerSummaryPage.tsx
 import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { prayerService } from "../services/prayerService";
 import { semesterService } from "../services/semesterService";
 import { memberService } from "../services/memberService";
-import { cellService } from "../services/cellService";
 import { useAuth } from "../hooks/useAuth";
 import { normalizeNumberInput } from "../utils/numberUtils";
 import { formatDisplayName } from "../utils/memberUtils";
@@ -13,7 +12,7 @@ import type {
   Page,
   SemesterDto,
   PrayerMemberSummaryDto,
-  CellDto,
+  PrayerCellSummaryDto,
 } from "../types";
 import SimpleSearchableSelect from "../components/SimpleSearchableSelect";
 import Pagination from "../components/Pagination";
@@ -22,19 +21,24 @@ import {
   ChatBubbleBottomCenterTextIcon,
   FunnelIcon,
   PlusIcon,
+  UserIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/solid";
 
-// [변경] 조회 단위에서 'month' 삭제
-type UnitType = "year" | "semester";
+type SummaryMode = "members" | "cells";
+type UnitType = "year" | "month" | "semester";
 
 type SortDirection = "ascending" | "descending";
 type SortKey = "totalCount" | "latestCreatedAt" | "memberName" | "cellName";
 
-// 로컬 스토리지 키
+interface AdminPrayerSummaryPageProps {
+  initialMode?: SummaryMode;
+}
+
 const FILTER_STORAGE_KEY = "adminPrayerSummaryFilters";
 
-// 필터 상태 타입 정의
 type SavedFilterState = {
+  mode: SummaryMode;
   filterType: "unit" | "range";
   unitType: UnitType;
   filters: {
@@ -43,6 +47,7 @@ type SavedFilterState = {
     startDate: string;
     endDate: string;
     year: number | "";
+    month: number | "";
     semesterId: number | "";
   };
   currentPage: number;
@@ -50,21 +55,12 @@ type SavedFilterState = {
   sortDirection?: SortDirection;
 };
 
-// 멤버 간략 정보 타입 (셀 ID 포함)
-interface MemberSimpleDto {
-  id: number;
-  name: string;
-  birthDate?: string;
-  cellId?: number;
-}
-
 // 스크롤바 숨김 스타일
 const scrollbarHideStyle: React.CSSProperties = {
-  msOverflowStyle: "none",
-  scrollbarWidth: "none",
+  msOverflowStyle: "none" /* IE and Edge */,
+  scrollbarWidth: "none" /* Firefox */,
 };
 
-// 저장된 필터 불러오기
 const loadSavedFilterState = (): SavedFilterState | null => {
   if (typeof window === "undefined") return null;
   try {
@@ -76,37 +72,47 @@ const loadSavedFilterState = (): SavedFilterState | null => {
   }
 };
 
-const AdminPrayerSummaryPage: React.FC = () => {
+const AdminPrayerSummaryPage: React.FC<AdminPrayerSummaryPageProps> = ({
+  initialMode = "members",
+}) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const savedState = loadSavedFilterState();
 
-  // --------------------------------------------------------------------------
-  // State Definitions
-  // --------------------------------------------------------------------------
+  const urlMode: SummaryMode = useMemo(() => {
+    if (location.pathname.endsWith("/cells")) return "cells";
+    return initialMode;
+  }, [location.pathname, initialMode]);
 
-  // 데이터 리스트 상태
+  const [mode, setMode] = useState<SummaryMode>(savedState?.mode ?? urlMode);
+
+  useEffect(() => {
+    setMode(urlMode);
+  }, [urlMode]);
+
   const [memberSummaryPage, setMemberSummaryPage] =
     useState<Page<PrayerMemberSummaryDto> | null>(null);
+  const [cellSummaryPage, setCellSummaryPage] =
+    useState<Page<PrayerCellSummaryDto> | null>(null);
 
-  // 기준 정보 상태
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
-  const [allCells, setAllCells] = useState<CellDto[]>([]);
-  const [allMembers, setAllMembers] = useState<MemberSimpleDto[]>([]);
 
-  // 로딩 및 에러 상태
+  const [allMembersForNameCheck, setAllMembersForNameCheck] = useState<
+    { id: number; name: string; birthDate?: string }[]
+  >([]);
+
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 필터 및 페이지네이션 상태
   const [currentPage, setCurrentPage] = useState(savedState?.currentPage ?? 0);
   const [filterType, setFilterType] = useState<"unit" | "range">(
-    savedState?.filterType ?? "unit",
+    savedState?.filterType ?? "unit"
   );
   const [unitType, setUnitType] = useState<UnitType>(
-    savedState?.unitType ?? "semester",
+    savedState?.unitType ?? "semester"
   );
 
   const [filters, setFilters] = useState({
@@ -117,8 +123,21 @@ const AdminPrayerSummaryPage: React.FC = () => {
     year: (savedState?.filters?.year ?? new Date().getFullYear()) as
       | number
       | "",
+    month: (savedState?.filters?.month ?? "") as number | "",
     semesterId: (savedState?.filters?.semesterId ?? "") as number | "",
   });
+
+  const hasActiveSemesters = semesters.length > 0;
+
+  // ✅ [추가] 1. availableYears와 현재 filters.year 불일치 시 자동 보정
+  useEffect(() => {
+    if (availableYears.length > 0 && filters.year) {
+      if (!availableYears.includes(Number(filters.year))) {
+        // 목록에 없는 연도라면 가장 최신 연도(index 0)로 강제 변경
+        setFilters((prev) => ({ ...prev, year: availableYears[0] }));
+      }
+    }
+  }, [availableYears, filters.year]);
 
   const [sortConfig, setSortConfig] = useState<{
     key: SortKey;
@@ -128,47 +147,8 @@ const AdminPrayerSummaryPage: React.FC = () => {
     direction: savedState?.sortDirection ?? "descending",
   }));
 
-  const hasActiveSemesters = semesters.length > 0;
-
-  // --------------------------------------------------------------------------
-  // Derived State (Options & Cascading Logic)
-  // --------------------------------------------------------------------------
-
-  // 1. 셀 옵션
-  const cellOptions = useMemo(() => {
-    return allCells.map((c) => ({ value: c.id, label: c.name }));
-  }, [allCells]);
-
-  // 2. 멤버 옵션 (Cascading Select 적용)
-  const memberOptions = useMemo(() => {
-    let targetMembers = allMembers;
-
-    // 특정 셀이 선택된 경우, 해당 셀 멤버만 필터링
-    if (filters.cell !== "all") {
-      const selectedCellId = Number(filters.cell);
-      targetMembers = targetMembers.filter((m) => m.cellId === selectedCellId);
-    }
-
-    return targetMembers.map((m) => ({
-      value: m.id,
-      label: formatDisplayName(m, allMembers),
-    }));
-  }, [allMembers, filters.cell]);
-
-  const yearOptions = useMemo(() => {
-    if (availableYears.length === 0) {
-      const currentYear = new Date().getFullYear();
-      return [{ value: currentYear, label: `${currentYear}년` }];
-    }
-    return availableYears.map((year) => ({
-      value: year,
-      label: `${year}년`,
-    }));
-  }, [availableYears]);
-
-  // --------------------------------------------------------------------------
-  // Helper Functions
-  // --------------------------------------------------------------------------
+  const memberOptions: { value: number; label: string }[] = [];
+  const cellOptions: { value: number; label: string }[] = [];
 
   const safeFormatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return "-";
@@ -181,8 +161,57 @@ const AdminPrayerSummaryPage: React.FC = () => {
     return `${year}.${month}.${day}`;
   };
 
+  const fetchSemesters = useCallback(async () => {
+    try {
+      const data = await semesterService.getAllSemesters(true);
+      // 최신 학기 순 정렬
+      const sorted = data.sort((a, b) =>
+        b.startDate.localeCompare(a.startDate)
+      );
+      setSemesters(sorted);
+    } catch (err) {
+      console.error("학기 목록 로딩 실패:", err);
+      setSemesters([]);
+    }
+  }, []);
+
+  const fetchAvailableYears = useCallback(async () => {
+    try {
+      const years = await prayerService.getAvailableYears();
+      // ✅ [수정] 2. 연도 목록 정렬 (최신순)
+      setAvailableYears(years.sort((a, b) => b - a));
+    } catch (err) {
+      console.error("Failed to fetch available years for prayers:", err);
+      setAvailableYears([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchAllMembers = async () => {
+      try {
+        const page = await memberService.getAllMembers({
+          page: 0,
+          size: 2000,
+          sort: "id,asc",
+        });
+        const list = page.content.map((m) => ({
+          id: m.id,
+          name: m.name,
+          birthDate: m.birthDate,
+        }));
+        setAllMembersForNameCheck(list);
+      } catch (e) {
+        console.error("동명이인 확인용 멤버 목록 로딩 실패:", e);
+      }
+    };
+    fetchAllMembers();
+  }, [user]);
+
+  // 현재 날짜 기준 적절한 학기를 찾는 헬퍼 함수
   const findCurrentSemester = useCallback((semesterList: SemesterDto[]) => {
     if (semesterList.length === 0) return null;
+
     const now = new Date();
     const offset = now.getTimezoneOffset() * 60000;
     const localDate = new Date(now.getTime() - offset);
@@ -204,11 +233,29 @@ const AdminPrayerSummaryPage: React.FC = () => {
     }
 
     if (!target) {
+      // 이미 정렬되어 있다고 가정하지만 안전하게 재정렬
       const sorted = [...semesterList].sort((a, b) => b.id - a.id);
       target = sorted[0];
     }
+
     return target;
   }, []);
+
+  // 학기 데이터 로드 후 자동 선택 로직
+  useEffect(() => {
+    if (semesters.length === 0) return;
+    if (unitType === "semester" && !filters.semesterId) {
+      const targetSemester = findCurrentSemester(semesters);
+      if (targetSemester) {
+        setFilters((prev) => ({
+          ...prev,
+          semesterId: targetSemester.id,
+          year: "",
+          month: "",
+        }));
+      }
+    }
+  }, [semesters, unitType, filters.semesterId, findCurrentSemester]);
 
   const buildBaseParams = useCallback((): GetPrayersParams => {
     const params: GetPrayersParams = {
@@ -231,6 +278,7 @@ const AdminPrayerSummaryPage: React.FC = () => {
         }
       } else {
         params.year = normalizeNumberInput(filters.year);
+        params.month = normalizeNumberInput(filters.month);
       }
     }
 
@@ -239,114 +287,56 @@ const AdminPrayerSummaryPage: React.FC = () => {
 
     return Object.fromEntries(
       Object.entries(params).filter(
-        ([, v]) => v !== "" && v !== null && v !== undefined,
-      ),
+        ([, v]) => v !== "" && v !== null && v !== undefined
+      )
     ) as GetPrayersParams;
   }, [currentPage, filterType, filters, semesters, sortConfig]);
 
-  // --------------------------------------------------------------------------
-  // Data Fetching
-  // --------------------------------------------------------------------------
-
-  // 1. 기초 데이터 로드 (학기, 연도, 셀, 멤버)
-  const fetchBaseData = useCallback(async () => {
-    try {
-      // 학기
-      const semData = await semesterService.getAllSemesters(true);
-      setSemesters(
-        semData.sort((a, b) => b.startDate.localeCompare(a.startDate)),
-      );
-
-      // 연도
-      const years = await prayerService.getAvailableYears();
-      setAvailableYears(years.sort((a, b) => b - a));
-
-      // 셀 목록
-      const cellPage = await cellService.getAllCells({
-        page: 0,
-        size: 1000,
-        sort: "name,asc",
-      });
-      setAllCells(cellPage.content);
-
-      // 멤버 목록
-      const memberPage = await memberService.getAllMembers({
-        page: 0,
-        size: 2000,
-        sort: "name,asc",
-      });
-      const mappedMembers = memberPage.content.map((m: any) => ({
-        id: m.id,
-        name: m.name,
-        birthDate: m.birthDate,
-        cellId: m.cell?.id || m.cellId, // 셀 ID 매핑
-      }));
-      setAllMembers(mappedMembers);
-    } catch (err) {
-      console.error("기초 데이터 로딩 실패:", err);
-    }
-  }, []);
-
-  // 2. 메인 데이터 로드 (기도제목 요약)
   const fetchData = useCallback(async () => {
     if (!user) {
       setLoading(false);
       setError("로그인이 필요한 페이지입니다.");
       return;
     }
+
     setLoading(true);
     setError(null);
 
     const params = buildBaseParams();
 
     try {
-      const data = await prayerService.getMemberPrayerSummary(params);
-      setMemberSummaryPage(data);
+      if (mode === "members") {
+        const data = await prayerService.getMemberPrayerSummary(params);
+        setMemberSummaryPage(data);
+      } else {
+        const data = await prayerService.getCellPrayerSummary(params);
+        setCellSummaryPage(data);
+      }
     } catch (err) {
       console.error("기도제목 요약 로딩 실패:", err);
       setError("데이터를 불러오는 데 실패했습니다.");
     } finally {
       setLoading(false);
     }
-  }, [user, buildBaseParams]);
+  }, [user, buildBaseParams, mode]);
 
-  // --------------------------------------------------------------------------
-  // Effects
-  // --------------------------------------------------------------------------
-
-  // 초기 권한 체크 및 데이터 로드
-  useEffect(() => {
-    if (user) {
-      fetchBaseData();
-    }
-  }, [user, fetchBaseData]);
-
-  // 조건 변경 시 데이터 다시 불러오기
   useEffect(() => {
     if (user?.role === "EXECUTIVE" || user?.role === "CELL_LEADER") {
       fetchData();
     }
   }, [fetchData, user?.role]);
 
-  // 학기/연도 자동 설정
   useEffect(() => {
-    if (semesters.length === 0) return;
-    if (unitType === "semester" && !filters.semesterId) {
-      const targetSemester = findCurrentSemester(semesters);
-      if (targetSemester) {
-        setFilters((prev) => ({
-          ...prev,
-          semesterId: targetSemester.id,
-          year: "",
-        }));
-      }
+    if (user) {
+      fetchAvailableYears();
+      fetchSemesters();
     }
-  }, [semesters, unitType, filters.semesterId, findCurrentSemester]);
+  }, [user, fetchAvailableYears, fetchSemesters]);
 
-  // 필터 상태 저장
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stateToSave: SavedFilterState = {
+      mode,
       filterType,
       unitType,
       filters,
@@ -355,52 +345,47 @@ const AdminPrayerSummaryPage: React.FC = () => {
       sortDirection: sortConfig.direction,
     };
     sessionStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(stateToSave));
-  }, [filterType, unitType, filters, currentPage, sortConfig]);
-
-  // 연도 보정
-  useEffect(() => {
-    if (availableYears.length > 0 && filters.year) {
-      if (!availableYears.includes(Number(filters.year))) {
-        setFilters((prev) => ({ ...prev, year: availableYears[0] }));
-      }
-    }
-  }, [availableYears, filters.year]);
-
-  // --------------------------------------------------------------------------
-  // Event Handlers
-  // --------------------------------------------------------------------------
+  }, [mode, filterType, unitType, filters, currentPage, sortConfig]);
 
   const handleFilterChange = (field: keyof typeof filters, value: any) => {
-    setFilters((prev) => {
-      const next = { ...prev, [field]: value };
-      // 셀 변경 시 멤버 필터 초기화 (Cascading Reset)
-      if (field === "cell") {
-        next.member = "all";
-      }
-      return next;
-    });
+    setFilters((prev) => ({ ...prev, [field]: value }));
     setCurrentPage(0);
   };
 
+  // ✅ [수정] 3. 학기 -> 연간/월간 전환 시 해당 학기의 연도를 유지하도록 로직 개선
   const handleUnitTypeClick = (type: UnitType) => {
     setUnitType(type);
     setFilters((prev) => {
       let baseYear =
         typeof prev.year === "number" ? prev.year : new Date().getFullYear();
+
+      // 학기 모드에서 다른 모드로 갈 때, 선택된 학기의 연도를 가져옴
       if (unitType === "semester" && prev.semesterId) {
         const curSem = semesters.find((s) => s.id === prev.semesterId);
-        if (curSem) baseYear = new Date(curSem.startDate).getFullYear();
+        if (curSem) {
+          baseYear = new Date(curSem.startDate).getFullYear();
+        }
       }
+
+      // availableYears에 해당 연도가 없다면 최신 연도로 보정
       if (availableYears.length > 0 && !availableYears.includes(baseYear)) {
         baseYear = availableYears[0];
       }
 
       const next = { ...prev };
+      const now = new Date();
+
       if (type === "year") {
         next.year = baseYear;
+        next.month = "";
+        next.semesterId = "";
+      } else if (type === "month") {
+        next.year = baseYear;
+        next.month = next.month || now.getMonth() + 1;
         next.semesterId = "";
       } else if (type === "semester") {
         next.year = "";
+        next.month = "";
         const target = findCurrentSemester(semesters);
         if (target) next.semesterId = target.id;
       }
@@ -409,8 +394,13 @@ const AdminPrayerSummaryPage: React.FC = () => {
     setCurrentPage(0);
   };
 
+  const handleUnitValueClick = (value: number) => {
+    setFilters((prev) => ({ ...prev, month: value, semesterId: "" }));
+    setCurrentPage(0);
+  };
+
   const handleSemesterClick = (semesterId: number) => {
-    setFilters((prev) => ({ ...prev, semesterId, year: "" }));
+    setFilters((prev) => ({ ...prev, semesterId, year: "", month: "" }));
     setCurrentPage(0);
   };
 
@@ -433,11 +423,45 @@ const AdminPrayerSummaryPage: React.FC = () => {
     return sortConfig.direction === "ascending" ? " ▲" : " ▼";
   };
 
-  // --------------------------------------------------------------------------
-  // Render Helpers
-  // --------------------------------------------------------------------------
+  const yearOptions = useMemo(() => {
+    if (availableYears.length === 0) {
+      const currentYear = new Date().getFullYear();
+      return [{ value: currentYear, label: `${currentYear}년` }];
+    }
+    return availableYears.map((year) => ({
+      value: year,
+      label: `${year}년`,
+    }));
+  }, [availableYears]);
 
   const renderUnitButtons = () => {
+    // 1. 월 선택
+    if (unitType === "month") {
+      return (
+        <div className="pt-2 border-t border-gray-200/50 mt-2">
+          <label className="text-xs font-bold text-gray-500 block mb-1">
+            월 선택
+          </label>
+          <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5 mt-2">
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+              <button
+                key={m}
+                onClick={() => handleUnitValueClick(m)}
+                className={`py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap ${
+                  filters.month === m
+                    ? "bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105"
+                    : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 shadow-sm"
+                }`}
+              >
+                {m}월
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // 2. 학기 선택
     if (unitType === "semester") {
       if (semesters.length === 0) {
         return (
@@ -456,6 +480,7 @@ const AdminPrayerSummaryPage: React.FC = () => {
               좌우로 스크롤
             </span>
           </div>
+
           <div
             className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap scrollbar-hide"
             style={scrollbarHideStyle}
@@ -488,10 +513,6 @@ const AdminPrayerSummaryPage: React.FC = () => {
     return null;
   };
 
-  // --------------------------------------------------------------------------
-  // Main Render
-  // --------------------------------------------------------------------------
-
   if (!user || (user.role !== "EXECUTIVE" && user.role !== "CELL_LEADER")) {
     return (
       <div className="bg-gray-50 min-h-screen flex items-center justify-center p-4">
@@ -512,17 +533,48 @@ const AdminPrayerSummaryPage: React.FC = () => {
           <div>
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2 whitespace-nowrap">
               <ChatBubbleBottomCenterTextIcon className="h-7 w-7 text-indigo-500" />
-              기도제목 현황
+              기도제목 요약
             </h1>
             <p className="text-sm text-gray-500 mt-1">
-              기간 및 셀 조건을 설정하여 멤버들의 기도제목 제출 현황을
-              확인합니다.
+              기간/셀/멤버 기준으로 등록된 기도제목을 확인합니다.
             </p>
+          </div>
+          {/* Mode Switcher */}
+          <div className="bg-gray-200 p-1 rounded-xl flex text-xs font-bold self-start sm:self-center">
+            <button
+              onClick={() => {
+                setCurrentPage(0);
+                setSortConfig({ key: "totalCount", direction: "descending" });
+                navigate("/admin/prayers/summary/members");
+              }}
+              className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all whitespace-nowrap ${
+                mode === "members"
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <UserIcon className="h-3 w-3" /> 멤버별
+            </button>
+            <button
+              onClick={() => {
+                setCurrentPage(0);
+                setSortConfig({ key: "totalCount", direction: "descending" });
+                navigate("/admin/prayers/summary/cells");
+              }}
+              className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all whitespace-nowrap ${
+                mode === "cells"
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <UserGroupIcon className="h-3 w-3" /> 셀별
+            </button>
           </div>
         </div>
 
         {/* Filter Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6">
+          {/* 1. 제목 영역 (단독 배치) */}
           <div className="flex items-center gap-2 mb-4">
             <FunnelIcon className="h-5 w-5 text-gray-400" />
             <h3 className="font-bold text-gray-700 whitespace-nowrap">
@@ -530,7 +582,7 @@ const AdminPrayerSummaryPage: React.FC = () => {
             </h3>
           </div>
 
-          {/* Mode Switcher */}
+          {/* 2. 모드 변경 버튼 (제목 아래로 이동 & 가로 꽉 채움) */}
           <div className="bg-gray-100 p-1 rounded-xl flex text-xs sm:text-sm font-bold mb-5">
             <button
               onClick={() => setFilterType("unit")}
@@ -555,7 +607,7 @@ const AdminPrayerSummaryPage: React.FC = () => {
           </div>
 
           <div className="space-y-5">
-            {/* 1. Date Settings */}
+            {/* Date Settings */}
             {filterType === "range" ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
                 <div>
@@ -580,6 +632,7 @@ const AdminPrayerSummaryPage: React.FC = () => {
             ) : (
               <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100">
                 <div className="flex flex-col sm:flex-row items-start gap-4 mb-2">
+                  {/* 1. 기준 연도 */}
                   <div className="w-full sm:w-32">
                     <label className="text-xs font-bold text-gray-500 mb-1 block">
                       연도
@@ -607,11 +660,22 @@ const AdminPrayerSummaryPage: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* 2. 조회 단위 */}
                   <div className="flex-1 w-full">
                     <label className="text-xs font-bold text-gray-500 mb-1 block">
                       조회 단위
                     </label>
                     <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => handleUnitTypeClick("month")}
+                        className={`px-3 py-2 text-sm font-bold rounded-lg border shadow-sm transition-all whitespace-nowrap ${
+                          unitType === "month"
+                            ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                            : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        월간
+                      </button>
                       <button
                         onClick={() =>
                           hasActiveSemesters && handleUnitTypeClick("semester")
@@ -640,15 +704,16 @@ const AdminPrayerSummaryPage: React.FC = () => {
                     </div>
                   </div>
                 </div>
+                {/* 상세 선택 버튼 (월/학기) */}
                 {renderUnitButtons()}
               </div>
             )}
 
-            {/* 2. Cell & Member Filters (Cascading Select) */}
+            {/* Cell & Member Filters */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-bold text-gray-500 mb-1 block">
-                  소속 셀 (필터)
+                  소속 셀
                 </label>
                 <div className="h-[42px]">
                   <SimpleSearchableSelect
@@ -659,21 +724,16 @@ const AdminPrayerSummaryPage: React.FC = () => {
                     onChange={(val) =>
                       handleFilterChange(
                         "cell",
-                        val != null ? String(val) : "all",
+                        val != null ? String(val) : "all"
                       )
                     }
-                    placeholder="셀 전체 보기"
+                    placeholder="셀 필터"
                   />
                 </div>
               </div>
               <div>
                 <label className="text-xs font-bold text-gray-500 mb-1 block">
-                  멤버 검색
-                  {filters.cell !== "all" && (
-                    <span className="text-indigo-600 ml-2 font-normal">
-                      (선택된 셀 내 검색)
-                    </span>
-                  )}
+                  멤버
                 </label>
                 <div className="h-[42px]">
                   <SimpleSearchableSelect
@@ -686,17 +746,10 @@ const AdminPrayerSummaryPage: React.FC = () => {
                     onChange={(val) =>
                       handleFilterChange(
                         "member",
-                        val != null ? String(val) : "all",
+                        val != null ? String(val) : "all"
                       )
                     }
-                    placeholder={
-                      filters.cell !== "all" && memberOptions.length === 0
-                        ? "해당 셀에 멤버가 없습니다"
-                        : "멤버 전체 보기"
-                    }
-                    disabled={
-                      filters.cell !== "all" && memberOptions.length === 0
-                    }
+                    placeholder="멤버 필터"
                   />
                 </div>
               </div>
@@ -716,7 +769,7 @@ const AdminPrayerSummaryPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Loading / Error / Results */}
+        {/* Loading / Error States */}
         {loading && (
           <div className="flex justify-center py-20">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -728,21 +781,22 @@ const AdminPrayerSummaryPage: React.FC = () => {
           </div>
         )}
 
-        {!loading && !error && memberSummaryPage && (
+        {/* 1. Members Summary List */}
+        {!loading && !error && mode === "members" && memberSummaryPage && (
           <>
             {/* Mobile Cards */}
             <div className="space-y-3 md:hidden mb-4">
               {memberSummaryPage.content.length === 0 ? (
                 <div className="py-20 text-center bg-white rounded-2xl border border-dashed border-gray-200 text-gray-400">
-                  조건에 맞는 데이터가 없습니다.
+                  조건에 맞는 멤버가 없습니다.
                 </div>
               ) : (
                 memberSummaryPage.content.map((row) => {
-                  const foundMember = allMembers.find(
-                    (m) => m.id === row.memberId,
+                  const foundMember = allMembersForNameCheck.find(
+                    (m) => m.id === row.memberId
                   );
                   const displayName = foundMember
-                    ? formatDisplayName(foundMember, allMembers)
+                    ? formatDisplayName(foundMember, allMembersForNameCheck)
                     : row.memberName;
 
                   return (
@@ -762,9 +816,14 @@ const AdminPrayerSummaryPage: React.FC = () => {
                           </button>
                           <div className="text-xs text-gray-500 mt-1">
                             {row.cellId ? (
-                              <span className="flex items-center gap-1">
+                              <button
+                                onClick={() =>
+                                  navigate(`/admin/prayers/cells/${row.cellId}`)
+                                }
+                                className="hover:underline flex items-center gap-1"
+                              >
                                 {row.cellName}
-                              </span>
+                              </button>
                             ) : (
                               "미배정"
                             )}
@@ -831,16 +890,16 @@ const AdminPrayerSummaryPage: React.FC = () => {
                         colSpan={4}
                         className="px-6 py-10 text-center text-gray-400 text-sm"
                       >
-                        조건에 맞는 데이터가 없습니다.
+                        조건에 맞는 멤버가 없습니다.
                       </td>
                     </tr>
                   ) : (
                     memberSummaryPage.content.map((row) => {
-                      const foundMember = allMembers.find(
-                        (m) => m.id === row.memberId,
+                      const foundMember = allMembersForNameCheck.find(
+                        (m) => m.id === row.memberId
                       );
                       const displayName = foundMember
-                        ? formatDisplayName(foundMember, allMembers)
+                        ? formatDisplayName(foundMember, allMembersForNameCheck)
                         : row.memberName;
 
                       return (
@@ -852,7 +911,7 @@ const AdminPrayerSummaryPage: React.FC = () => {
                             <button
                               onClick={() =>
                                 navigate(
-                                  `/admin/prayers/members/${row.memberId}`,
+                                  `/admin/prayers/members/${row.memberId}`
                                 )
                               }
                               className="hover:underline"
@@ -861,7 +920,18 @@ const AdminPrayerSummaryPage: React.FC = () => {
                             </button>
                           </td>
                           <td className="px-6 py-4 text-gray-700 font-medium">
-                            {row.cellId ? row.cellName : "-"}
+                            {row.cellId ? (
+                              <button
+                                onClick={() =>
+                                  navigate(`/admin/prayers/cells/${row.cellId}`)
+                                }
+                                className="hover:underline"
+                              >
+                                {row.cellName}
+                              </button>
+                            ) : (
+                              "-"
+                            )}
                           </td>
                           <td className="px-6 py-4 text-right">
                             <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-xs font-bold">
@@ -883,6 +953,127 @@ const AdminPrayerSummaryPage: React.FC = () => {
               currentPage={memberSummaryPage.number}
               totalPages={memberSummaryPage.totalPages}
               totalElements={memberSummaryPage.totalElements}
+              onPageChange={setCurrentPage}
+            />
+          </>
+        )}
+
+        {/* 2. Cells Summary List */}
+        {!loading && !error && mode === "cells" && cellSummaryPage && (
+          <>
+            {/* Mobile Cards */}
+            <div className="space-y-3 md:hidden mb-4">
+              {cellSummaryPage.content.length === 0 ? (
+                <div className="py-20 text-center bg-white rounded-2xl border border-dashed border-gray-200 text-gray-400">
+                  조건에 맞는 셀이 없습니다.
+                </div>
+              ) : (
+                cellSummaryPage.content.map((row) => (
+                  <div
+                    key={row.cellId}
+                    className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <button
+                        onClick={() =>
+                          navigate(`/admin/prayers/cells/${row.cellId}`)
+                        }
+                        className="text-lg font-bold text-indigo-600 hover:text-indigo-800"
+                      >
+                        {row.cellName}
+                      </button>
+                      <div className="text-right">
+                        <span className="text-xs font-bold text-gray-400 block mb-0.5">
+                          최근 작성
+                        </span>
+                        <span className="text-sm font-medium text-gray-800">
+                          {safeFormatDate(row.latestCreatedAt)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="pt-3 mt-2 border-t border-gray-50 flex justify-between items-center">
+                      <span className="text-xs text-gray-400 font-bold">
+                        총 기도제목
+                      </span>
+                      <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded-lg text-xs font-bold">
+                        {row.totalCount.toLocaleString()}건
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Desktop Table */}
+            <div className="hidden md:block bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden mb-4">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50/50">
+                  <tr>
+                    <th
+                      className="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
+                      onClick={() => requestSort("cellName")}
+                    >
+                      셀 {getSortIndicator("cellName")}
+                    </th>
+                    <th
+                      className="px-6 py-3 text-right font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
+                      onClick={() => requestSort("totalCount")}
+                    >
+                      기도제목 수 {getSortIndicator("totalCount")}
+                    </th>
+                    <th
+                      className="px-6 py-3 text-right font-bold text-gray-500 uppercase text-xs cursor-pointer hover:text-indigo-600"
+                      onClick={() => requestSort("latestCreatedAt")}
+                    >
+                      최근 작성일 {getSortIndicator("latestCreatedAt")}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {cellSummaryPage.content.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        className="px-6 py-10 text-center text-gray-400 text-sm"
+                      >
+                        조건에 맞는 셀이 없습니다.
+                      </td>
+                    </tr>
+                  ) : (
+                    cellSummaryPage.content.map((row) => (
+                      <tr
+                        key={row.cellId}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="px-6 py-4 font-bold text-indigo-600">
+                          <button
+                            onClick={() =>
+                              navigate(`/admin/prayers/cells/${row.cellId}`)
+                            }
+                            className="hover:underline"
+                          >
+                            {row.cellName}
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-xs font-bold">
+                            {row.totalCount.toLocaleString()}건
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-gray-500 text-right">
+                          {safeFormatDate(row.latestCreatedAt)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <Pagination
+              currentPage={cellSummaryPage.number}
+              totalPages={cellSummaryPage.totalPages}
+              totalElements={cellSummaryPage.totalElements}
               onPageChange={setCurrentPage}
             />
           </>

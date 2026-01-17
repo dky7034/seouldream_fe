@@ -409,7 +409,7 @@ const EditMemberPage: React.FC = () => {
                     )
                   }
                   placeholder="셀을 선택하세요..."
-                  isDisabled={!isExecutive}
+                  disabled={!isExecutive}
                 />
               </div>
               {!isExecutive && (

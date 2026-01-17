@@ -1,5 +1,6 @@
+// src/App.tsx
 import { Suspense, lazy } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"; // ✅ Navigate 추가 (비정상 접근 방지용)
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import MainLayout from "./components/MainLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -8,10 +9,7 @@ import ExecOnlyRoute from "./components/ExecOnlyRoute";
 import "react-datepicker/dist/react-datepicker.css";
 import "./styles/datepicker-tailwind.css";
 
-// ✅ 1. [수정됨] 로그인 페이지 활성화 (주석 해제)
 const LoginPage = lazy(() => import("./pages/LoginPage"));
-
-// ✅ 2. [수정됨] 회원가입 페이지 비활성화 (주석 처리)
 // const RegisterPage = lazy(() => import("./pages/RegisterPage"));
 
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
@@ -20,7 +18,7 @@ const AddUserPage = lazy(() => import("./pages/AddUserPage"));
 const EditMemberPage = lazy(() => import("./pages/EditMemberPage"));
 const MemberDetailPage = lazy(() => import("./pages/MemberDetailPage"));
 const MemberAttendanceHistoryPage = lazy(
-  () => import("./pages/MemberAttendanceHistoryPage")
+  () => import("./pages/MemberAttendanceHistoryPage"),
 );
 const AdminTeamsPage = lazy(() => import("./pages/AdminTeamsPage"));
 const AddTeamPage = lazy(() => import("./pages/AddTeamPage"));
@@ -32,7 +30,7 @@ const EditCellPage = lazy(() => import("./pages/EditCellPage"));
 const CellDetailPage = lazy(() => import("./pages/CellDetailPage"));
 const AdminAttendancesPage = lazy(() => import("./pages/AdminAttendancesPage"));
 const ProcessAttendancePage = lazy(
-  () => import("./pages/ProcessAttendancePage")
+  () => import("./pages/ProcessAttendancePage"),
 );
 const AttendanceAlertsPage = lazy(() => import("./pages/AttendanceAlertsPage"));
 const AdminPrayersPage = lazy(() => import("./pages/AdminPrayersPage"));
@@ -46,12 +44,12 @@ const NoticeDetailPage = lazy(() => import("./pages/NoticeDetailPage"));
 const MyCellPage = lazy(() => import("./pages/MyCellPage"));
 const AdminSemestersPage = lazy(() => import("./pages/AdminSemestersPage"));
 const AdminIncompleteChecksReportPage = lazy(
-  () => import("./pages/AdminIncompleteChecksReportPage")
+  () => import("./pages/AdminIncompleteChecksReportPage"),
 );
 const MemberPrayersPage = lazy(() => import("./pages/MemberPrayersPage"));
 const CellPrayersPage = lazy(() => import("./pages/CellPrayersPage"));
 const AdminPrayerSummaryPage = lazy(
-  () => import("./pages/AdminPrayerSummaryPage")
+  () => import("./pages/AdminPrayerSummaryPage"),
 );
 const CellLeaderDashboard = lazy(() => import("./pages/CellLeaderDashboard"));
 const StatisticsPage = lazy(() => import("./pages/StatisticsPage"));
@@ -68,12 +66,7 @@ function App() {
       <Suspense fallback={<LoadingFallback />}>
         <Routes>
           {/* Public routes */}
-
-          {/* ✅ 3. [수정됨] 로그인 경로 활성화 */}
           <Route path="/" element={<LoginPage />} />
-
-          {/* ✅ 4. [수정됨] 회원가입 경로 막기 (접속 시 로그인 화면으로 튕기게 설정) */}
-          {/* <Route path="/register" element={<RegisterPage />} /> */}
           <Route path="/register" element={<Navigate to="/" replace />} />
 
           {/* Protected routes (로그인한 모든 사용자) */}
@@ -174,13 +167,15 @@ function App() {
                 {/* 기도제목 리스트 & 관리 */}
                 <Route path="/admin/prayers" element={<AdminPrayersPage />} />
                 <Route path="/admin/prayers/add" element={<AddPrayerPage />} />
+
+                {/* ✅ [수정완료] initialMode 속성을 제거했습니다 */}
                 <Route
                   path="/admin/prayers/summary/members"
-                  element={<AdminPrayerSummaryPage initialMode="members" />}
+                  element={<AdminPrayerSummaryPage />}
                 />
                 <Route
                   path="/admin/prayers/summary/cells"
-                  element={<AdminPrayerSummaryPage initialMode="cells" />}
+                  element={<AdminPrayerSummaryPage />}
                 />
 
                 {/* 공지사항 추가/수정 */}

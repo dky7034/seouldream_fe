@@ -28,7 +28,7 @@ const AddPrayerPage: React.FC = () => {
 
   // ✅ 기본값: 오늘 날짜
   const [selectedDate, setSelectedDate] = useState<string>(
-    format(new Date(), "yyyy-MM-dd")
+    format(new Date(), "yyyy-MM-dd"),
   );
 
   const [members, setMembers] = useState<MemberDto[]>([]);
@@ -73,7 +73,7 @@ const AddPrayerPage: React.FC = () => {
       } catch (err) {
         console.error(err);
         setSubmitError(
-          "기도제목을 등록할 멤버 목록을 불러오는 데 실패했습니다."
+          "기도제목을 등록할 멤버 목록을 불러오는 데 실패했습니다.",
         );
       } finally {
         setLoading(false);
@@ -89,11 +89,11 @@ const AddPrayerPage: React.FC = () => {
         value: m.id,
         label: formatDisplayName(m, members),
       })),
-    [members]
+    [members],
   );
 
   const handleFormChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -156,7 +156,7 @@ const AddPrayerPage: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       setSubmitError(
-        err?.response?.data?.message || "기도제목 생성에 실패했습니다."
+        err?.response?.data?.message || "기도제목 생성에 실패했습니다.",
       );
     } finally {
       setLoading(false);
@@ -214,11 +214,11 @@ const AddPrayerPage: React.FC = () => {
               value={formData.memberId}
               onChange={(value) =>
                 handleMemberSelect(
-                  typeof value === "number" ? value : undefined
+                  typeof value === "number" ? value : undefined,
                 )
               }
               placeholder="멤버를 선택하세요..."
-              isDisabled={loading}
+              disabled={loading}
             />
             {formErrors.memberId && (
               <p className="mt-1 text-xs sm:text-sm text-red-600">

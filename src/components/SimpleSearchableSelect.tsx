@@ -1,3 +1,4 @@
+// src/components/SimpleSearchableSelect.tsx
 import React, { useState, useRef, useEffect } from "react";
 
 export interface Option {
@@ -10,9 +11,9 @@ interface SimpleSearchableSelectProps {
   placeholder?: string;
   value: number | string | null | undefined;
   onChange: (value: number | string | null | undefined) => void;
-  isDisabled?: boolean;
+  disabled?: boolean; // ✅ [변경] isDisabled -> disabled (이름 통일)
   isClearable?: boolean;
-  isSearchable?: boolean; // ✅ [추가] 검색 기능 활성화 여부
+  isSearchable?: boolean;
 }
 
 const SimpleSearchableSelect: React.FC<SimpleSearchableSelectProps> = ({
@@ -20,9 +21,9 @@ const SimpleSearchableSelect: React.FC<SimpleSearchableSelectProps> = ({
   placeholder,
   value,
   onChange,
-  isDisabled,
+  disabled, // ✅ [변경] 여기도 disabled로 변경
   isClearable = true,
-  isSearchable = true, // ✅ [추가] 기본값은 true (검색 가능)
+  isSearchable = true,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -34,7 +35,7 @@ const SimpleSearchableSelect: React.FC<SimpleSearchableSelectProps> = ({
   const filteredOptions =
     isSearchable && searchTerm
       ? options.filter((option) =>
-          option.label.toLowerCase().includes(searchTerm.toLowerCase())
+          option.label.toLowerCase().includes(searchTerm.toLowerCase()),
         )
       : options;
 
@@ -72,11 +73,12 @@ const SimpleSearchableSelect: React.FC<SimpleSearchableSelectProps> = ({
       <div
         className={`w-full bg-white border border-gray-300 rounded-md shadow-sm pl-3 pr-10 py-2.5 sm:py-2 text-left
           ${
-            isDisabled
-              ? "pointer-events-none opacity-50"
+            disabled // ✅ [변경] disabled 상태 체크
+              ? "pointer-events-none opacity-50 bg-gray-100 text-gray-400" // 비활성화 스타일 강화
               : "cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
           }`}
-        onClick={() => !isDisabled && setIsOpen((prev) => !prev)}
+        // ✅ [변경] 클릭 이벤트 제어
+        onClick={() => !disabled && setIsOpen((prev) => !prev)}
       >
         <span className="block truncate">
           {selectedOption ? (
@@ -86,7 +88,8 @@ const SimpleSearchableSelect: React.FC<SimpleSearchableSelectProps> = ({
           )}
         </span>
 
-        {selectedOption && isClearable && (
+        {/* Clear 버튼 (disabled가 아닐 때만 노출) */}
+        {selectedOption && isClearable && !disabled && (
           <span
             className="absolute inset-y-0 right-5 flex items-center pr-2"
             onClick={handleClear}
@@ -127,15 +130,14 @@ const SimpleSearchableSelect: React.FC<SimpleSearchableSelectProps> = ({
       </div>
 
       {/* 드롭다운 영역 */}
-      {isOpen && (
+      {isOpen && !disabled && (
         <div className="absolute mt-1 w-full rounded-md bg-white shadow-lg z-10 border border-gray-200">
-          {/* ✅ [수정] isSearchable이 true일 때만 검색창 표시 */}
           {isSearchable && (
             <div className="p-2 border-b border-gray-100 sticky top-0 bg-white z-10">
               <input
                 type="text"
                 placeholder="Search..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-xs sm:text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-xs sm:text-sm focus:outline-none focus:border-indigo-500"
                 value={searchTerm}
                 autoFocus
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -143,7 +145,6 @@ const SimpleSearchableSelect: React.FC<SimpleSearchableSelectProps> = ({
             </div>
           )}
 
-          {/* 옵션 리스트 */}
           <ul className="max-h-56 sm:max-h-60 overflow-auto overscroll-contain">
             {filteredOptions.map((option) => (
               <li
