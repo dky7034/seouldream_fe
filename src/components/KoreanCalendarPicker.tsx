@@ -3,7 +3,6 @@ import DatePicker from "react-datepicker";
 import { ko } from "date-fns/locale";
 import { format } from "date-fns";
 import "react-datepicker/dist/react-datepicker.css";
-import { CheckIcon } from "@heroicons/react/24/outline"; // 아이콘 사용 (선택 사항)
 
 type Mode = "day" | "month" | "year";
 type GridCols = 3 | 4;
@@ -17,7 +16,7 @@ type Props = {
   yearCols?: GridCols;
   filterDate?: (date: Date) => boolean;
   placeholder?: string;
-  /* ✅ 추가: 이미 제출된 날짜 리스트 (YYYY-MM-DD) */
+  /* 이미 제출된 날짜 리스트 (YYYY-MM-DD) */
   submittedDates?: string[];
 };
 
@@ -96,9 +95,9 @@ const KoreanCalendarPicker: React.FC<Props> = ({
     const day = date.getDay();
     const isHoliday = isPublicHoliday(date);
 
-    let classes = [];
+    const classes = [];
 
-    // 1. 제출 완료 여부 (가장 중요)
+    // 1. 제출 완료 여부
     if (isSubmitted) classes.push("day-submitted");
 
     // 2. 휴일/주말 표시
@@ -153,21 +152,18 @@ const KoreanCalendarPicker: React.FC<Props> = ({
         }
 
         /* ─── 1. 비활성 날짜 (filterDate false) 시각적 약화 ─── */
-        /* 주일이 아닌 날짜를 아주 흐리게 만들어 주일을 강조 */
         .react-datepicker__day--disabled {
-          color: #d1d5db !important; /* 매우 연한 회색 */
-          opacity: 0.3;              /* 투명도 낮춤 */
+          color: #d1d5db !important; 
+          opacity: 0.3;              
           cursor: not-allowed;
           background-color: transparent !important;
         }
-        /* 비활성 날짜는 hover 효과 제거 */
         .react-datepicker__day--disabled:hover {
           background-color: transparent !important;
           border-radius: 0 !important;
         }
 
         /* ─── 2. 주말 색상 ─── */
-        /* 기본 주일 색상 (빨강) - 비활성 상태가 아닐 때만 */
         .react-datepicker__day:not(.react-datepicker__day--disabled).day-sunday { 
           color: #e11d48 !important; 
           font-weight: 700;
@@ -177,11 +173,10 @@ const KoreanCalendarPicker: React.FC<Props> = ({
         }
 
         /* ─── 3. 제출 완료된 날짜 (Submitted) ─── */
-        /* 비활성이 아닐 때, 제출된 날짜 스타일 */
         .react-datepicker__day:not(.react-datepicker__day--disabled).day-submitted {
-          background-color: #ecfdf5 !important; /* 연한 초록 배경 */
-          border: 1px solid #10b981 !important; /* 초록 테두리 */
-          color: #059669 !important;            /* 진한 초록 글씨 */
+          background-color: #ecfdf5 !important; 
+          border: 1px solid #10b981 !important; 
+          color: #059669 !important;            
           border-radius: 50% !important;
           font-weight: bold;
         }
@@ -189,20 +184,33 @@ const KoreanCalendarPicker: React.FC<Props> = ({
         /* ─── 4. 오늘 날짜 (Today) ─── */
         .react-datepicker__day--today {
           font-weight: 900 !important;
-          border: 2px solid #6366f1 !important; /* 인디고 테두리 */
+          border: 2px solid #6366f1 !important; 
           background-color: transparent;
           color: #4338ca !important;
           border-radius: 50% !important;
         }
 
         /* ─── 5. 선택된 날짜 (Selected) - 최우선 순위 ─── */
-        .react-datepicker__day--selected,
-        .react-datepicker__day--keyboard-selected {
+        .react-datepicker__day--selected {
           background-color: #4f46e5 !important; /* 진한 인디고 */
           color: #ffffff !important;
           border: none !important;
           border-radius: 50% !important;
           box-shadow: 0 2px 4px rgba(79, 70, 229, 0.4);
+        }
+
+        /* ✅ [수정 핵심] 키보드 포커스(임시 선택) 상태 투명화 */
+        /* 월 이동 시 따라다니는 '가짜 선택'을 제거합니다 */
+        .react-datepicker__day--keyboard-selected {
+          background-color: transparent !important;
+          color: inherit !important;
+          border: none !important;
+        }
+
+        /* 단, '진짜 선택'이면서 '포커스'된 경우는 파란색 유지 */
+        .react-datepicker__day--selected.react-datepicker__day--keyboard-selected {
+          background-color: #4f46e5 !important;
+          color: #ffffff !important;
         }
         
         /* 선택된 날짜 내부의 주일/제출 스타일 덮어쓰기 */
@@ -255,7 +263,7 @@ const KoreanCalendarPicker: React.FC<Props> = ({
         maxDate={maxDate}
         showPopperArrow={false}
         dayClassName={getDayClassName}
-        renderDayContents={renderDayContents} // ✅ 날짜 내용 커스텀 (점 표시)
+        renderDayContents={renderDayContents}
         showYearPicker={mode === "year"}
         showMonthYearPicker={mode === "month"}
         yearItemNumber={12}

@@ -350,30 +350,23 @@ const AttendanceSummaryCard: React.FC<{
   startDate,
   endDate,
   limitStartDate,
-  userRole,
 }) => {
   const totalSummary = summary?.totalSummary;
 
-  // ✅ [수정됨] 권한 및 날짜 제한에 따른 학기 필터링
+  // 권한 및 날짜 제한에 따른 학기 필터링 (화면단)
   const availableSemesters = useMemo(() => {
     let filtered = semesters;
 
-    // 1. 셀장(CELL_LEADER)은 오직 '활성화된(isActive)' 학기만 조회 가능
-    if (userRole === "CELL_LEADER") {
-      filtered = filtered.filter((s) => s.isActive);
-    }
-
-    // 2. limitStartDate(배정일 등)가 있으면 그 이전 학기는 제외
+    // limitStartDate(배정일 등)가 있으면 그 이전 학기는 제외
     if (limitStartDate) {
       filtered = filtered.filter((s) => s.endDate >= limitStartDate);
     }
 
     return filtered;
-  }, [semesters, limitStartDate, userRole]);
+  }, [semesters, limitStartDate]);
 
   const semesterMonths = useMemo(() => {
     if (!activeSemester) return [];
-    // ... (기존 로직 동일)
     const s = new Date(activeSemester.startDate);
     const e = new Date(activeSemester.endDate);
     const months: number[] = [];
@@ -404,7 +397,7 @@ const AttendanceSummaryCard: React.FC<{
     const assignDateObj = new Date(
       cellAssignmentDate.includes("T")
         ? cellAssignmentDate
-        : `${cellAssignmentDate}T00:00:00`
+        : `${cellAssignmentDate}T00:00:00`,
     );
     assignDateObj.setHours(0, 0, 0, 0);
 
@@ -414,7 +407,7 @@ const AttendanceSummaryCard: React.FC<{
       restrictionDate = new Date(
         limitStartDate.includes("T")
           ? limitStartDate
-          : `${limitStartDate}T00:00:00`
+          : `${limitStartDate}T00:00:00`,
       );
       restrictionDate.setHours(0, 0, 0, 0);
     }
@@ -424,8 +417,8 @@ const AttendanceSummaryCard: React.FC<{
       Math.max(
         filterStart.getTime(),
         assignDateObj.getTime(),
-        restrictionDate.getTime()
-      )
+        restrictionDate.getTime(),
+      ),
     );
 
     if (effectiveStart > effectiveEnd) return 0;
@@ -632,7 +625,7 @@ const TeamManagementModal: React.FC<{
   memberTeams: TeamDto[];
 }> = ({ isOpen, onClose, onSave, memberName, allTeams, memberTeams }) => {
   const [selectedTeamIds, setSelectedTeamIds] = useState<number[]>(() =>
-    memberTeams.map((t) => t.id)
+    memberTeams.map((t) => t.id),
   );
   const [isSaving, setIsSaving] = useState(false);
 
@@ -751,7 +744,7 @@ const MemberDetailPage: React.FC = () => {
 
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const [activeSemester, setActiveSemester] = useState<SemesterDto | null>(
-    null
+    null,
   );
   const [unitType, setUnitType] = useState<"semester" | "month">("semester");
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
@@ -762,7 +755,7 @@ const MemberDetailPage: React.FC = () => {
 
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [resetPasswordError, setResetPasswordError] = useState<string | null>(
-    null
+    null,
   );
   const [temporaryPassword, setTemporaryPassword] = useState<string>("");
 
@@ -789,21 +782,25 @@ const MemberDetailPage: React.FC = () => {
     }
   }, [user, memberIdNum, navigate]);
 
+  // ✅ [수정됨] 학기 목록 로딩 로직 (모두 활성 학기만 조회)
   useEffect(() => {
     const loadSemesters = async () => {
+      if (!user) return; // user 정보 로딩 대기
+
       try {
-        // 모든 학기 조회
-        const data = await semesterService.getAllSemesters();
+        // ✅ [핵심] 임원 포함 모든 사용자에게 '활성 학기(true)'만 조회하여 표시
+        const data = await semesterService.getAllSemesters(true);
+
         const sortedData = data.sort(
           (a, b) =>
-            new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+            new Date(b.startDate).getTime() - new Date(a.startDate).getTime(),
         );
         setSemesters(sortedData);
 
         if (sortedData.length > 0) {
           const now = new Date();
           const currentSemester = sortedData.find((sem) =>
-            isDateInSemesterMonthRange(now, sem)
+            isDateInSemesterMonthRange(now, sem),
           );
 
           if (currentSemester) {
@@ -819,23 +816,16 @@ const MemberDetailPage: React.FC = () => {
       }
     };
     loadSemesters();
-  }, []);
+  }, [user]);
 
   // ✅ [핵심] 조회 권한에 따른 시작일 제한 계산 (본인 포함)
-  // 셀장이나 멤버가 '본인'을 조회할 때도, '배정일' 이전의 기록은 안 보이게 할 것인가?
-  // -> 보통 본인은 전체 기록을 볼 수 있어야 함.
-  // -> 하지만 요청 사항은 "셀장은... 과거 이력을 보면 안 된다" 였으므로
-  // -> 여기서는 셀장 본인이라도 일단은 '배정일' 기준을 적용해 둠.
-  // -> (만약 본인은 다 보여야 한다면, user.memberId === memberIdNum 조건을 추가하여 return undefined 처리하면 됨)
   const viewableStartDate = useMemo(() => {
     if (!user || !member) return undefined;
     // 임원은 제한 없음
     if (user.role === "EXECUTIVE") return undefined;
 
-    // 셀장은 멤버가 현재 셀에 배정된 날짜부터만 조회 가능
-    if (user.role === "CELL_LEADER") {
-      // 본인이라도 제한을 걸지, 아닐지 결정 필요.
-      // 현재 로직: 본인이어도 배정일 기준 제한 (요청의 취지에 맞춤)
+    // 셀장/멤버 본인은 배정일 이후 데이터만 조회 (요청 사항 반영)
+    if (user.role === "CELL_LEADER" || user.role === "MEMBER") {
       if (member.cellAssignmentDate) {
         return member.cellAssignmentDate;
       }
@@ -863,7 +853,7 @@ const MemberDetailPage: React.FC = () => {
       const monthStartStr = `${targetYear}-${String(m).padStart(2, "0")}-01`;
       const lastDayObj = new Date(targetYear, m, 0);
       const monthEndStr = `${targetYear}-${String(m).padStart(2, "0")}-${String(
-        lastDayObj.getDate()
+        lastDayObj.getDate(),
       ).padStart(2, "0")}`;
 
       targetStart = monthStartStr < semStart ? semStart : monthStartStr;
@@ -916,14 +906,14 @@ const MemberDetailPage: React.FC = () => {
       const targetDate = new Date(
         currentStart.getFullYear(),
         currentStart.getMonth() + increment,
-        1
+        1,
       );
 
       if (isDateInSemesterMonthRange(targetDate, activeSemester)) {
         setSelectedMonth(targetDate.getMonth() + 1);
       }
     },
-    [unitType, activeSemester, periodRange.startDate]
+    [unitType, activeSemester, periodRange.startDate],
   );
 
   const fetchMemberDetails = useCallback(async () => {
@@ -987,7 +977,7 @@ const MemberDetailPage: React.FC = () => {
           startDate: periodRange.startDate,
           endDate: periodRange.endDate,
           groupBy: "DAY",
-        }
+        },
       );
       setAttendanceSummary(summaryData);
 
@@ -1022,30 +1012,29 @@ const MemberDetailPage: React.FC = () => {
       const selectedTeamIds = new Set(newTeamIds);
 
       const toAdd = [...selectedTeamIds].filter(
-        (tid) => !currentTeamIds.has(tid)
+        (tid) => !currentTeamIds.has(tid),
       );
       const toRemove = [...currentTeamIds].filter(
-        (tid) => !selectedTeamIds.has(tid)
+        (tid) => !selectedTeamIds.has(tid),
       );
 
       try {
         await Promise.all([
           ...toAdd.map((teamId) =>
-            memberService.addMemberToTeam(memberIdNum, teamId)
+            memberService.addMemberToTeam(memberIdNum, teamId),
           ),
           ...toRemove.map((teamId) =>
-            memberService.removeMemberFromTeam(memberIdNum, teamId)
+            memberService.removeMemberFromTeam(memberIdNum, teamId),
           ),
         ]);
-        const updatedMemberTeams = await memberService.getMemberTeams(
-          memberIdNum
-        );
+        const updatedMemberTeams =
+          await memberService.getMemberTeams(memberIdNum);
         setMemberTeams(updatedMemberTeams);
       } catch (error) {
         console.error("Failed to update teams:", error);
       }
     },
-    [memberIdNum, memberTeams]
+    [memberIdNum, memberTeams],
   );
 
   const handleResetPassword = async () => {
@@ -1061,7 +1050,7 @@ const MemberDetailPage: React.FC = () => {
     } catch (error: any) {
       console.error("resetPassword error:", error);
       setResetPasswordError(
-        error.response?.data?.message || "비밀번호 초기화에 실패했습니다."
+        error.response?.data?.message || "비밀번호 초기화에 실패했습니다.",
       );
     } finally {
       setIsResettingPassword(false);
