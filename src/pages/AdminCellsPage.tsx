@@ -79,7 +79,7 @@ const AdminCellsPage: React.FC = () => {
 
   // 검색어 로컬 상태
   const [localSearchName, setLocalSearchName] = useState(
-    searchParams.get("name") || ""
+    searchParams.get("name") || "",
   );
   const debouncedSearchName = useDebounce(localSearchName, 500);
 
@@ -114,7 +114,7 @@ const AdminCellsPage: React.FC = () => {
 
   const [filterType, setFilterType] = useState<"unit" | "range">("unit");
   const [unitType, setUnitType] = useState<"year" | "month" | "semester">(
-    "semester"
+    "semester",
   );
 
   const hasSemesters = semesters.length > 0;
@@ -131,7 +131,7 @@ const AdminCellsPage: React.FC = () => {
         newParams.set("page", "0");
       setSearchParams(newParams);
     },
-    [searchParams, setSearchParams]
+    [searchParams, setSearchParams],
   );
 
   const getValidSortKey = (value: string | null): SortKey => {
@@ -220,12 +220,9 @@ const AdminCellsPage: React.FC = () => {
     }));
   }, [searchParams]);
 
-  // ✅ [핵심 수정] 연도 목록(availableYears) 로드 시, 현재 선택된 연도가 목록에 없으면 자동으로 맞춰줌
   useEffect(() => {
     if (availableYears.length > 0 && filters.year) {
-      // 예: 선택된 연도가 2026인데, 목록에는 [2025, 2024]만 있는 경우
       if (!availableYears.includes(filters.year)) {
-        // 목록의 첫 번째(가장 최신) 연도인 2025로 강제 변경 -> 데이터 재요청됨
         updateQueryParams({ year: availableYears[0] });
       }
     }
@@ -234,12 +231,9 @@ const AdminCellsPage: React.FC = () => {
   const fetchAvailableYears = useCallback(async () => {
     try {
       const years = await cellService.getAvailableYears();
-
-      // 강제로 올해를 넣지 말고, 서버가 준 연도 목록만 사용합니다.
       if (years && years.length > 0) {
         setAvailableYears(years.sort((a, b) => b - a));
       } else {
-        // 데이터가 정말 아예 없는 초기 상태라면 '올해' 하나만 보여줍니다.
         setAvailableYears([new Date().getFullYear()]);
       }
     } catch (err) {
@@ -247,12 +241,14 @@ const AdminCellsPage: React.FC = () => {
     }
   }, []);
 
+  // ✅ [수정됨] 활성화된 학기만 조회하도록 변경
   const fetchSemesters = useCallback(async () => {
     try {
-      const data = await semesterService.getAllSemesters();
+      // true를 전달하여 active=true인 학기만 가져옵니다.
+      const data = await semesterService.getAllSemesters(true);
       const sorted = data.sort(
         (a, b) =>
-          new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+          new Date(b.startDate).getTime() - new Date(a.startDate).getTime(),
       );
       setSemesters(sorted);
     } catch (err) {
@@ -268,56 +264,42 @@ const AdminCellsPage: React.FC = () => {
     let startStr = "";
     let endStr = "";
 
-    // 1. 기간 직접 설정 (CalendarPicker)
     if (filterType === "range") {
       if (!filters.startDate || !filters.endDate) return null;
       startStr = filters.startDate;
       endStr = filters.endDate;
-    }
-    // 2. 학기 선택
-    else if (filters.semesterId) {
+    } else if (filters.semesterId) {
       const semester = semesters.find((s) => s.id === filters.semesterId);
       if (semester) {
         startStr = semester.startDate;
         endStr = semester.endDate;
       }
-    }
-    // 3. 연도/월 단위 선택
-    else {
+    } else {
       const year = filters.year;
       const { month } = filters;
 
       if (month) {
-        // 월간
         const m = month as number;
         const last = lastDayOfMonth(year, m);
         startStr = `${year}-${pad(m)}-01`;
         endStr = `${year}-${pad(m)}-${pad(last)}`;
       } else {
-        // 연간
         const last = lastDayOfMonth(year, 12);
         startStr = `${year}-01-01`;
         endStr = `${year}-12-${pad(last)}`;
       }
     }
 
-    // -----------------------------------------------------------------------
-    // ✅ [핵심 수정] 미래 날짜 제한 로직
-    // -----------------------------------------------------------------------
     if (startStr && endStr) {
       const today = new Date();
       const todayStr = `${today.getFullYear()}-${pad(
-        today.getMonth() + 1
+        today.getMonth() + 1,
       )}-${pad(today.getDate())}`;
 
-      // 종료일이 오늘보다 미래라면 '오늘'로 제한 (출석률 계산 분모 정상화)
       if (endStr > todayStr && startStr <= todayStr) {
         endStr = todayStr;
       }
     }
-
-    // 수정된 최종 기간 확인용 로그
-    // console.log("최종 서버 요청 기간:", startStr, "~", endStr);
 
     return { startDate: startStr, endDate: endStr };
   }, [filterType, filters, semesters]);
@@ -351,8 +333,8 @@ const AdminCellsPage: React.FC = () => {
     };
     const cleanedParams = Object.fromEntries(
       Object.entries(params).filter(
-        ([, v]) => v !== null && v !== "" && v !== undefined
-      )
+        ([, v]) => v !== null && v !== "" && v !== undefined,
+      ),
     );
 
     try {
@@ -389,8 +371,8 @@ const AdminCellsPage: React.FC = () => {
       .then((p) =>
         setAllMembersForNameCheck(
           p?.content?.map((m) => ({ name: m.name, birthDate: m.birthDate })) ??
-            []
-        )
+            [],
+        ),
       )
       .catch(() => {});
   }, [user, fetchAvailableYears, fetchSemesters]);
@@ -414,13 +396,14 @@ const AdminCellsPage: React.FC = () => {
 
     const now = new Date();
     const currentYM = `${now.getFullYear()}-${String(
-      now.getMonth() + 1
+      now.getMonth() + 1,
     ).padStart(2, "0")}`;
     let target = semesters.find(
       (s) =>
         s.startDate.substring(0, 7) <= currentYM &&
-        s.endDate.substring(0, 7) >= currentYM
+        s.endDate.substring(0, 7) >= currentYM,
     );
+    // 활성 학기가 여러 개라면 가장 최신 학기(0번째)가 선택됨
     if (!target) target = semesters[0];
 
     if (target)
@@ -445,11 +428,11 @@ const AdminCellsPage: React.FC = () => {
   // Handlers
   const yearOptions = useMemo(
     () => availableYears.map((y) => ({ value: y, label: `${y}` })),
-    [availableYears]
+    [availableYears],
   );
   const sortedCells = useMemo(
     () => (cellPage ? cellPage.content : []),
-    [cellPage]
+    [cellPage],
   );
 
   const requestSort = (key: SortKey) => {
@@ -553,7 +536,7 @@ const AdminCellsPage: React.FC = () => {
       if (semesters.length === 0)
         return (
           <div className="text-xs text-yellow-800 bg-yellow-50 p-3 rounded-lg border border-yellow-100 mt-2">
-            등록된 학기가 없습니다.
+            활성 학기가 없습니다.
           </div>
         );
       return (
@@ -688,7 +671,6 @@ const AdminCellsPage: React.FC = () => {
                           {o.label}년
                         </option>
                       ))}
-                      {/* 데이터 로딩 전 fallback */}
                       {yearOptions.length === 0 && (
                         <option value={new Date().getFullYear()}>
                           {new Date().getFullYear()}년
@@ -802,7 +784,7 @@ const AdminCellsPage: React.FC = () => {
                         name: cell.leader.name,
                         birthDate: cell.leader.birthDate,
                       },
-                      allMembersForNameCheck
+                      allMembersForNameCheck,
                     )
                   : "미정";
                 const rateText =
@@ -923,7 +905,7 @@ const AdminCellsPage: React.FC = () => {
                             name: cell.leader.name,
                             birthDate: cell.leader.birthDate,
                           },
-                          allMembersForNameCheck
+                          allMembersForNameCheck,
                         )
                       : "미정";
                     const rateText =

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, forwardRef } from "react";
 import DatePicker from "react-datepicker";
 import { ko } from "date-fns/locale";
 import { format } from "date-fns";
@@ -14,8 +14,12 @@ type Props = {
   maxDate?: Date;
   monthCols?: GridCols;
   yearCols?: GridCols;
+  filterDate?: (date: Date) => boolean;
+  /* ✅ 안내 문구 설정 */
+  placeholder?: string;
 };
 
+// ─── 날짜 파싱/포맷 헬퍼 ───
 const parseLocalDate = (yyyyMMdd: string): Date | null => {
   if (!yyyyMMdd) return null;
   const [y, m, d] = yyyyMMdd.split("-").map(Number);
@@ -48,6 +52,25 @@ const isPublicHoliday = (date: Date) => {
   return solarHolidays.includes(dateString);
 };
 
+// ─── 모바일 키보드 방지용 커스텀 인풋 (Button) ───
+const CustomInput = forwardRef<
+  HTMLButtonElement,
+  { value?: string; onClick?: () => void; placeholder?: string }
+>(({ value, onClick, placeholder }, ref) => (
+  <button
+    type="button"
+    onClick={onClick}
+    ref={ref}
+    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm text-left focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer bg-white"
+  >
+    {/* 값이 있으면 검은색, 없으면 회색(placeholder) */}
+    <span className={value ? "text-gray-900" : "text-gray-400"}>
+      {value || placeholder}
+    </span>
+  </button>
+));
+CustomInput.displayName = "CustomInput";
+
 const KoreanCalendarPicker: React.FC<Props> = ({
   value,
   onChange,
@@ -55,6 +78,8 @@ const KoreanCalendarPicker: React.FC<Props> = ({
   maxDate,
   monthCols = 3,
   yearCols = 4,
+  filterDate,
+  placeholder = "YYYY-MM-DD",
 }) => {
   const selectedDate = useMemo(() => parseLocalDate(value), [value]);
   const [viewDate, setViewDate] = useState<Date>(new Date());
@@ -75,11 +100,35 @@ const KoreanCalendarPicker: React.FC<Props> = ({
   return (
     <div className={wrapperClass}>
       <style>{`
-        /* ✅ react-datepicker wrapper를 100% 폭으로 (정렬/폭 틀어짐 방지) */
         .react-datepicker-wrapper { width: 100%; }
         .react-datepicker__input-container { width: 100%; }
 
-        /* ─── 색상 커스텀 ─── */
+        /* 요일 및 날짜 기본 스타일 (데스크탑) */
+        .react-datepicker__day-name, 
+        .react-datepicker__day, 
+        .react-datepicker__time-name {
+          width: 2.1rem; 
+          line-height: 2.1rem;
+          margin: 0.1rem;
+        }
+
+        /* ─── 모바일 반응형 수정 (간격 넓힘) ─── */
+        @media (max-width: 640px) {
+          .react-datepicker { font-size: 0.8rem; }
+          .react-datepicker__header { padding-top: 0.5rem; padding-bottom: 0.4rem; }
+          
+          /* ✅ 모바일에서도 크기와 간격을 데스크탑과 비슷하게 유지하여 터치 편의성 증대 */
+          .react-datepicker__day-name, 
+          .react-datepicker__day {
+            width: 2rem;       /* 1.7rem -> 2rem (확대) */
+            line-height: 2rem; /* 1.7rem -> 2rem (확대) */
+            margin: 0.1rem;    /* 0 -> 0.1rem (간격 추가) */
+          }
+          
+          .react-datepicker__month { margin: 0.4rem; }
+        }
+
+        /* 색상 커스텀 */
         .react-datepicker__day-name:first-child { color: #dc2626; }
         .react-datepicker__day-name:last-child { color: #2563eb; }
         .react-datepicker__day.day-sunday { color: #dc2626 !important; }
@@ -92,7 +141,6 @@ const KoreanCalendarPicker: React.FC<Props> = ({
           color: #ffffff !important;
         }
 
-        /* ─── 오늘 날짜 강조 ─── */
         .react-datepicker__day--today {
           font-weight: 900 !important;
           border: 2px solid #6366f1 !important;
@@ -108,7 +156,6 @@ const KoreanCalendarPicker: React.FC<Props> = ({
           border: 2px solid #216ba5 !important;
         }
 
-        /* ─── 크기 조절 (Desktop 기본) ─── */
         .react-datepicker {
           font-family: inherit;
           font-size: 0.85rem;
@@ -120,48 +167,24 @@ const KoreanCalendarPicker: React.FC<Props> = ({
           padding-top: 0.4rem;
           padding-bottom: 0.4rem;
         }
-
-        .react-datepicker__day-name, 
-        .react-datepicker__day, 
-        .react-datepicker__time-name {
-          width: 2rem;
-          line-height: 2rem;
-          margin: 0.1rem;
-        }
         
         .react-datepicker__current-month {
           font-size: 0.95rem;
           margin-bottom: 0.2rem;
         }
 
-        /* ─── 크기 조절 (Mobile 반응형) ─── */
-        @media (max-width: 640px) {
-          .react-datepicker {
-            font-size: 0.75rem;
-          }
-          
-          .react-datepicker__header {
-            padding-top: 0.3rem;
-            padding-bottom: 0.2rem;
-          }
-
-          .react-datepicker__day-name, 
-          .react-datepicker__day {
-            width: 1.7rem;
-            line-height: 1.7rem;
-            margin: 0;
-          }
-          
-          .react-datepicker__month {
-            margin: 0.2rem 0.4rem;
-          }
+        .react-datepicker__day--disabled {
+          color: #d1d5db !important;
+          cursor: not-allowed;
+          opacity: 0.6;
         }
       `}</style>
 
       <DatePicker
-        onKeyDown={(e) => e.preventDefault()}
-        // @ts-expect-error: 라이브러리 타입 정의 누락 무시 (모바일 키보드 방지)
-        inputMode="none"
+        // ✅ placeholderText 속성을 사용해야 customInput에 정상적으로 전달됩니다.
+        customInput={<CustomInput />}
+        placeholderText={placeholder}
+        filterDate={filterDate}
         open={open}
         onInputClick={() => {
           setViewDate(selectedDate ?? new Date());
@@ -178,9 +201,6 @@ const KoreanCalendarPicker: React.FC<Props> = ({
         minDate={minDate}
         maxDate={maxDate}
         showPopperArrow={false}
-        placeholderText="YYYY-MM-DD"
-        /* ✅ 여기서 mt-1 제거: “정렬/간격”은 페이지에서 통일 */
-        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer caret-transparent bg-white"
         dayClassName={getDayClassName}
         showYearPicker={mode === "year"}
         showMonthYearPicker={mode === "month"}
@@ -238,22 +258,27 @@ const KoreanCalendarPicker: React.FC<Props> = ({
             else setMode("year");
           };
 
-          const btnClass =
-            "w-8 h-8 flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 active:bg-gray-100 transition-colors";
-          const titleClass =
-            "text-sm font-bold text-gray-800 px-3 py-1 rounded-md hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition-colors";
-
           return (
             <div className="flex items-center justify-center gap-2 px-2 pb-2 mt-1">
-              <button type="button" onClick={goPrev} className={btnClass}>
+              <button
+                type="button"
+                onClick={goPrev}
+                className="w-8 h-8 flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 active:bg-gray-100 transition-colors"
+              >
                 ‹
               </button>
-
-              <button type="button" onClick={toggleMode} className={titleClass}>
+              <button
+                type="button"
+                onClick={toggleMode}
+                className="text-sm font-bold text-gray-800 px-3 py-1 rounded-md hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition-colors"
+              >
                 {title}
               </button>
-
-              <button type="button" onClick={goNext} className={btnClass}>
+              <button
+                type="button"
+                onClick={goNext}
+                className="w-8 h-8 flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 active:bg-gray-100 transition-colors"
+              >
                 ›
               </button>
             </div>

@@ -115,8 +115,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                   growthData.value > 0
                     ? "text-red-500"
                     : growthData.value < 0
-                    ? "text-blue-500"
-                    : "text-gray-500"
+                      ? "text-blue-500"
+                      : "text-gray-500"
                 }`}
               >
                 {/* 소수점 제거하여 정수로 표시 */}
@@ -225,7 +225,7 @@ const NewcomerGrowthChart = React.memo(
         </div>
       </div>
     );
-  }
+  },
 );
 
 // --- AgeGroupPieChart ---
@@ -271,7 +271,7 @@ const AgeGroupPieChart = React.memo(
         </div>
       </div>
     );
-  }
+  },
 );
 
 // --- GenderRatioChart ---
@@ -327,7 +327,7 @@ const GenderRatioChart = React.memo(
         </div>
       </div>
     );
-  }
+  },
 );
 
 // --- 메인 페이지 ---
@@ -339,7 +339,7 @@ const StatisticsPage: React.FC = () => {
 
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const [selectedSemesterId, setSelectedSemesterId] = useState<number | null>(
-    null
+    null,
   );
 
   const [newcomerStats, setNewcomerStats] = useState<NewcomerStatDto[]>([]);
@@ -349,46 +349,55 @@ const StatisticsPage: React.FC = () => {
   const [detailDemographics, setDetailDemographics] =
     useState<DashboardDemographicsDto | null>(null);
   const [unassignedList, setUnassignedList] = useState<UnassignedMemberDto[]>(
-    []
+    [],
   );
 
-  // 1. 학기 목록 로딩 (모든 학기 조회)
+  // 1. 학기 목록 로딩 (활성 학기만)
   useEffect(() => {
-    semesterService.getAllSemesters().then((list) => {
-      // 최신순 정렬
-      const sortedList = list.sort(
-        (a, b) =>
-          new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
-      );
-      setSemesters(sortedList);
+    // ✅ true 전달: 활성 학기만 조회
+    semesterService
+      .getAllSemesters(true)
+      .then((list) => {
+        // 최신순 정렬
+        const sortedList = list.sort(
+          (a, b) =>
+            new Date(b.startDate).getTime() - new Date(a.startDate).getTime(),
+        );
+        setSemesters(sortedList);
 
-      if (sortedList.length > 0) {
-        // 현재 날짜가 포함된 학기를 찾거나, 없으면 최신 학기를 선택
-        const today = new Date();
-        const currentMonthTotal =
-          today.getFullYear() * 12 + (today.getMonth() + 1);
+        if (sortedList.length > 0) {
+          // 현재 날짜가 포함된 학기를 찾거나, 없으면 최신 학기를 선택
+          const today = new Date();
+          const currentMonthTotal =
+            today.getFullYear() * 12 + (today.getMonth() + 1);
 
-        const currentSemester = sortedList.find((s) => {
-          const start = new Date(s.startDate);
-          const end = new Date(s.endDate);
-          const startMonthTotal =
-            start.getFullYear() * 12 + (start.getMonth() + 1);
-          const endMonthTotal = end.getFullYear() * 12 + (end.getMonth() + 1);
+          const currentSemester = sortedList.find((s) => {
+            const start = new Date(s.startDate);
+            const end = new Date(s.endDate);
+            const startMonthTotal =
+              start.getFullYear() * 12 + (start.getMonth() + 1);
+            const endMonthTotal = end.getFullYear() * 12 + (end.getMonth() + 1);
 
-          return (
-            currentMonthTotal >= startMonthTotal &&
-            currentMonthTotal <= endMonthTotal
-          );
-        });
+            return (
+              currentMonthTotal >= startMonthTotal &&
+              currentMonthTotal <= endMonthTotal
+            );
+          });
 
-        const targetId = currentSemester
-          ? currentSemester.id
-          : sortedList[0].id;
-        setSelectedSemesterId(targetId);
-      } else {
+          // 활성 학기 중 현재 날짜에 해당하는 게 있으면 선택, 없으면 가장 최신(0번째) 선택
+          const targetId = currentSemester
+            ? currentSemester.id
+            : sortedList[0].id;
+          setSelectedSemesterId(targetId);
+        } else {
+          // 활성 학기가 아예 없으면 로딩 종료
+          setIsInitialLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch semesters:", err);
         setIsInitialLoading(false);
-      }
-    });
+      });
   }, []);
 
   // 2. 데이터 Fetching
@@ -416,7 +425,7 @@ const StatisticsPage: React.FC = () => {
           endObj > today
             ? `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(
                 2,
-                "0"
+                "0",
               )}-${String(today.getDate()).padStart(2, "0")}`
             : endDate;
 
@@ -425,7 +434,7 @@ const StatisticsPage: React.FC = () => {
             statisticsService.getNewcomerStats(
               "MONTH",
               startDate,
-              effectiveEndDate
+              effectiveEndDate,
             ),
             statisticsService.getSemesterSummary(selectedSemesterId),
             dashboardService.getDashboardData("SEMESTER", {
@@ -445,7 +454,7 @@ const StatisticsPage: React.FC = () => {
 
         // 임원(EXECUTIVE) 제외 필터링
         const filteredUnassigned = (unassigned as any[]).filter(
-          (m) => m.role !== "EXECUTIVE"
+          (m) => m.role !== "EXECUTIVE",
         );
         setUnassignedList(filteredUnassigned);
       } catch (error) {
@@ -494,10 +503,33 @@ const StatisticsPage: React.FC = () => {
     );
   }
 
+  // 활성 학기가 없을 경우 처리 (초기 로딩 이후)
   if (!isInitialLoading && semesters.length === 0) {
     return (
-      <div className="flex justify-center items-center h-screen bg-gray-50 text-gray-500">
-        등록된 학기 정보가 없습니다. 관리자에게 문의하세요.
+      <div className="bg-gray-50 min-h-screen pb-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 whitespace-nowrap">
+              통계 및 리포트
+            </h1>
+            <p className="mt-1 text-sm text-gray-500">
+              공동체의 성장 흐름과 구성원 현황을 상세하게 분석합니다.
+            </p>
+          </div>
+          <div className="bg-white p-20 rounded-2xl shadow-sm border border-dashed border-gray-300 flex flex-col items-center justify-center text-center">
+            <div className="bg-yellow-50 p-4 rounded-full mb-4">
+              <FaChartLine className="h-8 w-8 text-yellow-600" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">
+              등록된 활성 학기가 없습니다
+            </h3>
+            <p className="text-gray-500 max-w-md">
+              현재 활성화된 학기가 없어 통계 데이터를 표시할 수 없습니다.
+              <br />
+              관리자에게 문의하여 학기를 등록하거나 활성화해주세요.
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -505,7 +537,7 @@ const StatisticsPage: React.FC = () => {
   return (
     <div className="bg-gray-50 min-h-screen pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 헤더 & 필터 (모바일 최적화: 가로 스크롤 칩) */}
+        {/* 헤더 & 필터 */}
         <div className="mb-8 space-y-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 whitespace-nowrap">
@@ -604,8 +636,8 @@ const StatisticsPage: React.FC = () => {
                           {lastNewcomerStat.growthRate > 0
                             ? " 증가"
                             : lastNewcomerStat.growthRate < 0
-                            ? " 감소"
-                            : " 변동 없음"}
+                              ? " 감소"
+                              : " 변동 없음"}
                         </>
                       ) : (
                         "데이터 없음"

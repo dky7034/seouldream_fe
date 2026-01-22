@@ -7,12 +7,11 @@ import { formatDisplayName } from "../../utils/memberUtils";
 import type {
   MemberDto,
   AttendanceDto,
-  AttendanceStatus,
   User,
   GetAttendancesParams,
   SemesterDto,
 } from "../../types";
-import SimpleSearchableSelect from "../SimpleSearchableSelect";
+// SimpleSearchableSelect import 제거
 import AttendanceMatrix from "../AttendanceMatrix";
 import {
   TableCellsIcon,
@@ -166,7 +165,7 @@ const AttendanceMatrixView: React.FC<{
           joinYear: m.joinYear,
         };
       }),
-    [members, allMembers]
+    [members, allMembers],
   );
 
   const matrixMode =
@@ -254,17 +253,14 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
 
+  // ✅ [수정] memberId 필터 제거
   const [filters, setFilters] = useState<{
-    status: string;
-    memberId: number | null;
     startDate: string;
     endDate: string;
     year: number;
     month: number;
     semesterId: number | "";
   }>({
-    status: "all",
-    memberId: null,
     startDate: "",
     endDate: "",
     year: now.getFullYear(),
@@ -291,12 +287,12 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
           date.getMonth() === start.getMonth())
       );
     },
-    []
+    [],
   );
 
   const selectedSemester = useMemo(
     () => semesters.find((s) => s.id === filters.semesterId) || null,
-    [semesters, filters.semesterId]
+    [semesters, filters.semesterId],
   );
 
   const semesterMonths = useMemo(() => {
@@ -339,10 +335,9 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
 
   const fetchSemesters = useCallback(async () => {
     try {
-      // ✅ [수정] 셀 리더 전용: 활성 학기만 조회 (true)
       const data = await semesterService.getAllSemesters(true);
       const sorted = data.sort((a, b) =>
-        b.startDate.localeCompare(a.startDate)
+        b.startDate.localeCompare(a.startDate),
       );
       setSemesters(sorted);
     } catch {
@@ -355,7 +350,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
     const today = new Date();
 
     const currentSem = semesters.find((s) =>
-      isDateInSemesterOrSameMonth(today, s)
+      isDateInSemesterOrSameMonth(today, s),
     );
     const targetSem =
       currentSem || semesters.find((s) => s.isActive) || semesters[0];
@@ -387,11 +382,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
       page: 0,
       size: 2000,
       sort: "date,asc",
-      memberId: filters.memberId || undefined,
-      status:
-        filters.status !== "all"
-          ? (filters.status as AttendanceStatus)
-          : undefined,
+      // ✅ [수정] memberId, status 모두 제거됨
     };
 
     if (queryFilterMode === "range") {
@@ -416,8 +407,8 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
 
     const cleanedParams = Object.fromEntries(
       Object.entries(params).filter(
-        ([, v]) => v !== null && v !== "" && v !== undefined
-      )
+        ([, v]) => v !== null && v !== "" && v !== undefined,
+      ),
     ) as GetAttendancesParams;
 
     try {
@@ -464,7 +455,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
     if (type === "month") {
       if (semesterMonths.length > 0) {
         const isCurrentMonthInSemester = semesterMonths.some(
-          (m) => m.year === todayYear && m.month === todayMonth
+          (m) => m.year === todayYear && m.month === todayMonth,
         );
         if (isCurrentMonthInSemester) {
           setFilters((prev) => ({
@@ -475,7 +466,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
           return;
         }
         const isInRange = semesterMonths.some(
-          (m) => m.year === filters.year && m.month === filters.month
+          (m) => m.year === filters.year && m.month === filters.month,
         );
         if (!isInRange) {
           setFilters((prev) => ({
@@ -487,7 +478,7 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
       }
     } else {
       const currentSem = semesters.find((s) =>
-        isDateInSemesterOrSameMonth(today, s)
+        isDateInSemesterOrSameMonth(today, s),
       );
       if (currentSem) {
         setFilters((prev) => ({
@@ -515,14 +506,6 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
       month: start.getMonth() + 1,
     }));
   };
-
-  const filteredMembers = useMemo(
-    () =>
-      filters.memberId
-        ? members.filter((m) => m.id === filters.memberId)
-        : members,
-    [members, filters.memberId]
-  );
 
   const viewProps = useMemo(() => {
     if (filterMode === "range")
@@ -552,18 +535,6 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
       eDate: toDateKey(endObj),
     };
   }, [filterMode, unitType, filters, semesters, selectedSemester]);
-
-  const memberOptions = useMemo(
-    () =>
-      members.map((m) => {
-        const found = allMembers.find((am) => am.id === m.id);
-        return {
-          value: m.id,
-          label: found ? formatDisplayName(found, allMembers) : m.name,
-        };
-      }),
-    [members, allMembers]
-  );
 
   return (
     <div className="space-y-6">
@@ -663,7 +634,6 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
                   >
                     {semesters.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {/* ✅ [수정] 심플한 학기 이름만 표시 */}
                         {s.name}
                       </option>
                     ))}
@@ -747,42 +717,12 @@ const AttendanceLogView: React.FC<AttendanceLogViewProps> = ({
               )}
             </div>
           )}
-
-          <div className="border-t border-gray-100 mt-5 pt-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div>
-              <div className="text-xs font-bold text-gray-500 uppercase mb-1.5">
-                셀원 검색
-              </div>
-              <SimpleSearchableSelect
-                options={memberOptions}
-                value={filters.memberId ?? undefined}
-                onChange={(val) =>
-                  handleFilterChange("memberId", val === undefined ? null : val)
-                }
-                placeholder="전체 보기"
-              />
-            </div>
-            <div>
-              <div className="text-xs font-bold text-gray-500 uppercase mb-1.5">
-                상태 필터
-              </div>
-              <select
-                value={filters.status}
-                onChange={(e) => handleFilterChange("status", e.target.value)}
-                className="block w-full border-gray-200 rounded-xl shadow-sm py-2 px-3 text-sm focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 font-medium"
-              >
-                <option value="all">모든 상태</option>
-                <option value="PRESENT">출석만 표시</option>
-                <option value="ABSENT">결석만 표시</option>
-              </select>
-            </div>
-          </div>
         </div>
       </div>
 
       {/* Main Content */}
       <AttendanceMatrixView
-        members={filteredMembers}
+        members={members} // ✅ 필터링 없이 전체 멤버 전달
         attendances={attendanceList}
         startDate={viewProps.sDate}
         endDate={viewProps.eDate}

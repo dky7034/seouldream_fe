@@ -175,7 +175,7 @@ const AttendanceStats = memo(
         </div>
       </div>
     );
-  }
+  },
 );
 
 // ─────────────────────────────────────────────────────────────
@@ -251,7 +251,7 @@ const AttendanceMatrixView = memo(
         const currentDateStr = toDateKey(current);
         if (unitType === "year" && semesters.length > 0) {
           const isInSemester = semesters.some(
-            (s) => currentDateStr >= s.startDate && currentDateStr <= s.endDate
+            (s) => currentDateStr >= s.startDate && currentDateStr <= s.endDate,
           );
           if (!isInSemester) isSemesterDate = false;
         }
@@ -329,7 +329,7 @@ const AttendanceMatrixView = memo(
             createdAt: m.createdAt,
             joinYear: m.joinYear,
           })),
-      [members, includeExecutive, nameSort, ageSort] // 의존성 업데이트
+      [members, includeExecutive, nameSort, ageSort], // 의존성 업데이트
     );
 
     const matrixMode = "semester";
@@ -397,7 +397,7 @@ const AttendanceMatrixView = memo(
         </div>
       </div>
     );
-  }
+  },
 );
 
 // ─────────────────────────────────────────────────────────────
@@ -410,7 +410,7 @@ const AdminAttendancesPage: React.FC = () => {
   const currentYear = now.getFullYear();
 
   const [matrixAttendances, setMatrixAttendances] = useState<AttendanceDto[]>(
-    []
+    [],
   );
   const [allMembers, setAllMembers] = useState<MemberDto[]>([]);
   const [overallStats, setOverallStats] =
@@ -460,7 +460,7 @@ const AdminAttendancesPage: React.FC = () => {
     if (semesters.length > 0 && !hasAutoSelectedSemester) {
       const today = new Date();
       const currentYM = `${today.getFullYear()}-${String(
-        today.getMonth() + 1
+        today.getMonth() + 1,
       ).padStart(2, "0")}`;
 
       let target = semesters.find((s) => {
@@ -470,6 +470,7 @@ const AdminAttendancesPage: React.FC = () => {
       });
 
       if (!target) {
+        // 활성 학기 중에서 가장 최신(ID가 큰) 학기 선택
         target = [...semesters].sort((a, b) => b.id - a.id)[0];
       }
 
@@ -507,11 +508,11 @@ const AdminAttendancesPage: React.FC = () => {
 
     if (semesters.length > 0) {
       const overlappingSemesters = semesters.filter(
-        (s) => s.startDate <= rawEnd && s.endDate >= rawStart
+        (s) => s.startDate <= rawEnd && s.endDate >= rawStart,
       );
       if (overlappingSemesters.length > 0) {
         const sorted = [...overlappingSemesters].sort((a, b) =>
-          a.startDate.localeCompare(b.startDate)
+          a.startDate.localeCompare(b.startDate),
         );
         const firstSem = sorted[0];
         const lastSem = sorted[sorted.length - 1];
@@ -537,8 +538,8 @@ const AdminAttendancesPage: React.FC = () => {
     }
     return Object.fromEntries(
       Object.entries(params).filter(
-        ([, v]) => v !== null && v !== "" && v !== undefined
-      )
+        ([, v]) => v !== null && v !== "" && v !== undefined,
+      ),
     );
   }, [filters, effectiveDateRange]);
 
@@ -554,7 +555,7 @@ const AdminAttendancesPage: React.FC = () => {
         sort: "date,asc",
       };
       const data = await attendanceService.getAttendances(
-        matrixParams as GetAttendancesParams
+        matrixParams as GetAttendancesParams,
       );
       setMatrixAttendances(data.content);
     } catch (err) {
@@ -617,11 +618,12 @@ const AdminAttendancesPage: React.FC = () => {
         .then((data) => setAvailableYears(data.sort((a, b) => b - a)))
         .catch(() => setAvailableYears([]));
 
+      // ✅ [수정됨] 활성화된 학기만 조회 (true 전달)
       semesterService
-        .getAllSemesters()
+        .getAllSemesters(true)
         .then((data) => {
           const sorted = data.sort((a, b) =>
-            b.startDate.localeCompare(a.startDate)
+            b.startDate.localeCompare(a.startDate),
           );
           setSemesters(sorted);
         })
@@ -664,7 +666,7 @@ const AdminAttendancesPage: React.FC = () => {
 
         if (unitType === "semester" && prev.semesterId) {
           const currentSemester = semesters.find(
-            (s) => s.id === prev.semesterId
+            (s) => s.id === prev.semesterId,
           );
           if (currentSemester) {
             baseYear = new Date(currentSemester.startDate).getFullYear();
@@ -680,7 +682,7 @@ const AdminAttendancesPage: React.FC = () => {
           if (semesters.length > 0) {
             const today = new Date();
             const currentYM = `${today.getFullYear()}-${String(
-              today.getMonth() + 1
+              today.getMonth() + 1,
             ).padStart(2, "0")}`;
             let target = semesters.find((s) => {
               const start = s.startDate.substring(0, 7);
@@ -694,7 +696,7 @@ const AdminAttendancesPage: React.FC = () => {
         return next;
       });
     },
-    [semesters, currentYear, unitType]
+    [semesters, currentYear, unitType],
   );
 
   const cellOptions = useMemo(
@@ -705,7 +707,7 @@ const AdminAttendancesPage: React.FC = () => {
             { value: null, label: "전체 셀" },
             ...allCells.map((c) => ({ value: c.id, label: c.name })),
           ],
-    [allCells, isExecutive]
+    [allCells, isExecutive],
   );
 
   const memberOptions = useMemo(() => {
@@ -800,7 +802,7 @@ const AdminAttendancesPage: React.FC = () => {
                       onChange={(e) =>
                         handleFilterChange(
                           "year",
-                          e.target.value ? Number(e.target.value) : ""
+                          e.target.value ? Number(e.target.value) : "",
                         )
                       }
                       className="w-full py-2 px-1 border border-gray-300 rounded-lg text-sm bg-white focus:ring-indigo-500 focus:border-indigo-500 shadow-sm disabled:bg-gray-50 disabled:text-gray-400"
@@ -854,33 +856,40 @@ const AdminAttendancesPage: React.FC = () => {
                 </div>
               </div>
 
-              {unitType === "semester" && semesters.length > 0 && (
+              {/* ✅ [수정] 활성 학기가 없을 때 메시지 표시 추가 */}
+              {unitType === "semester" && (
                 <div className="pt-3 border-t border-gray-200/50 mt-3 animate-fadeIn">
-                  <div className="flex justify-between items-end mb-2">
-                    <label className="text-xs font-bold text-gray-500">
-                      학기 선택
-                    </label>
-                    <span className="text-[10px] text-gray-400 font-normal sm:hidden">
-                      좌우로 스크롤
-                    </span>
-                  </div>
+                  {semesters.length === 0 ? (
+                    <div className="text-xs text-yellow-800 bg-yellow-50 p-3 rounded-lg border border-yellow-100">
+                      활성 학기가 없습니다.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-end mb-2">
+                        <label className="text-xs font-bold text-gray-500">
+                          학기 선택
+                        </label>
+                        <span className="text-[10px] text-gray-400 font-normal sm:hidden">
+                          좌우로 스크롤
+                        </span>
+                      </div>
 
-                  <div
-                    className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap scrollbar-hide"
-                    style={scrollbarHideStyle}
-                  >
-                    {semesters.map((s) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() =>
-                          setFilters((prev) => ({
-                            ...prev,
-                            semesterId: s.id,
-                            year: "",
-                          }))
-                        }
-                        className={`
+                      <div
+                        className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap scrollbar-hide"
+                        style={scrollbarHideStyle}
+                      >
+                        {semesters.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() =>
+                              setFilters((prev) => ({
+                                ...prev,
+                                semesterId: s.id,
+                                year: "",
+                              }))
+                            }
+                            className={`
                             flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all shadow-sm whitespace-nowrap
                             ${
                               filters.semesterId === s.id
@@ -888,16 +897,18 @@ const AdminAttendancesPage: React.FC = () => {
                                 : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
                             }
                           `}
-                      >
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            s.isActive ? "bg-green-400" : "bg-gray-300"
-                          }`}
-                        ></span>
-                        <span>{s.name}</span>
-                      </button>
-                    ))}
-                  </div>
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                s.isActive ? "bg-green-400" : "bg-gray-300"
+                              }`}
+                            ></span>
+                            <span>{s.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -916,7 +927,7 @@ const AdminAttendancesPage: React.FC = () => {
                       onChange={(value) =>
                         handleFilterChange(
                           "cell",
-                          cellOptions.find((o) => o.value === value) || null
+                          cellOptions.find((o) => o.value === value) || null,
                         )
                       }
                       placeholder="전체 셀"
@@ -941,7 +952,7 @@ const AdminAttendancesPage: React.FC = () => {
                     onChange={(value) =>
                       handleFilterChange(
                         "member",
-                        memberOptions.find((o) => o.value === value) || null
+                        memberOptions.find((o) => o.value === value) || null,
                       )
                     }
                     placeholder={

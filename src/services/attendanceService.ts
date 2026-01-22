@@ -13,7 +13,7 @@ import type {
   Page,
   ProcessAttendanceWithPrayersRequest,
   CellReportDto,
-  GetAttendanceAlertsParams, // ✅ [추가] 새로 만든 파라미터 타입 import
+  GetAttendanceAlertsParams,
 } from "../types";
 
 // Define query parameters for the new rate APIs, which don't use 'groupBy'
@@ -21,7 +21,7 @@ type AttendanceRateQueryParams = Omit<AttendanceSummaryQueryParams, "groupBy">;
 
 export const attendanceService = {
   getAttendances: async (
-    params?: GetAttendancesParams
+    params?: GetAttendancesParams,
   ): Promise<Page<AttendanceDto>> => {
     try {
       const response = await api.get("/attendances", { params });
@@ -29,14 +29,14 @@ export const attendanceService = {
     } catch (error: any) {
       console.error(
         "Failed to fetch attendances:",
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
       throw error;
     }
   },
 
   processAttendances: async (
-    data: ProcessAttendanceRequest[]
+    data: ProcessAttendanceRequest[],
   ): Promise<AttendanceDto[]> => {
     try {
       const response = await api.post("/attendances/process", data);
@@ -44,7 +44,7 @@ export const attendanceService = {
     } catch (error: any) {
       console.error(
         "Failed to process attendances:",
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
       throw error;
     }
@@ -53,14 +53,14 @@ export const attendanceService = {
   // ✅ 출석 + 기도제목 통합 저장 API
   processAttendanceWithPrayers: async (
     cellId: number,
-    data: ProcessAttendanceWithPrayersRequest
+    data: ProcessAttendanceWithPrayersRequest,
   ): Promise<void> => {
     try {
       await api.post(`/cells/${cellId}/attendance-with-prayers`, data);
     } catch (error: any) {
       console.error(
         `Failed to process attendances with prayers for cell ${cellId}:`,
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
       throw error;
     }
@@ -69,22 +69,39 @@ export const attendanceService = {
   // ✅ 특정 날짜의 셀 보고서(나눔, 특이사항) 조회 API
   getCellReport: async (
     cellId: number,
-    date: string
+    date: string,
   ): Promise<CellReportDto> => {
     try {
-      // GET /cells/{cellId}/attendance-report?date=YYYY-MM-DD
       const response = await api.get(`/cells/${cellId}/attendance-report`, {
         params: { date },
       });
       return response.data;
     } catch (error: any) {
-      // 데이터가 없거나 에러 발생 시 로그 출력 후 throw
-      // (컴포넌트 쪽에서 catch하여 처리)
       console.error(
         `Failed to fetch cell report for cell ${cellId}:`,
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
       throw error;
+    }
+  },
+
+  // ✅ [수정] 제출된 날짜 목록 조회 (이름을 getSubmittedDates로 통일)
+  getSubmittedDates: async (
+    cellId: number,
+    year?: number,
+    month?: number,
+  ): Promise<string[]> => {
+    try {
+      const response = await api.get(`/cells/${cellId}/submitted-dates`, {
+        params: { year, month },
+      });
+      return response.data; // ["2026-01-01", ...]
+    } catch (error: any) {
+      console.error(
+        `Failed to fetch submitted dates for cell ${cellId}:`,
+        error.response?.data || error.message,
+      );
+      return [];
     }
   },
 
@@ -94,18 +111,16 @@ export const attendanceService = {
     } catch (error: any) {
       console.error(
         `Failed to delete attendance ${id}:`,
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
       throw error;
     }
   },
 
-  // ✅ [수정] 파라미터 객체(GetAttendanceAlertsParams)를 받아서 처리하도록 변경
   getAttendanceAlerts: async (
-    params: GetAttendanceAlertsParams
+    params: GetAttendanceAlertsParams,
   ): Promise<MemberAlertDto[]> => {
     try {
-      // params 안에 consecutiveAbsences, year, semesterId 등이 들어있음 -> 쿼리 스트링 변환
       const response = await api.get("/attendances/alerts", {
         params,
       });
@@ -113,16 +128,14 @@ export const attendanceService = {
     } catch (error: any) {
       console.error(
         "Failed to fetch attendance alerts:",
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
       throw error;
     }
   },
 
-  // --- New Simplified Rate APIs ---
-
   getOverallAttendanceRate: async (
-    params: AttendanceRateQueryParams
+    params: AttendanceRateQueryParams,
   ): Promise<SimpleAttendanceRateDto> => {
     try {
       const response = await api.get("/attendances/rate/overall", { params });
@@ -130,7 +143,7 @@ export const attendanceService = {
     } catch (error: any) {
       console.error(
         "Failed to fetch overall attendance rate:",
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
       throw error;
     }
@@ -138,7 +151,7 @@ export const attendanceService = {
 
   getCellAttendanceRate: async (
     cellId: number,
-    params: AttendanceRateQueryParams
+    params: AttendanceRateQueryParams,
   ): Promise<SimpleAttendanceRateDto> => {
     try {
       const response = await api.get(`/cells/${cellId}/attendance-rate`, {
@@ -148,7 +161,7 @@ export const attendanceService = {
     } catch (error: any) {
       console.error(
         `Failed to fetch cell ${cellId} attendance rate:`,
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
       throw error;
     }
@@ -156,18 +169,18 @@ export const attendanceService = {
 
   getMemberAttendanceRate: async (
     cellId: number,
-    params: any
+    params: any,
   ): Promise<SimpleAttendanceRateDto[]> => {
     try {
       const response = await api.get<SimpleAttendanceRateDto[]>(
         `/cells/${cellId}/members/attendance-rate`,
-        { params }
+        { params },
       );
       return response.data;
     } catch (error) {
       console.error(
         `Failed to fetch member attendance rate for cell ${cellId}:`,
-        error
+        error,
       );
       throw error;
     }
@@ -180,16 +193,14 @@ export const attendanceService = {
     } catch (error: any) {
       console.error(
         "Failed to fetch available years for attendances:",
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
       throw error;
     }
   },
 
-  // --- Deprecated Summary APIs ---
-
   getOverallAttendanceSummary: async (
-    params: AttendanceSummaryQueryParams
+    params: AttendanceSummaryQueryParams,
   ): Promise<OverallAttendanceSummaryDto> => {
     try {
       const response = await api.get("/attendances/summary/overall", {
@@ -199,7 +210,7 @@ export const attendanceService = {
     } catch (error: any) {
       console.error(
         "Failed to fetch overall attendance summary:",
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
       throw error;
     }
@@ -207,7 +218,7 @@ export const attendanceService = {
 
   getCellAttendanceSummary: async (
     cellId: number,
-    params: AttendanceSummaryQueryParams
+    params: AttendanceSummaryQueryParams,
   ): Promise<CellAttendanceSummaryDto> => {
     try {
       const response = await api.get(`/cells/${cellId}/attendances/summary`, {
@@ -217,7 +228,7 @@ export const attendanceService = {
     } catch (error: any) {
       console.error(
         `Failed to fetch cell ${cellId} attendance summary:`,
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
       throw error;
     }
@@ -225,18 +236,18 @@ export const attendanceService = {
 
   getMemberAttendanceSummary: async (
     memberId: number,
-    params: AttendanceSummaryQueryParams
+    params: AttendanceSummaryQueryParams,
   ): Promise<MemberAttendanceSummaryDto> => {
     try {
       const response = await api.get(
         `/attendances/summary/members/${memberId}`,
-        { params }
+        { params },
       );
       return response.data;
     } catch (error: any) {
       console.error(
         `Failed to fetch member ${memberId} attendance summary:`,
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
       throw error;
     }
