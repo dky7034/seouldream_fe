@@ -624,8 +624,6 @@ export interface AttendanceKeyMetricsDto {
   lastYearPeriodAttendanceRate: number;
 }
 
-// --- [수정됨] 대시보드 통계 DTO ---
-
 export interface DemographicsDistributionDto {
   birthYear: number;
   maleCount: number;
@@ -639,11 +637,10 @@ export interface DashboardDemographicsDto {
   previousSemesterCount: number;
   executiveCount: number;
   cellLeaderCount: number;
-
-  // [변경] 기존 연령대 필드 삭제 -> 대학부/청년부 필드 추가
-  countDaehak: number; // 대학부 (한국나이 28세 이하)
-  countCheongnyeon: number; // 청년부 (한국나이 29세 이상)
-
+  count10sAndUnder: number;
+  count20s: number;
+  count30s: number;
+  count40sAndOver: number;
   distribution: DemographicsDistributionDto[];
 }
 

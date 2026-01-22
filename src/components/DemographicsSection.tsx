@@ -19,8 +19,7 @@ interface Props {
 }
 
 /**
- * ✅ Recharts Tooltip content props는 버전별 타입 export가 흔들립니다.
- * 필요한 필드만 직접 타입으로 정의하면 가장 안전합니다.
+ * Recharts Tooltip Props Type
  */
 type BirthYearTooltipProps = {
   active?: boolean;
@@ -33,7 +32,6 @@ type BirthYearTooltipProps = {
 
 /**
  * 출생년도별 분포 Tooltip
- * - 남/여 + 총원(남+여) 표시
  */
 const BirthYearTooltip: React.FC<BirthYearTooltipProps> = ({
   active,
@@ -54,7 +52,7 @@ const BirthYearTooltip: React.FC<BirthYearTooltipProps> = ({
       className="rounded-xl bg-white shadow-lg border border-gray-100 px-3 py-3"
       style={{ minWidth: 160 }}
     >
-      <div className="text-sm font-bold text-gray-700 mb-2">{label}년</div>
+      <div className="text-sm font-bold text-gray-700 mb-2">{label}년생</div>
 
       {/* 총원 */}
       <div className="flex justify-between items-center mb-2 pb-2 border-b border-gray-100">
@@ -81,36 +79,40 @@ export const DemographicsSection: React.FC<Props> = ({
   data,
   onUnassignedClick,
 }) => {
-  // 1) 차트 너비 동적 계산 (데이터 많으면 가로 스크롤)
+  // 1) 차트 너비 동적 계산 (데이터가 많으면 가로 스크롤)
   const minChartWidth = Math.max(data.distribution.length * 45, 800);
 
   // 2) 미배정 인원 계산 (음수 방지)
-  // NOTE: 임원단이 셀에 소속된 경우 중복 차감될 수 있으므로 Math.max 필수
   const unassignedCount = Math.max(
     0,
-    data.totalMemberCount - data.cellMemberCount - (data.executiveCount ?? 0)
+    data.totalMemberCount - data.cellMemberCount - (data.executiveCount ?? 0),
   );
 
-  // 3) 연령대별(2030) 집계 로직
-  const stats = useMemo(() => {
+  /**
+   * 3) 그룹별 성별 상세 집계 (distribution 데이터 기반)
+   * - 정책: 한국나이 28세 이하 = 대학부 / 29세 이상 = 청년부
+   * - 한국나이 공식: (현재연도 - 출생연도) + 1
+   */
+  const groupStats = useMemo(() => {
     const currentYear = new Date().getFullYear();
     const result = {
-      age20s: { male: 0, female: 0, total: 0 },
-      age30s: { male: 0, female: 0, total: 0 },
+      daehak: { male: 0, female: 0, total: 0 },
+      cheongnyeon: { male: 0, female: 0, total: 0 },
     };
 
     data.distribution.forEach((item) => {
-      // item.birthYear: number, maleCount/femaleCount: number ✅
-      const age = currentYear - item.birthYear;
+      const koreanAge = currentYear - item.birthYear + 1;
 
-      if (age >= 20 && age <= 29) {
-        result.age20s.male += item.maleCount;
-        result.age20s.female += item.femaleCount;
-        result.age20s.total += item.maleCount + item.femaleCount;
-      } else if (age >= 30 && age <= 39) {
-        result.age30s.male += item.maleCount;
-        result.age30s.female += item.femaleCount;
-        result.age30s.total += item.maleCount + item.femaleCount;
+      if (koreanAge <= 28) {
+        // 대학부
+        result.daehak.male += item.maleCount;
+        result.daehak.female += item.femaleCount;
+        result.daehak.total += item.maleCount + item.femaleCount;
+      } else {
+        // 청년부
+        result.cheongnyeon.male += item.maleCount;
+        result.cheongnyeon.female += item.femaleCount;
+        result.cheongnyeon.total += item.maleCount + item.femaleCount;
       }
     });
 
@@ -169,25 +171,35 @@ export const DemographicsSection: React.FC<Props> = ({
         />
       </div>
 
-      {/* (1) 연령대별 현황 */}
+      {/* (1) 그룹별 현황 (대학부 vs 청년부) */}
       <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-        <h3 className="text-lg font-bold text-gray-800 mb-4">연령대별 현황</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-800">그룹별 현황</h3>
+          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+            기준: {new Date().getFullYear()}년
+          </span>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <DetailAgeCard
-            label="20대"
-            maleCount={stats.age20s.male}
-            femaleCount={stats.age20s.female}
-            totalCount={stats.age20s.total}
-            colorClass="bg-green-50 border-green-100"
-            iconColor="text-green-600"
+          <DetailGroupCard
+            label="대학부"
+            subLabel="28세 이하"
+            maleCount={groupStats.daehak.male}
+            femaleCount={groupStats.daehak.female}
+            totalCount={groupStats.daehak.total} // 또는 data.countDaehak 사용 가능
+            colorClass="bg-indigo-50 border-indigo-100"
+            iconColor="text-indigo-600"
+            badgeColor="bg-indigo-100 text-indigo-700"
           />
-          <DetailAgeCard
-            label="30대"
-            maleCount={stats.age30s.male}
-            femaleCount={stats.age30s.female}
-            totalCount={stats.age30s.total}
-            colorClass="bg-yellow-50 border-yellow-100"
-            iconColor="text-yellow-600"
+          <DetailGroupCard
+            label="청년부"
+            subLabel="29세 이상"
+            maleCount={groupStats.cheongnyeon.male}
+            femaleCount={groupStats.cheongnyeon.female}
+            totalCount={groupStats.cheongnyeon.total} // 또는 data.countCheongnyeon 사용 가능
+            colorClass="bg-teal-50 border-teal-100"
+            iconColor="text-teal-600"
+            badgeColor="bg-teal-100 text-teal-700"
           />
         </div>
       </div>
@@ -197,7 +209,7 @@ export const DemographicsSection: React.FC<Props> = ({
         <div className="mb-4">
           <h3 className="text-lg font-bold text-gray-800">출생년도별 분포</h3>
           <p className="text-sm text-gray-500 mt-1">
-            스크롤하여 전체 연령 분포를 확인하세요.
+            가로로 스크롤하여 전체 연령 분포를 확인할 수 있습니다.
           </p>
         </div>
 
@@ -237,7 +249,6 @@ export const DemographicsSection: React.FC<Props> = ({
                   }}
                 />
 
-                {/* ✅ 총원 포함 Tooltip */}
                 <Tooltip
                   cursor={{ fill: "rgba(243, 244, 246, 0.6)" }}
                   content={<BirthYearTooltip />}
@@ -278,7 +289,7 @@ export const DemographicsSection: React.FC<Props> = ({
 };
 
 // ─────────────────────────────────────────────────────────────
-// Sub Components (디자인 유지)
+// Sub Components
 // ─────────────────────────────────────────────────────────────
 
 const SummaryCard = ({
@@ -312,30 +323,42 @@ const SummaryCard = ({
   </div>
 );
 
-const DetailAgeCard = ({
+/**
+ * 변경된 디자인의 그룹별 상세 카드
+ */
+const DetailGroupCard = ({
   label,
+  subLabel,
   maleCount,
   femaleCount,
   totalCount,
   colorClass,
   iconColor,
+  badgeColor,
 }: {
   label: string;
+  subLabel: string;
   maleCount: number;
   femaleCount: number;
   totalCount: number;
   colorClass: string;
   iconColor: string;
+  badgeColor: string;
 }) => (
   <div
     className={`p-5 rounded-lg border ${colorClass} transition-all hover:shadow-sm`}
   >
     <div className="flex justify-between items-center mb-4">
-      <span
-        className={`text-sm font-bold px-3 py-1 rounded-full bg-white ${iconColor} shadow-sm border border-gray-100`}
-      >
-        {label}
-      </span>
+      <div className="flex items-center gap-2">
+        <span
+          className={`text-sm font-bold px-3 py-1 rounded-full ${iconColor} bg-white shadow-sm border border-gray-100`}
+        >
+          {label}
+        </span>
+        <span className={`text-[10px] px-1.5 py-0.5 rounded ${badgeColor}`}>
+          {subLabel}
+        </span>
+      </div>
       <span className="text-2xl font-extrabold text-gray-800">
         {totalCount}명
       </span>

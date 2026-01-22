@@ -18,21 +18,80 @@ interface Props {
   onUnassignedClick?: () => void;
 }
 
+/**
+ * ✅ Recharts Tooltip content props는 버전별 타입 export가 흔들립니다.
+ * 필요한 필드만 직접 타입으로 정의하면 가장 안전합니다.
+ */
+type BirthYearTooltipProps = {
+  active?: boolean;
+  label?: string | number;
+  payload?: Array<{
+    dataKey?: string;
+    value?: number | string;
+  }>;
+};
+
+/**
+ * 출생년도별 분포 Tooltip
+ * - 남/여 + 총원(남+여) 표시
+ */
+const BirthYearTooltip: React.FC<BirthYearTooltipProps> = ({
+  active,
+  payload,
+  label,
+}) => {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const getValue = (key: "maleCount" | "femaleCount") =>
+    Number(payload.find((p) => p.dataKey === key)?.value ?? 0);
+
+  const male = getValue("maleCount");
+  const female = getValue("femaleCount");
+  const total = male + female;
+
+  return (
+    <div
+      className="rounded-xl bg-white shadow-lg border border-gray-100 px-3 py-3"
+      style={{ minWidth: 160 }}
+    >
+      <div className="text-sm font-bold text-gray-700 mb-2">{label}년</div>
+
+      {/* 총원 */}
+      <div className="flex justify-between items-center mb-2 pb-2 border-b border-gray-100">
+        <span className="text-gray-500 font-medium">총원</span>
+        <span className="font-extrabold text-gray-900">{total}명</span>
+      </div>
+
+      {/* 남/여 */}
+      <div className="space-y-1 text-sm">
+        <div className="flex justify-between items-center">
+          <span className="text-gray-500">남자</span>
+          <span className="font-bold text-blue-600">{male}명</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-gray-500">여자</span>
+          <span className="font-bold text-pink-500">{female}명</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const DemographicsSection: React.FC<Props> = ({
   data,
   onUnassignedClick,
 }) => {
-  // 1. 차트 너비 동적 계산 (데이터가 많으면 가로 스크롤 발생)
+  // 1) 차트 너비 동적 계산 (데이터 많으면 가로 스크롤)
   const minChartWidth = Math.max(data.distribution.length * 45, 800);
 
-  // 2. 미배정 인원 계산 (음수 방지 안전장치)
+  // 2) 미배정 인원 계산 (음수 방지)
   // NOTE: 임원단이 셀에 소속된 경우 중복 차감될 수 있으므로 Math.max 필수
   const unassignedCount = Math.max(
     0,
     data.totalMemberCount - data.cellMemberCount - (data.executiveCount ?? 0)
   );
 
-  // 3. 연령대별(2030) 집계 로직
+  // 3) 연령대별(2030) 집계 로직
   const stats = useMemo(() => {
     const currentYear = new Date().getFullYear();
     const result = {
@@ -41,7 +100,9 @@ export const DemographicsSection: React.FC<Props> = ({
     };
 
     data.distribution.forEach((item) => {
-      const age = currentYear - item.birthYear; // 한국식 나이/만 나이 여부에 따라 +1 조정 가능
+      // item.birthYear: number, maleCount/femaleCount: number ✅
+      const age = currentYear - item.birthYear;
+
       if (age >= 20 && age <= 29) {
         result.age20s.male += item.maleCount;
         result.age20s.female += item.femaleCount;
@@ -52,12 +113,13 @@ export const DemographicsSection: React.FC<Props> = ({
         result.age30s.total += item.maleCount + item.femaleCount;
       }
     });
+
     return result;
   }, [data.distribution]);
 
   return (
     <div className="space-y-6">
-      {/* 🔹 1. 상단 요약 카드 그리드 */}
+      {/* 상단 요약 카드 */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
         <SummaryCard label="전체 인원" value={data.totalMemberCount} />
 
@@ -107,7 +169,6 @@ export const DemographicsSection: React.FC<Props> = ({
         />
       </div>
 
-      {/* 🔹 2. 하단 상세 내용 */}
       {/* (1) 연령대별 현황 */}
       <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
         <h3 className="text-lg font-bold text-gray-800 mb-4">연령대별 현황</h3>
@@ -140,20 +201,20 @@ export const DemographicsSection: React.FC<Props> = ({
           </p>
         </div>
 
-        {/* 차트 영역 (가로 스크롤 적용) */}
         <div className="w-full overflow-x-auto pb-2 scrollbar-hide">
           <div style={{ height: "400px", minWidth: `${minChartWidth}px` }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={data.distribution}
                 margin={{ top: 30, right: 10, left: 0, bottom: 5 }}
-                barSize={16} // 막대 두께 조정
+                barSize={16}
               >
                 <CartesianGrid
                   strokeDasharray="3 3"
                   vertical={false}
                   stroke="#f3f4f6"
                 />
+
                 <XAxis
                   dataKey="birthYear"
                   interval={0}
@@ -162,6 +223,7 @@ export const DemographicsSection: React.FC<Props> = ({
                   height={60}
                   tick={{ fontSize: 11, fill: "#6b7280" }}
                 />
+
                 <YAxis
                   allowDecimals={false}
                   tick={{ fontSize: 12, fill: "#9ca3af" }}
@@ -175,24 +237,10 @@ export const DemographicsSection: React.FC<Props> = ({
                   }}
                 />
 
+                {/* ✅ 총원 포함 Tooltip */}
                 <Tooltip
                   cursor={{ fill: "rgba(243, 244, 246, 0.6)" }}
-                  contentStyle={{
-                    borderRadius: "12px",
-                    border: "none",
-                    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
-                    padding: "12px",
-                  }}
-                  // 툴팁 포맷: 이름과 값을 명확하게 표시
-                  formatter={(value: number, name: string) => [
-                    `${value}명`,
-                    name,
-                  ]}
-                  labelStyle={{
-                    fontWeight: "bold",
-                    marginBottom: "8px",
-                    color: "#374151",
-                  }}
+                  content={<BirthYearTooltip />}
                 />
 
                 <Legend
@@ -205,6 +253,7 @@ export const DemographicsSection: React.FC<Props> = ({
                     </span>
                   )}
                 />
+
                 <Bar
                   dataKey="maleCount"
                   name="남자"
@@ -217,7 +266,7 @@ export const DemographicsSection: React.FC<Props> = ({
                   name="여자"
                   stackId="a"
                   fill="#f472b6"
-                  radius={[4, 4, 0, 0]} // 상단 둥글게
+                  radius={[4, 4, 0, 0]}
                 />
               </BarChart>
             </ResponsiveContainer>
