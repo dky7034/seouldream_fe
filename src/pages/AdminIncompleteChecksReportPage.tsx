@@ -19,20 +19,20 @@ import {
 } from "@heroicons/react/24/solid";
 
 type FilterType = "unit" | "range";
-type UnitType = "year" | "month" | "semester";
+// ✅ [수정] 'month' 타입 제거
+type UnitType = "year" | "semester";
 
 type Filters = {
   startDate: string;
   endDate: string;
   year: number | "";
-  month: number | "";
   semesterId: number | "";
 };
 
 // 스크롤바 숨김 스타일
 const scrollbarHideStyle: React.CSSProperties = {
-  msOverflowStyle: "none" /* IE and Edge */,
-  scrollbarWidth: "none" /* Firefox */,
+  msOverflowStyle: "none",
+  scrollbarWidth: "none",
 };
 
 const AdminIncompleteChecksReportPage: React.FC = () => {
@@ -41,7 +41,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
 
   const now = new Date();
   const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
 
   const [report, setReport] = useState<IncompleteCheckReportDto[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -58,17 +57,15 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
     startDate: "",
     endDate: "",
     year: currentYear,
-    month: "" as number | "",
     semesterId: "" as number | "",
   });
   const [filterType, setFilterType] = useState<FilterType>("unit");
   const [unitType, setUnitType] = useState<UnitType>("semester");
 
-  // ✅ [추가] 1. availableYears와 현재 filters.year 불일치 시 자동 보정
+  // 1. 연도 보정
   useEffect(() => {
     if (availableYears.length > 0 && filters.year) {
       if (!availableYears.includes(filters.year as number)) {
-        // 목록에 없는 연도라면 가장 최신 연도(index 0)로 강제 변경
         setFilters((prev) => ({ ...prev, year: availableYears[0] }));
       }
     }
@@ -95,7 +92,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
   const periodSummary = useMemo(() => {
     if (filterType === "range" && filters.startDate && filters.endDate) {
       return `기간: ${formatShortDate(filters.startDate)} ~ ${formatShortDate(
-        filters.endDate
+        filters.endDate,
       )}`;
     }
     if (filterType === "unit") {
@@ -103,55 +100,58 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
         const semester = semesters.find((s) => s.id === filters.semesterId);
         if (semester) return `학기: ${semester.name}`;
       }
-      const yearText = filters.year ? `${filters.year}년` : "전체 연도";
-      if (unitType === "year") return `연간: ${yearText}`;
-      if (unitType === "month" && filters.month)
-        return `월간: ${yearText} ${filters.month}월`;
+      if (unitType === "year") {
+        return `연간: ${filters.year ? `${filters.year}년` : "전체 연도"}`;
+      }
     }
     return "";
   }, [filterType, unitType, filters, semesters]);
 
+  // ✅ [수정] 초기 자동 선택 로직 (월간 fallback 제거 -> 연간으로 fallback)
   useEffect(() => {
     if (semesters.length > 0 && !hasAutoSelectedSemester) {
       const today = new Date();
       const currentYearMonth = `${today.getFullYear()}-${String(
-        today.getMonth() + 1
+        today.getMonth() + 1,
       ).padStart(2, "0")}`;
+
       let targetSemester = semesters.find(
         (s) =>
           s.startDate.substring(0, 7) <= currentYearMonth &&
-          s.endDate.substring(0, 7) >= currentYearMonth
+          s.endDate.substring(0, 7) >= currentYearMonth,
       );
+
+      // 해당하는 학기가 없으면 가장 최신 학기 선택
       if (!targetSemester)
         targetSemester = [...semesters].sort((a, b) => b.id - a.id)[0];
 
-      if (targetSemester)
+      if (targetSemester) {
         setFilters((prev) => ({
           ...prev,
           semesterId: targetSemester!.id,
           year: "",
-          month: "",
         }));
-      else {
-        setUnitType("month");
+        setUnitType("semester");
+      } else {
+        // 학기 데이터가 아예 없거나 매칭 실패 시 '연간'으로 설정
+        setUnitType("year");
         setFilters((prev) => ({
           ...prev,
           year: currentYear,
-          month: currentMonth,
           semesterId: "",
         }));
       }
       setHasAutoSelectedSemester(true);
     }
-  }, [semesters, hasAutoSelectedSemester, currentYear, currentMonth]);
+  }, [semesters, hasAutoSelectedSemester, currentYear]);
 
-  // ✅ [수정] 2. 학기 -> 연간/월간 전환 시 해당 학기의 연도를 유지하도록 로직 개선
+  // ✅ [수정] 학기 <-> 연간 전환 로직
   const handleUnitTypeClick = (type: UnitType) => {
     setUnitType(type);
     setFilters((prev) => {
       let baseYear = typeof prev.year === "number" ? prev.year : currentYear;
 
-      // 학기 모드에서 다른 모드로 갈 때, 선택된 학기의 연도를 가져옴
+      // 학기 -> 연간 전환 시, 해당 학기의 연도를 가져옴
       if (unitType === "semester" && prev.semesterId) {
         const currentSemester = semesters.find((s) => s.id === prev.semesterId);
         if (currentSemester) {
@@ -162,24 +162,18 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
       const next: Filters = { ...prev };
       if (type === "year") {
         next.year = baseYear;
-        next.month = "";
-        next.semesterId = "";
-      } else if (type === "month") {
-        next.year = baseYear;
-        next.month = (next.month as number) || currentMonth;
         next.semesterId = "";
       } else if (type === "semester") {
         next.year = "";
-        next.month = "";
         if (semesters.length > 0) {
           const today = new Date();
           const currentYM = `${today.getFullYear()}-${String(
-            today.getMonth() + 1
+            today.getMonth() + 1,
           ).padStart(2, "0")}`;
           let target = semesters.find(
             (s) =>
               s.startDate.substring(0, 7) <= currentYM &&
-              s.endDate.substring(0, 7) >= currentYM
+              s.endDate.substring(0, 7) >= currentYM,
           );
           if (!target) target = [...semesters].sort((a, b) => b.id - a.id)[0];
           if (target) next.semesterId = target.id;
@@ -189,56 +183,12 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
     });
   };
 
-  const handleUnitValueChange = (value: number) => {
-    setFilters((prev) => ({
-      ...prev,
-      year: typeof prev.year === "number" ? prev.year : currentYear,
-      month: value,
-      semesterId: "",
-    }));
-  };
   const handleSemesterClick = (semesterId: number) => {
-    setFilters((prev) => ({ ...prev, semesterId, year: "", month: "" }));
+    setFilters((prev) => ({ ...prev, semesterId, year: "" }));
   };
 
-  // ✅ 렌더링 함수 개선: 가로 스크롤 칩 UI 적용
+  // ✅ [수정] 월 선택 렌더링 제거 (학기 선택만 남음)
   const renderUnitButtons = () => {
-    // 1. 월 선택
-    if (unitType === "month") {
-      return (
-        <div className="pt-2 border-t border-gray-200/50 mt-2">
-          <div className="flex justify-between items-end mb-2">
-            <label className="text-xs font-bold text-gray-500">월 선택</label>
-            <span className="text-[10px] text-gray-400 font-normal sm:hidden">
-              좌우로 스크롤
-            </span>
-          </div>
-          <div
-            className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap scrollbar-hide"
-            style={scrollbarHideStyle}
-          >
-            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-              <button
-                key={m}
-                onClick={() => handleUnitValueChange(m)}
-                className={`
-                  flex-shrink-0 px-3 py-1.5 border rounded-lg text-xs font-bold transition-all shadow-sm whitespace-nowrap
-                  ${
-                    filters.month === m
-                      ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-1 ring-indigo-600"
-                      : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
-                  }
-                `}
-              >
-                {m}월
-              </button>
-            ))}
-          </div>
-        </div>
-      );
-    }
-
-    // 2. 학기 선택
     if (unitType === "semester") {
       if (semesters.length === 0)
         return (
@@ -304,7 +254,9 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
           endDate: filters.endDate || undefined,
         };
       } else {
+        // Unit Type
         if (filters.semesterId && semesters.length > 0) {
+          // 학기
           const semester = semesters.find((s) => s.id === filters.semesterId);
           if (semester)
             params = {
@@ -312,55 +264,44 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
               endDate: semester.endDate,
             };
         } else {
+          // 연간 (월간 로직 제거됨)
           const yearVal = normalizeNumberInput(filters.year);
-          const monthVal = normalizeNumberInput(filters.month);
           if (!yearVal) {
             setLoading(false);
             setReport([]);
             return;
           }
-          let rangeStart = "",
-            rangeEnd = "";
-          if (monthVal) {
-            const startD = new Date(yearVal, monthVal - 1, 1);
-            const endD = new Date(yearVal, monthVal, 0);
-            const pad = (n: number) => String(n).padStart(2, "0");
-            rangeStart = `${startD.getFullYear()}-${pad(
-              startD.getMonth() + 1
-            )}-${pad(startD.getDate())}`;
-            rangeEnd = `${endD.getFullYear()}-${pad(endD.getMonth() + 1)}-${pad(
-              endD.getDate()
-            )}`;
-          } else {
-            rangeStart = `${yearVal}-01-01`;
-            rangeEnd = `${yearVal}-12-31`;
-          }
+          const rangeStart = `${yearVal}-01-01`;
+          const rangeEnd = `${yearVal}-12-31`;
 
+          // 연도 내에 포함되는 학기가 있으면 그 기간을 합집합으로 계산 (더 정확한 범위)
           const overlappingSemesters = semesters.filter(
-            (s) => s.startDate <= rangeEnd && s.endDate >= rangeStart
+            (s) => s.startDate <= rangeEnd && s.endDate >= rangeStart,
           );
 
           if (overlappingSemesters.length > 0) {
             const minS = overlappingSemesters.reduce(
               (m, s) => (s.startDate < m ? s.startDate : m),
-              overlappingSemesters[0].startDate
+              overlappingSemesters[0].startDate,
             );
             const maxE = overlappingSemesters.reduce(
               (m, s) => (s.endDate > m ? s.endDate : m),
-              overlappingSemesters[0].endDate
+              overlappingSemesters[0].endDate,
             );
+            // 연도 범위와 학기 범위의 교집합/합집합 고려 (여기선 학기 범위를 우선하되 연도 내로 자르는 게 일반적이나,
+            // 보통 학기 전체 데이터를 보여주는 게 맞으므로 min/max 사용)
             params = {
               startDate: rangeStart > minS ? rangeStart : minS,
               endDate: rangeEnd < maxE ? rangeEnd : maxE,
             };
           } else {
-            // 학기가 없으면 해당 연도/월 전체 조회
+            // 학기가 없으면 그냥 1/1 ~ 12/31
             params = { startDate: rangeStart, endDate: rangeEnd };
           }
         }
       }
 
-      // ✅ 날짜 Boundary Cutoff
+      // ✅ 날짜 Boundary Cutoff (미래 날짜 조회 방지)
       if (params.endDate) {
         const today = new Date();
         today.setHours(23, 59, 59, 999);
@@ -375,7 +316,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
           params.endDate = `${y}-${m}-${d}`;
         }
 
-        // B. 연말 날짜 제한
+        // B. 연말 날짜 제한 (연간 모드일 때)
         if (filters.year && filterType === "unit" && unitType === "year") {
           const yearEnd = `${filters.year}-12-31`;
           if (params.endDate > yearEnd) {
@@ -386,8 +327,8 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
 
       const cleanedParams = Object.fromEntries(
         Object.entries(params).filter(
-          ([, v]) => v !== null && v !== "" && v !== undefined
-        )
+          ([, v]) => v !== null && v !== "" && v !== undefined,
+        ),
       );
       if (Object.keys(cleanedParams).length === 0) {
         setReport([]);
@@ -403,12 +344,11 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
         if (!opts?.skipLoading) setLoading(false);
       }
     },
-    [user, filters, filterType, semesters, unitType]
+    [user, filters, filterType, semesters, unitType],
   );
 
   const fetchAvailableYears = useCallback(async () => {
     try {
-      // ✅ [수정] 3. 연도 목록 정렬 (최신순)
       const years = await reportService.getAvailableYearsForReports();
       setAvailableYears(years.sort((a, b) => b - a));
     } catch {
@@ -420,7 +360,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
     try {
       const data = await semesterService.getAllSemesters(true);
       const sorted = data.sort((a, b) =>
-        b.startDate.localeCompare(a.startDate)
+        b.startDate.localeCompare(a.startDate),
       );
       setSemesters(sorted);
     } catch {
@@ -433,11 +373,13 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
     if (semesters.length > 0 || hasActiveSemesters === false)
       fetchIncompleteChecks();
   }, [user, fetchIncompleteChecks, semesters.length, hasActiveSemesters]);
+
   useEffect(() => {
     if (!user || user.role !== "EXECUTIVE") return;
     fetchAvailableYears();
     fetchSemesters();
   }, [user, fetchAvailableYears, fetchSemesters]);
+
   useEffect(() => {
     if (!user || user.role !== "EXECUTIVE") return;
     memberService
@@ -448,8 +390,8 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
             id: m.id,
             name: m.name,
             birthDate: m.birthDate,
-          })) ?? []
-        )
+          })) ?? [],
+        ),
       )
       .catch(console.error);
   }, [user]);
@@ -549,7 +491,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                       onChange={(e) =>
                         handleFilterChange(
                           "year",
-                          e.target.value ? Number(e.target.value) : ""
+                          e.target.value ? Number(e.target.value) : "",
                         )
                       }
                       className="w-full py-2 px-1 border border-gray-300 rounded-lg text-sm bg-white focus:ring-indigo-500 focus:border-indigo-500 shadow-sm disabled:bg-gray-50 disabled:text-gray-400"
@@ -569,7 +511,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 2. 조회 단위 */}
+                {/* 2. 조회 단위 (월간 제거됨) */}
                 <div className="flex-1">
                   <label className="text-xs font-bold text-gray-500 mb-1 block">
                     조회 단위
@@ -577,7 +519,6 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                   <div className="flex flex-wrap gap-2">
                     {(
                       [
-                        { t: "month", l: "월간" },
                         { t: "semester", l: "학기" },
                         { t: "year", l: "연간" },
                       ] as const
@@ -595,8 +536,8 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                             isDisabled
                               ? "bg-gray-50 text-gray-400 border-gray-200 border-dashed cursor-not-allowed shadow-none"
                               : unitType === u.t
-                              ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                              : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
+                                ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                                : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
                           }`}
                         >
                           {u.l}
@@ -606,7 +547,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                   </div>
                 </div>
               </div>
-              {/* 월/학기 선택 버튼 영역 */}
+              {/* 학기 선택 버튼 영역 */}
               {renderUnitButtons()}
             </div>
           )}
@@ -640,7 +581,7 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
               ) : (
                 report.map((item) => {
                   const leaderMember = allMembersForNameCheck.find(
-                    (m) => m.id === item.leaderId
+                    (m) => m.id === item.leaderId,
                   );
                   const displayName = leaderMember
                     ? formatDisplayName(leaderMember, allMembersForNameCheck)
@@ -649,8 +590,8 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                     item.missedDatesCount >= 5
                       ? "bg-red-100 text-red-700"
                       : item.missedDatesCount >= 2
-                      ? "bg-yellow-100 text-yellow-700"
-                      : "bg-gray-100 text-gray-700";
+                        ? "bg-yellow-100 text-yellow-700"
+                        : "bg-gray-100 text-gray-700";
 
                   return (
                     <div
@@ -726,20 +667,20 @@ const AdminIncompleteChecksReportPage: React.FC = () => {
                   ) : (
                     report.map((item) => {
                       const leaderMember = allMembersForNameCheck.find(
-                        (m) => m.id === item.leaderId
+                        (m) => m.id === item.leaderId,
                       );
                       const displayName = leaderMember
                         ? formatDisplayName(
                             leaderMember,
-                            allMembersForNameCheck
+                            allMembersForNameCheck,
                           )
                         : item.leaderName;
                       const badgeClass =
                         item.missedDatesCount >= 5
                           ? "bg-red-100 text-red-700"
                           : item.missedDatesCount >= 2
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-gray-100 text-gray-700";
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-gray-100 text-gray-700";
 
                       return (
                         <tr
