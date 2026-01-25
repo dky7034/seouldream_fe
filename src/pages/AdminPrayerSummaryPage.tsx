@@ -21,7 +21,6 @@ import KoreanCalendarPicker from "../components/KoreanCalendarPicker";
 import {
   ChatBubbleBottomCenterTextIcon,
   FunnelIcon,
-  PlusIcon,
 } from "@heroicons/react/24/solid";
 
 // [변경] 조회 단위에서 'month' 삭제
@@ -700,18 +699,6 @@ const AdminPrayerSummaryPage: React.FC = () => {
                   />
                 </div>
               </div>
-            </div>
-
-            <div className="flex justify-end pt-2">
-              {user.role === "EXECUTIVE" && (
-                <button
-                  type="button"
-                  onClick={() => navigate("/admin/prayers/add")}
-                  className="flex items-center gap-1 bg-indigo-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-indigo-700 transition-all whitespace-nowrap"
-                >
-                  <PlusIcon className="h-4 w-4" /> 새 기도제목
-                </button>
-              )}
             </div>
           </div>
         </div>
