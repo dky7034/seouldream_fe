@@ -3,7 +3,8 @@ import React, { useEffect, useState, useCallback, useMemo, memo } from "react";
 import { attendanceService } from "../services/attendanceService";
 import { memberService } from "../services/memberService";
 import { cellService } from "../services/cellService";
-import { statisticsService } from "../services/statisticsService";
+// ✅ [빌드 에러 방지] 사용하지 않는 서비스 주석 처리
+// import { statisticsService } from "../services/statisticsService";
 import { semesterService } from "../services/semesterService";
 import { useAuth } from "../hooks/useAuth";
 import { normalizeNumberInput } from "../utils/numberUtils";
@@ -18,18 +19,20 @@ import type {
   GetAttendancesParams,
   AttendanceDto,
   MemberDto,
-  OverallAttendanceStatDto,
+  // ✅ [빌드 에러 방지] 사용하지 않는 타입 주석 처리
+  // OverallAttendanceStatDto,
   SemesterDto,
 } from "../types";
 import type { SelectOption } from "../components/AsyncSearchableSelect";
 
 // Icons
 import {
-  ChartBarIcon,
-  UsersIcon,
-  ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
-  MinusIcon,
+  // ✅ [빌드 에러 방지] 통계 컴포넌트에서만 쓰는 아이콘 주석 처리
+  // ChartBarIcon,
+  // UsersIcon,
+  // ArrowTrendingUpIcon,
+  // ArrowTrendingDownIcon,
+  // MinusIcon,
   CalendarDaysIcon,
   FunnelIcon,
 } from "@heroicons/react/24/solid";
@@ -59,6 +62,8 @@ const scrollbarHideStyle: React.CSSProperties = {
 // Sub Component 1: AttendanceStats
 // ─────────────────────────────────────────────────────────────
 
+// ✅ [빌드 에러 방지] 컴포넌트 정의 전체 주석 처리
+/*
 const AttendanceStats = memo(
   ({
     stats,
@@ -177,6 +182,7 @@ const AttendanceStats = memo(
     );
   },
 );
+*/
 
 // ─────────────────────────────────────────────────────────────
 // Sub Component 2: AttendanceMatrixView
@@ -413,10 +419,14 @@ const AdminAttendancesPage: React.FC = () => {
     [],
   );
   const [allMembers, setAllMembers] = useState<MemberDto[]>([]);
+
+  // ✅ [빌드 에러 방지] 사용하지 않는 State 주석 처리
+  /*
   const [overallStats, setOverallStats] =
     useState<OverallAttendanceStatDto | null>(null);
 
   const [statsLoading, setStatsLoading] = useState<boolean>(false);
+  */
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -566,6 +576,8 @@ const AdminAttendancesPage: React.FC = () => {
     }
   }, [getCleanedParams]);
 
+  // ✅ [빌드 에러 방지] 사용하지 않는 함수 주석 처리
+  /*
   const fetchOverallStats = useCallback(async () => {
     setStatsLoading(true);
     try {
@@ -579,6 +591,7 @@ const AdminAttendancesPage: React.FC = () => {
       setStatsLoading(false);
     }
   }, [getCleanedParams]);
+  */
 
   // 필터 변경 시 자동 조회
   useEffect(() => {
@@ -586,11 +599,12 @@ const AdminAttendancesPage: React.FC = () => {
 
     if (user && ["EXECUTIVE", "CELL_LEADER"].includes(user.role)) {
       fetchAttendances();
-      fetchOverallStats();
+      // ✅ [데이터 부정확 이슈] 백엔드 로직 수정 전까지 통계 API 호출 임시 비활성화
+      // fetchOverallStats();
     }
   }, [
     fetchAttendances,
-    fetchOverallStats,
+    // fetchOverallStats, // ✅ 의존성 배열에서도 제거
     user,
     semesters.length,
     hasAutoSelectedSemester,
@@ -776,8 +790,8 @@ const AdminAttendancesPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 종합 통계 (Stats) */}
-        <AttendanceStats stats={overallStats} loading={statsLoading} />
+        {/* ✅ [수정됨] 종합 통계 (Stats) - 데이터 정합성 이슈로 임시 비활성화 */}
+        {/* <AttendanceStats stats={overallStats} loading={statsLoading} /> */}
 
         {/* Filter Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6">
