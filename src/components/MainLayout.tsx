@@ -39,7 +39,8 @@ const MainLayout: React.FC = () => {
 
     const base =
       variant === "desktop"
-        ? "text-sm px-1 pb-1 border-b-2 border-transparent whitespace-nowrap"
+        ? // ✅ 수정됨: px-1 -> px-2 (글자 좌우 여백을 늘려 클릭하기 편하게 만듦)
+          "text-sm px-2 pb-1 border-b-2 border-transparent whitespace-nowrap transition-colors"
         : "block w-full text-left px-4 py-2 text-sm";
 
     const active =
@@ -179,7 +180,6 @@ const MainLayout: React.FC = () => {
     <div className="min-h-screen bg-gray-100">
       <header className="bg-white shadow sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* ✅ gap-4 추가: 좌측 메뉴와 우측 유저 정보가 절대 붙지 않도록 안전거리 확보 */}
           <div className="flex justify-between items-center py-4 gap-4">
             {/* 좌측: 로고 + 네비게이션 */}
             <div className="flex items-center space-x-4 shrink-0">
@@ -197,8 +197,10 @@ const MainLayout: React.FC = () => {
                 </h1>
               </Link>
 
-              {/* ✅ 수정됨: space-x-4 -> space-x-2 (메뉴 간격 좁힘) */}
-              <nav className="hidden xl:flex space-x-2 lg:space-x-3 text-xs lg:text-sm">
+              {/* ✅ 수정됨: space-x-2 -> space-x-4 (메뉴 사이 간격을 넓혀서 시원하게 보이게 함) 
+                이미 인사말이 숨겨져 있어서 공간은 충분합니다.
+              */}
+              <nav className="hidden xl:flex space-x-4 text-sm">
                 {renderNavLinks("desktop")}
               </nav>
             </div>
@@ -206,15 +208,10 @@ const MainLayout: React.FC = () => {
             {/* 우측: 사용자 정보 + 로그아웃 */}
             {user && (
               <div className="hidden xl:flex items-center space-x-3 lg:space-x-4 shrink-0">
-                {/* ✅ 수정됨: 2xl(아주 넓은 화면)에서만 인사말 표시, xl(일반 노트북)에서는 숨김 */}
+                {/* 2xl(아주 넓은 화면)에서만 인사말 표시, xl에서는 숨김 */}
                 <span className="hidden 2xl:inline text-gray-700 font-medium text-sm text-right whitespace-nowrap">
                   안녕하세요, {user.name}님! ({roleMap[user.role] || user.role})
                 </span>
-
-                {/* (선택사항) xl에서는 이름만 짧게 보여주고 싶다면 아래 주석 해제 */}
-                {/* <span className="hidden xl:inline 2xl:hidden text-gray-700 font-medium text-sm">
-                   {user.name}님
-                </span> */}
 
                 <button
                   onClick={handleLogout}
