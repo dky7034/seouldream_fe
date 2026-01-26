@@ -57,17 +57,14 @@ const MainLayout: React.FC = () => {
   ) => {
     if (!user) return null;
 
-    // ✅ 1) 임원단 메뉴 구성
+    // ✅ 1) 임원단 메뉴 구성 (순서 변경)
     if (isExecutive) {
       return (
         <>
           {/* 1. 대시보드 */}
           <Link
             to="/dashboard"
-            className={getNavLinkClass("/dashboard", {
-              exact: true,
-              variant,
-            })}
+            className={getNavLinkClass("/dashboard", { exact: true, variant })}
             onClick={onLinkClick}
           >
             대시보드
@@ -82,25 +79,16 @@ const MainLayout: React.FC = () => {
             셀
           </Link>
 
-          {/* 3. 사용자 */}
+          {/* 3. 기도제목 */}
           <Link
-            to="/admin/users"
-            className={getNavLinkClass("/admin/users", { variant })}
+            to="/admin/prayers/summary/members"
+            className={getNavLinkClass("/admin/prayers/summary", { variant })}
             onClick={onLinkClick}
           >
-            사용자
+            기도제목
           </Link>
 
-          {/* 4. 팀 */}
-          <Link
-            to="/admin/teams"
-            className={getNavLinkClass("/admin/teams", { variant })}
-            onClick={onLinkClick}
-          >
-            팀
-          </Link>
-
-          {/* 5. 출석 */}
+          {/* 4. 출석 */}
           <Link
             to="/admin/attendances"
             className={getNavLinkClass("/admin/attendances", { variant })}
@@ -109,25 +97,7 @@ const MainLayout: React.FC = () => {
             출석
           </Link>
 
-          {/* 6. 통계 */}
-          <Link
-            to="/admin/statistics"
-            className={getNavLinkClass("/admin/statistics", { variant })}
-            onClick={onLinkClick}
-          >
-            통계
-          </Link>
-
-          {/* 7. 학기 */}
-          <Link
-            to="/admin/semesters"
-            className={getNavLinkClass("/admin/semesters", { variant })}
-            onClick={onLinkClick}
-          >
-            학기
-          </Link>
-
-          {/* 8. 출석 누락 현황 */}
+          {/* 5. 출석 누락 */}
           <Link
             to="/admin/incomplete-checks-report"
             className={getNavLinkClass("/admin/incomplete-checks-report", {
@@ -139,26 +109,49 @@ const MainLayout: React.FC = () => {
             출석 누락
           </Link>
 
-          {/* 9. 결석 관리 (임원만!) */}
+          {/* 6. 결석 관리 */}
           <Link
             to="/admin/attendance-alerts"
-            className={getNavLinkClass("/admin/attendance-alerts", {
-              variant,
-            })}
+            className={getNavLinkClass("/admin/attendance-alerts", { variant })}
             onClick={onLinkClick}
           >
             결석 관리
           </Link>
 
-          {/* 10. 기도제목 */}
+          {/* 7. 멤버 */}
           <Link
-            to="/admin/prayers/summary/members"
-            className={getNavLinkClass("/admin/prayers/summary", {
-              variant,
-            })}
+            to="/admin/users"
+            className={getNavLinkClass("/admin/users", { variant })}
             onClick={onLinkClick}
           >
-            기도제목
+            멤버
+          </Link>
+
+          {/* 8. 팀 */}
+          <Link
+            to="/admin/teams"
+            className={getNavLinkClass("/admin/teams", { variant })}
+            onClick={onLinkClick}
+          >
+            팀
+          </Link>
+
+          {/* 9. 통계 */}
+          <Link
+            to="/admin/statistics"
+            className={getNavLinkClass("/admin/statistics", { variant })}
+            onClick={onLinkClick}
+          >
+            통계
+          </Link>
+
+          {/* 10. 학기 */}
+          <Link
+            to="/admin/semesters"
+            className={getNavLinkClass("/admin/semesters", { variant })}
+            onClick={onLinkClick}
+          >
+            학기
           </Link>
 
           {/* 11. 공지사항 */}

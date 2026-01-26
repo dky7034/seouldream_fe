@@ -28,7 +28,7 @@ const MainLayout: React.FC = () => {
 
   const getNavLinkClass = (
     targetPath: string,
-    options?: { exact?: boolean; variant?: "desktop" | "mobile" }
+    options?: { exact?: boolean; variant?: "desktop" | "mobile" },
   ) => {
     const exact = options?.exact ?? false;
     const variant = options?.variant ?? "desktop";
@@ -39,7 +39,7 @@ const MainLayout: React.FC = () => {
 
     const base =
       variant === "desktop"
-        ? "text-sm px-1 pb-1 border-b-2 border-transparent"
+        ? "text-sm px-1 pb-1 border-b-2 border-transparent whitespace-nowrap" // ✅ 수정됨: whitespace-nowrap 추가 (줄바꿈 방지)
         : "block w-full text-left px-4 py-2 text-sm";
 
     const active =
@@ -53,11 +53,11 @@ const MainLayout: React.FC = () => {
 
   const renderNavLinks = (
     variant: "desktop" | "mobile",
-    onLinkClick?: () => void
+    onLinkClick?: () => void,
   ) => {
     if (!user) return null;
 
-    // ✅ 1) 임원단 메뉴 구성 (순서 변경)
+    // ✅ 1) 임원단 메뉴 구성
     if (isExecutive) {
       return (
         <>
@@ -166,7 +166,7 @@ const MainLayout: React.FC = () => {
       );
     }
 
-    // ✅ 2) 셀장 메뉴 구성 (수정됨: 결석 관리 제거)
+    // ✅ 2) 셀장 메뉴 구성
     if (isCellLeader) {
       return (
         <>
@@ -191,8 +191,6 @@ const MainLayout: React.FC = () => {
           >
             내 셀
           </Link>
-
-          {/* ❌ 결석 관리 링크 삭제됨 */}
 
           <Link
             to="/admin/notices"
@@ -219,37 +217,39 @@ const MainLayout: React.FC = () => {
             <div className="flex items-center space-x-4">
               <Link
                 to="/dashboard"
-                // gap-2 추가: 로고와 텍스트 사이 간격 확보
-                className="inline-flex items-center gap-2 px-1 py-1 rounded-md hover:bg-gray-50"
+                // ✅ 수정됨: shrink-0 추가 (로고 찌그러짐 방지)
+                className="inline-flex items-center gap-2 px-1 py-1 rounded-md hover:bg-gray-50 shrink-0"
               >
-                {/* 로고 이미지 추가 */}
                 <img
-                  // src="/seouldream_logo_upscaled_1280.jpg"
                   src="/seouldream_logo_upscaled_1280_cut.png"
                   alt="서울드림교회 로고"
                   className="h-10 w-auto object-contain"
                 />
-                <h1 className="text-xl font-bold text-gray-900">NEXTDREAM</h1>
+                <h1 className="text-xl font-bold text-gray-900 whitespace-nowrap">
+                  NEXTDREAM
+                </h1>
               </Link>
 
-              <nav className="hidden md:flex space-x-4 lg:space-x-6 text-xs lg:text-sm">
+              {/* ✅ 수정됨: md:flex -> xl:flex (메뉴가 많아서 xl 이상에서만 펼침) */}
+              <nav className="hidden xl:flex space-x-4 lg:space-x-6 text-xs lg:text-sm">
                 {renderNavLinks("desktop")}
               </nav>
             </div>
 
             {/* 우측: 사용자 정보 + 로그아웃 */}
             {user && (
-              <div className="hidden md:flex items-center space-x-3 lg:space-x-4">
-                <span className="text-gray-700 font-medium text-sm lg:text-base max-w-[220px] lg:max-w-none truncate">
-                  <span className="inline lg:hidden">{user.name}님</span>
+              // ✅ 수정됨: md:flex -> xl:flex
+              <div className="hidden xl:flex items-center space-x-3 lg:space-x-4">
+                <span className="text-gray-700 font-medium text-sm lg:text-base max-w-[220px] lg:max-w-none truncate text-right">
                   <span className="hidden lg:inline">
                     안녕하세요, {user.name}님! (
                     {roleMap[user.role] || user.role})
                   </span>
+                  <span className="inline lg:hidden">{user.name}님</span>
                 </span>
                 <button
                   onClick={handleLogout}
-                  className="px-3 lg:px-4 py-2 text-xs lg:text-sm font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  className="px-3 lg:px-4 py-2 text-xs lg:text-sm font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 whitespace-nowrap"
                 >
                   로그아웃
                 </button>
@@ -258,7 +258,8 @@ const MainLayout: React.FC = () => {
 
             {/* 모바일 햄버거 메뉴 버튼 */}
             {user && (
-              <div className="md:hidden">
+              // ✅ 수정됨: md:hidden -> xl:hidden (xl 미만에서는 햄버거 버튼 표시)
+              <div className="xl:hidden">
                 <button
                   type="button"
                   onClick={() => setIsMobileMenuOpen((prev) => !prev)}
@@ -306,7 +307,8 @@ const MainLayout: React.FC = () => {
           {/* 모바일 드롭다운 메뉴 */}
           {user && (
             <div
-              className={`md:hidden border-t border-gray-200 bg-white transition-all duration-200 ${
+              // ✅ 수정됨: md:hidden -> xl:hidden
+              className={`xl:hidden border-t border-gray-200 bg-white transition-all duration-200 ${
                 isMobileMenuOpen ? "max-h-screen" : "max-h-0 overflow-hidden"
               }`}
             >
