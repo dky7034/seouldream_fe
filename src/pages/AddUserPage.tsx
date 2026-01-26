@@ -65,7 +65,7 @@ const AddUserPage: React.FC = () => {
 
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(
-    null
+    null,
   );
   const debouncedUsername = useDebounce(formData.username, 500);
 
@@ -127,13 +127,13 @@ const AddUserPage: React.FC = () => {
 
   const cellOptions = useMemo(
     () => cells.map((c) => ({ value: c.id, label: c.name })),
-    [cells]
+    [cells],
   );
 
   const handleFormChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    >,
   ) => {
     const { name, value } = e.target;
 
@@ -217,7 +217,7 @@ const AddUserPage: React.FC = () => {
       navigate("/admin/users");
     } catch (err: any) {
       setSubmitError(
-        err.response?.data?.message || "멤버 추가에 실패했습니다."
+        err.response?.data?.message || "멤버 추가에 실패했습니다.",
       );
     } finally {
       setLoading(false);
@@ -472,7 +472,7 @@ const AddUserPage: React.FC = () => {
                   value={formData.cellId}
                   onChange={(value) =>
                     handleCellSelect(
-                      typeof value === "number" ? value : undefined
+                      typeof value === "number" ? value : undefined,
                     )
                   }
                   placeholder="셀을 선택하세요..."
@@ -527,7 +527,7 @@ const AddUserPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-2">
+          {/* <div className="mt-2">
             <label className="block text-sm font-medium text-gray-700">
               메모
             </label>
@@ -539,7 +539,7 @@ const AddUserPage: React.FC = () => {
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm
                          focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             />
-          </div>
+          </div> */}
         </fieldset>
 
         {/* 버튼 */}
