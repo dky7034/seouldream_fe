@@ -4,28 +4,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* @layer base를 사용하여 기본 스타일을 적용합니다 */
 @layer base {
-  html {
-    font-family:
-      "Pretendard",
-      -apple-system,
-      BlinkMacSystemFont,
-      system-ui,
-      Roboto,
-      "Helvetica Neue",
-      "Segoe UI",
-      "Apple SD Gothic Neo",
-      "Noto Sans KR",
-      "Malgun Gothic",
-      "Apple Color Emoji",
-      "Segoe UI Emoji",
-      "Segoe UI Symbol",
-      sans-serif;
-  }
-
   body {
-    /* 여기에 antialiased 적용 (Mac/iOS에서 폰트를 더 얇고 부드럽게) */
+    /* 폰트 목록을 다 지우고, antialiased만 남깁니다 */
     @apply antialiased text-gray-900;
   }
 }

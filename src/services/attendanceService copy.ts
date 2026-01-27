@@ -19,11 +19,6 @@ import type {
 // Define query parameters for the new rate APIs, which don't use 'groupBy'
 type AttendanceRateQueryParams = Omit<AttendanceSummaryQueryParams, "groupBy">;
 
-// ✅ [추가] 기제출 날짜 API 응답 타입 정의 ({ "dates": [...] })
-interface SubmittedDatesResponse {
-  dates: string[];
-}
-
 export const attendanceService = {
   getAttendances: async (
     params?: GetAttendancesParams,
@@ -90,28 +85,22 @@ export const attendanceService = {
     }
   },
 
-  // ✅ [수정 완료] 제출된 날짜 목록 조회 (백엔드 스펙 반영)
-  // URL: GET /api/attendances/submitted-dates/{cellId}
+  // ✅ [수정] 제출된 날짜 목록 조회 (이름을 getSubmittedDates로 통일)
   getSubmittedDates: async (
     cellId: number,
-    semesterId?: number, // 선택적 파라미터 (특정 학기 조회 시 사용)
+    year?: number,
+    month?: number,
   ): Promise<string[]> => {
     try {
-      const params = semesterId ? { semesterId } : {};
-
-      const response = await api.get<SubmittedDatesResponse>(
-        `/attendances/submitted-dates/${cellId}`,
-        { params },
-      );
-
-      // 백엔드 응답이 { dates: [...] } 형태이므로 dates 배열만 반환
-      return response.data.dates;
+      const response = await api.get(`/cells/${cellId}/submitted-dates`, {
+        params: { year, month },
+      });
+      return response.data; // ["2026-01-01", ...]
     } catch (error: any) {
       console.error(
         `Failed to fetch submitted dates for cell ${cellId}:`,
         error.response?.data || error.message,
       );
-      // 에러 발생 시 빈 배열 반환하여 캘린더 UI가 깨지지 않도록 함
       return [];
     }
   },

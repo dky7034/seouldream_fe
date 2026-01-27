@@ -16,7 +16,6 @@ type Props = {
   yearCols?: GridCols;
   filterDate?: (date: Date) => boolean;
   placeholder?: string;
-  /* 이미 제출된 날짜 리스트 (YYYY-MM-DD) */
   submittedDates?: string[];
 };
 
@@ -53,7 +52,7 @@ const isPublicHoliday = (date: Date) => {
   return solarHolidays.includes(dateString);
 };
 
-// ─── 커스텀 인풋 ───
+// ─── 커스텀 인풋 (인디고 포커스링 적용) ───
 const CustomInput = forwardRef<
   HTMLButtonElement,
   { value?: string; onClick?: () => void; placeholder?: string }
@@ -62,6 +61,7 @@ const CustomInput = forwardRef<
     type="button"
     onClick={onClick}
     ref={ref}
+    // focus:ring-indigo-500 으로 변경하여 선택 시 보라색 테두리
     className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm text-left focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer bg-white transition-colors hover:bg-gray-50"
   >
     <span className={value ? "text-gray-900 font-medium" : "text-gray-400"}>
@@ -96,27 +96,24 @@ const KoreanCalendarPicker: React.FC<Props> = ({
     const isHoliday = isPublicHoliday(date);
 
     const classes = [];
-
-    // 1. 제출 완료 여부
     if (isSubmitted) classes.push("day-submitted");
-
-    // 2. 휴일/주말 표시
     if (isHoliday || day === 0) classes.push("day-sunday");
     else if (day === 6) classes.push("day-saturday");
 
     return classes.join(" ");
   };
 
-  // ✅ 날짜 내용 커스텀 렌더링 (제출된 날짜에 체크 표시 추가)
+  // ✅ 점(Dot) 스타일 렌더링 유지
   const renderDayContents = (day: number, date: Date) => {
     const dateStr = formatLocalDate(date);
     const isSubmitted = submittedDates.includes(dateStr);
 
     return (
       <div className="relative w-full h-full flex items-center justify-center">
-        <span>{day}</span>
+        <span className="z-10">{day}</span>
         {isSubmitted && (
-          <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2">
+          // 점 색상은 그대로 초록색(green-500) 유지하여 '완료' 의미 전달
+          <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2">
             <div className="w-1 h-1 rounded-full bg-green-500"></div>
           </div>
         )}
@@ -130,7 +127,6 @@ const KoreanCalendarPicker: React.FC<Props> = ({
         .react-datepicker-wrapper { width: 100%; }
         .react-datepicker__input-container { width: 100%; }
 
-        /* ─── 기본 셀 크기 및 간격 ─── */
         .react-datepicker__day-name, 
         .react-datepicker__day, 
         .react-datepicker__time-name {
@@ -140,7 +136,6 @@ const KoreanCalendarPicker: React.FC<Props> = ({
           font-weight: 500;
         }
 
-        /* ─── 모바일 최적화 ─── */
         @media (max-width: 640px) {
           .react-datepicker { font-size: 0.85rem; }
           .react-datepicker__day-name, 
@@ -151,19 +146,13 @@ const KoreanCalendarPicker: React.FC<Props> = ({
           }
         }
 
-        /* ─── 1. 비활성 날짜 (filterDate false) 시각적 약화 ─── */
         .react-datepicker__day--disabled {
           color: #d1d5db !important; 
           opacity: 0.3;              
           cursor: not-allowed;
           background-color: transparent !important;
         }
-        .react-datepicker__day--disabled:hover {
-          background-color: transparent !important;
-          border-radius: 0 !important;
-        }
 
-        /* ─── 2. 주말 색상 ─── */
         .react-datepicker__day:not(.react-datepicker__day--disabled).day-sunday { 
           color: #e11d48 !important; 
           font-weight: 700;
@@ -172,65 +161,62 @@ const KoreanCalendarPicker: React.FC<Props> = ({
           color: #2563eb !important; 
         }
 
-        /* ─── 3. 제출 완료된 날짜 (Submitted) ─── */
+        /* ─── 제출 완료 (점 스타일) ─── */
+        /* 배경 없음, 글자색 초록 */
         .react-datepicker__day:not(.react-datepicker__day--disabled).day-submitted {
-          background-color: #ecfdf5 !important; 
-          border: 1px solid #10b981 !important; 
-          color: #059669 !important;            
-          border-radius: 50% !important;
-          font-weight: bold;
+          background-color: transparent !important; 
+          border: none !important; 
+          color: #059669 !important;
+          font-weight: 700;
         }
 
-        /* ─── 4. 오늘 날짜 (Today) ─── */
+        /* ─── 오늘 날짜 (Today) ─── */
+        /* 인디고 계열로 맞춤 (Indigo-400 테두리) */
         .react-datepicker__day--today {
           font-weight: 900 !important;
-          border: 2px solid #6366f1 !important; 
+          border: 2px solid #818cf8 !important; 
           background-color: transparent;
-          color: #4338ca !important;
+          color: #4f46e5 !important;
           border-radius: 50% !important;
         }
 
-        /* ─── 5. 선택된 날짜 (Selected) - 최우선 순위 ─── */
+        /* ─── 선택된 날짜 (Selected) : 인디고(Indigo) 적용 ─── */
+        /* 슬레이트(회색) 대신 쨍한 인디고 사용으로 시인성 확보 */
         .react-datepicker__day--selected {
-          background-color: #4f46e5 !important; /* 진한 인디고 */
+          background-color: #4f46e5 !important; /* Indigo-600 */
           color: #ffffff !important;
           border: none !important;
           border-radius: 50% !important;
-          box-shadow: 0 2px 4px rgba(79, 70, 229, 0.4);
+          box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.3); /* 보라색 그림자 */
         }
 
-        /* ✅ [수정 핵심] 키보드 포커스(임시 선택) 상태 투명화 */
-        /* 월 이동 시 따라다니는 '가짜 선택'을 제거합니다 */
         .react-datepicker__day--keyboard-selected {
           background-color: transparent !important;
           color: inherit !important;
           border: none !important;
         }
 
-        /* 단, '진짜 선택'이면서 '포커스'된 경우는 파란색 유지 */
         .react-datepicker__day--selected.react-datepicker__day--keyboard-selected {
           background-color: #4f46e5 !important;
           color: #ffffff !important;
         }
         
-        /* 선택된 날짜 내부의 주일/제출 스타일 덮어쓰기 */
         .react-datepicker__day--selected.day-sunday,
         .react-datepicker__day--selected.day-submitted {
           color: white !important;
         }
 
-        /* 달력 외관 */
         .react-datepicker {
           font-family: inherit;
-          border: 1px solid #f3f4f6;
-          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+          border: 1px solid #e5e7eb;
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
           border-radius: 1rem;
           overflow: hidden;
         }
         
         .react-datepicker__header {
           background-color: #ffffff;
-          border-bottom: 1px solid #f3f4f6;
+          border-bottom: 1px solid #e5e7eb;
           padding-top: 1rem;
         }
         
@@ -270,7 +256,6 @@ const KoreanCalendarPicker: React.FC<Props> = ({
         onChange={(date) => {
           if (!date) return;
           setViewDate(date);
-
           if (mode === "year") {
             setMode("month");
             return;
@@ -279,7 +264,6 @@ const KoreanCalendarPicker: React.FC<Props> = ({
             setMode("day");
             return;
           }
-
           onChange(formatLocalDate(date));
           setMode("day");
           setOpen(false);
@@ -294,26 +278,22 @@ const KoreanCalendarPicker: React.FC<Props> = ({
         }) => {
           const year = date.getFullYear();
           const month = date.getMonth() + 1;
-
           const title =
             mode === "day"
               ? `${year}년 ${month}월`
               : mode === "month"
                 ? `${year}년`
                 : getDecadeRangeText(year);
-
           const goPrev = () => {
             if (mode === "day") decreaseMonth();
-            if (mode === "month") decreaseYear();
-            if (mode === "year") changeYear(year - 12);
+            else if (mode === "month") decreaseYear();
+            else changeYear(year - 12);
           };
-
           const goNext = () => {
             if (mode === "day") increaseMonth();
-            if (mode === "month") increaseYear();
-            if (mode === "year") changeYear(year + 12);
+            else if (mode === "month") increaseYear();
+            else changeYear(year + 12);
           };
-
           const toggleMode = () => {
             if (mode === "year") setMode("month");
             else if (mode === "month") setMode("day");
@@ -325,21 +305,21 @@ const KoreanCalendarPicker: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={goPrev}
-                className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
               >
                 ‹
               </button>
               <button
                 type="button"
                 onClick={toggleMode}
-                className="text-sm font-bold text-gray-800 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors"
+                className="text-sm font-bold text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 {title}
               </button>
               <button
                 type="button"
                 onClick={goNext}
-                className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
               >
                 ›
               </button>

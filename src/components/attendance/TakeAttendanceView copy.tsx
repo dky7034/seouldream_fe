@@ -107,9 +107,6 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
   >([]);
   const [allSemesters, setAllSemesters] = useState<SemesterDto[]>([]);
 
-  // ✅ 기제출된 날짜 리스트를 저장할 State
-  const [submittedHistory, setSubmittedHistory] = useState<string[]>([]);
-
   // ── UI State ──
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [cellShare, setCellShare] = useState("");
@@ -134,7 +131,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
   const showAlert = (
     title: string,
     message: string,
-    onConfirm?: () => void,
+    onConfirm?: () => void
   ) => {
     setAlertState({ isOpen: true, title, message, onConfirm });
   };
@@ -146,7 +143,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
     setAlertState((prev) => ({ ...prev, isOpen: false, onConfirm: undefined }));
   };
 
-  // ── 1. 학기 목록 로드 & 기본 날짜 설정 ──
+  // ── 1. 학기 목록 로드 (활성 학기만) ──
   useEffect(() => {
     const fetchSemesters = async () => {
       try {
@@ -159,50 +156,42 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
     fetchSemesters();
   }, []);
 
+  // ── 스마트 초기 날짜 설정 ──
   useEffect(() => {
     if (selectedDate || allSemesters.length === 0) return;
+
+    // ✅ [버그 수정] 학기 기간 여부와 상관없이 무조건 '이번 주 주일'을 기본값으로 설정
+    // (기존에는 기간 아니라고 종료일(6/30)로 튀는 문제 있었음)
     const defaultSunday = toISODate(getMostRecentSunday());
     setSelectedDate(defaultSunday);
   }, [allSemesters, selectedDate]);
 
-  // ✅ [수정 완료] 백엔드 API를 통해 기제출 내역 가져오기
-  useEffect(() => {
-    const fetchSubmissionHistory = async () => {
-      if (!user.cellId) return;
-      try {
-        // 실제 API 호출 (semesterId 없이 호출하여 전체 내역 조회)
-        const history = await attendanceService.getSubmittedDates(user.cellId);
-        setSubmittedHistory(history);
-      } catch (e) {
-        console.error("제출 내역 로드 실패", e);
-      }
-    };
-
-    fetchSubmissionHistory();
-  }, [user.cellId, successMessage]); // user가 바뀌거나, 제출에 성공하면 리스트 갱신
-
-  // ── 날짜 범위 계산 ──
+  // ✅ [추가] 학기 정보를 바탕으로 선택 가능한 최소/최대 날짜 계산
   const { minDate, maxDate } = useMemo(() => {
     if (allSemesters.length === 0)
       return { minDate: undefined, maxDate: undefined };
 
+    // allSemesters는 이미 활성화된 학기(active=true)만 가져온 상태
     const startDates = allSemesters.map((s) => s.startDate).sort();
     const endDates = allSemesters.map((s) => s.endDate).sort();
 
+    const earliest = startDates[0];
+    const latest = endDates[endDates.length - 1];
+
     return {
-      minDate: new Date(startDates[0]),
-      maxDate: new Date(endDates[endDates.length - 1]),
+      minDate: new Date(earliest),
+      maxDate: new Date(latest),
     };
   }, [allSemesters]);
 
   const semesterForSelectedDate = useMemo(() => {
     if (!selectedDate || allSemesters.length === 0) return null;
     return allSemesters.find(
-      (s) => selectedDate >= s.startDate && selectedDate <= s.endDate,
+      (s) => selectedDate >= s.startDate && selectedDate <= s.endDate
     );
   }, [selectedDate, allSemesters]);
 
-  // ── 2. 선택된 날짜의 데이터(출석부, 보고서) 불러오기 ──
+  // ── 2. 데이터 불러오기 ──
   useEffect(() => {
     const cellId = user.cellId;
     if (!selectedDate) return;
@@ -249,7 +238,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
 
         const initialAttendances = relevantMembers.map((member) => {
           const existing = existingAttendances.find(
-            (att) => att.member.id === member.id,
+            (att) => att.member.id === member.id
           );
           return {
             id: existing?.id,
@@ -285,16 +274,21 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
   // ── Handlers ──
   const onDateSelect = (newDateStr: string) => {
     if (!newDateStr) return;
+    const selected = new Date(newDateStr + "T00:00:00");
+    if (selected.getDay() !== 0) {
+      showAlert("날짜 선택 불가", "출석 체크는 주일(일요일)만 가능합니다.");
+      return;
+    }
 
     if (allSemesters.length > 0) {
       const belongsToAnySemester = allSemesters.some(
-        (s) => newDateStr >= s.startDate && newDateStr <= s.endDate,
+        (s) => newDateStr >= s.startDate && newDateStr <= s.endDate
       );
 
       if (!belongsToAnySemester) {
         showAlert(
           "날짜 선택 불가",
-          "선택하신 날짜는 등록된 학기 기간에 포함되지 않습니다.\n(방학 기간이거나 등록되지 않은 날짜입니다.)",
+          "선택하신 날짜는 등록된 학기 기간에 포함되지 않습니다.\n(방학 기간이거나 등록되지 않은 날짜입니다.)"
         );
         return;
       }
@@ -310,12 +304,12 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
   const handleAttendanceChange = (
     memberId: number,
     field: keyof MemberAttendanceForm,
-    value: any,
+    value: any
   ) => {
     setMemberAttendances((prev) =>
       prev.map((att) =>
-        att.memberId === memberId ? { ...att, [field]: value } : att,
-      ),
+        att.memberId === memberId ? { ...att, [field]: value } : att
+      )
     );
   };
 
@@ -325,14 +319,15 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
 
     if (!selectedDate) return setSubmitError("출석 날짜를 선택해 주세요.");
 
+    // 학기 기간 체크
     if (allSemesters.length > 0) {
       const belongsToAnySemester = allSemesters.some(
-        (s) => selectedDate >= s.startDate && selectedDate <= s.endDate,
+        (s) => selectedDate >= s.startDate && selectedDate <= s.endDate
       );
       if (!belongsToAnySemester) {
         showAlert(
           "저장 불가",
-          "선택하신 날짜는 학기 기간에 포함되지 않아 저장할 수 없습니다.",
+          "선택하신 날짜는 학기 기간에 포함되지 않아 저장할 수 없습니다."
         );
         return;
       }
@@ -341,9 +336,10 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
     if (memberAttendances.length === 0)
       return setSubmitError("출석을 처리할 멤버가 없습니다.");
 
+    // 유효성 검사 (기도제목 필수)
     for (const member of members) {
       const attendance = memberAttendances.find(
-        (a) => a.memberId === member.id,
+        (a) => a.memberId === member.id
       );
       if (!attendance || !attendance.prayerContent?.trim()) {
         setSubmitError(`${member.name}님의 기도제목/특이사항을 입력해 주세요.`);
@@ -383,11 +379,8 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
       await attendanceService.processAttendanceWithPrayers(cellId, payload);
 
       setSubmitError(null);
-      setSuccessMessage("출석 기록이 성공적으로 저장되었습니다.");
+      setSuccessMessage(null);
       setIsEditMode(true);
-
-      // 성공 시 즉시 UI 반영 + useEffect가 돌면서 서버 데이터로 다시 동기화됨
-      setSubmittedHistory((prev) => [...prev, selectedDate]);
 
       showAlert("저장 완료", "출석 기록이 성공적으로 저장되었습니다.", () => {
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -444,11 +437,11 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
             <KoreanCalendarPicker
               value={selectedDate}
               onChange={onDateSelect}
+              // ✅ [핵심 1] 일요일(day 0)만 선택 가능
               filterDate={(date) => date.getDay() === 0}
+              // ✅ [핵심 2] 학기 기간 내로만 연도/월 이동 제한
               minDate={minDate}
               maxDate={maxDate}
-              // ✅ 제출된 날짜 리스트 전달 (달력에 표시됨)
-              submittedDates={submittedHistory}
             />
 
             {semesterForSelectedDate ? (
@@ -533,7 +526,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                                 handleAttendanceChange(
                                   member.id,
                                   "status",
-                                  "PRESENT",
+                                  "PRESENT"
                                 )
                               }
                               disabled={isEditMode}
@@ -551,7 +544,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                                 handleAttendanceChange(
                                   member.id,
                                   "status",
-                                  "ABSENT",
+                                  "ABSENT"
                                 )
                               }
                               disabled={isEditMode}
@@ -579,7 +572,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
                               handleAttendanceChange(
                                 member.id,
                                 "prayerContent",
-                                e.target.value,
+                                e.target.value
                               )
                             }
                             readOnly={isEditMode}
@@ -652,7 +645,7 @@ const TakeAttendanceView: React.FC<TakeAttendanceViewProps> = ({
               </div>
             </div>
 
-            {/* 4. 하단 버튼 */}
+            {/* 4. 하단 버튼 (Sticky) */}
             <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-40 sm:static sm:bg-transparent sm:border-0 sm:p-0">
               <div className="container mx-auto max-w-2xl">
                 {!isEditMode ? (
