@@ -20,6 +20,24 @@ const refreshAxiosInstance = axios.create({
   baseURL: API_BASE_URL,
 });
 
+// ✅ [추가] 탭 간 토큰 동기화를 위한 Broadcast Channel
+const tokenChannel = new BroadcastChannel("token_channel");
+
+// ✅ [추가] 다른 탭으로부터 토큰 업데이트 메시지 수신
+tokenChannel.onmessage = (event) => {
+  if (event.data?.type === "TOKENS_UPDATED") {
+    const { accessToken, refreshToken, user } = event.data.payload;
+    if (accessToken && refreshToken && user) {
+      // 현재 탭의 스토리지를 다른 탭의 최신 정보와 동기화
+      const rememberMe = !!localStorage.getItem("accessToken");
+      _setTokens(accessToken, refreshToken, user, rememberMe);
+
+      // React Context에 변경 사항을 알려 UI를 업데이트하도록 함
+      window.dispatchEvent(new CustomEvent("auth-storage-updated"));
+    }
+  }
+};
+
 // ----------------------------------------------------
 // Storage Helpers
 // ----------------------------------------------------
@@ -146,6 +164,13 @@ const authService = {
       };
 
       _setTokens(accessToken, refreshToken, user, rememberMe);
+
+      // ✅ [추가] 다른 탭에 토큰 업데이트 전파
+      tokenChannel.postMessage({
+        type: "TOKENS_UPDATED",
+        payload: { accessToken, refreshToken, user },
+      });
+
       return user;
     } catch (error: any) {
       console.error("Login error:", error.response?.data || error.message);
@@ -190,8 +215,21 @@ const authService = {
         response.data;
 
       if (newAccessToken && newRefreshToken) {
+        const user = authService.getCurrentUser(); // 최신 유저 정보 가져오기
+
         targetStorage.setItem("accessToken", newAccessToken);
         targetStorage.setItem("refreshToken", newRefreshToken); // Refresh Token 교체
+
+        // ✅ [추가] 다른 탭에 토큰 업데이트 전파
+        tokenChannel.postMessage({
+          type: "TOKENS_UPDATED",
+          payload: {
+            accessToken: newAccessToken,
+            refreshToken: newRefreshToken,
+            user,
+          },
+        });
+
         return newAccessToken;
       }
 

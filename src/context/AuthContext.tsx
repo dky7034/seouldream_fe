@@ -32,6 +32,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // 앱 부팅 시 최초 1회 인증 상태 확인
     const checkUser = () => {
       const storedUser = authService.getCurrentUser();
       if (storedUser) {
@@ -40,6 +41,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(false);
     };
     checkUser();
+
+    // ✅ [추가] 다른 탭의 토큰 변경 사항을 감지하는 리스너
+    const handleStorageChange = () => {
+      console.log(
+        "Auth storage updated by another tab. Re-checking auth state."
+      );
+      const updatedUser = authService.getCurrentUser();
+      setUser(updatedUser);
+    };
+
+    window.addEventListener("auth-storage-updated", handleStorageChange);
+
+    return () => {
+      window.removeEventListener("auth-storage-updated", handleStorageChange);
+    };
   }, []);
 
   const login = async (
