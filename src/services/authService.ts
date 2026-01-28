@@ -46,7 +46,7 @@ const _setTokens = (
   accessToken: string,
   refreshToken: string,
   user: User,
-  rememberMe: boolean
+  rememberMe: boolean,
 ) => {
   const targetStorage = rememberMe ? localStorage : sessionStorage;
   const otherStorage = rememberMe ? sessionStorage : localStorage;
@@ -85,7 +85,7 @@ const _getTokens = (): {
   } catch (e) {
     console.error(
       "Failed to parse user data from storage. The data might be corrupt. Treating as logged out for this session.",
-      e
+      e,
     );
     // 파싱 실패 시 모든 토큰을 지우면 디버깅이 불가능해지므로,
     // 현재 세션만 로그아웃 처리하고 토큰은 유지시킨다.
@@ -124,15 +124,14 @@ const authService = {
   login: async (
     username: string,
     password: string,
-    rememberMe: boolean = false
+    rememberMe: boolean = false,
   ): Promise<User> => {
     try {
-      // ✅ [변경] rememberMe 기능을 비활성화하기 위해 항상 false 전달
       const response: AxiosResponse<JwtAuthenticationResponse> =
         await axios.post(`${API_BASE_URL}/auth/login`, {
           username,
           password,
-          rememberMe: false, // 하드코딩
+          rememberMe,
         });
 
       const {
@@ -153,7 +152,7 @@ const authService = {
       const decodedToken = jwtDecode<JwtPayload>(accessToken);
       const allowedRoles: UserRole[] = ["EXECUTIVE", "CELL_LEADER", "MEMBER"];
       const normalizedRole: UserRole = allowedRoles.includes(
-        responseRole as UserRole
+        responseRole as UserRole,
       )
         ? (responseRole as UserRole)
         : "MEMBER";
@@ -191,7 +190,7 @@ const authService = {
         await axios.post(
           `${API_BASE_URL}/auth/logout`,
           {},
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
       } catch (error) {
         console.error("Logout API failed");
@@ -264,7 +263,7 @@ const authService = {
 
   changePassword: async (
     userId: number,
-    data: ChangePasswordRequest
+    data: ChangePasswordRequest,
   ): Promise<void> => {
     await api.post(`/auth/change-password/${userId}`, data);
   },

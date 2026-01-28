@@ -13,14 +13,14 @@ export interface AuthContextType {
   login: (
     username: string,
     password: string,
-    rememberMe?: boolean
+    rememberMe?: boolean,
   ) => Promise<void>; // ✅ rememberMe optional 추가
   logout: () => void;
   isAuthenticated: boolean;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(
-  undefined
+  undefined,
 );
 
 interface AuthProviderProps {
@@ -45,7 +45,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // ✅ [추가] 다른 탭의 토큰 변경 사항을 감지하는 리스너
     const handleStorageChange = () => {
       console.log(
-        "Auth storage updated by another tab. Re-checking auth state."
+        "Auth storage updated by another tab. Re-checking auth state.",
       );
       const updatedUser = authService.getCurrentUser();
       setUser(updatedUser);
@@ -61,12 +61,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (
     username: string,
     password: string,
-    rememberMe: boolean = false
+    rememberMe: boolean = false,
   ) => {
     const loggedInUser = await authService.login(
       username,
       password,
-      rememberMe
+      rememberMe,
     );
     setUser(loggedInUser);
   };
