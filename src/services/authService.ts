@@ -127,12 +127,12 @@ const authService = {
     rememberMe: boolean = false
   ): Promise<User> => {
     try {
-      // ✅ [변경 1] 백엔드에 rememberMe 값 전달 (30일 토큰 발급 요청)
+      // ✅ [변경] rememberMe 기능을 비활성화하기 위해 항상 false 전달
       const response: AxiosResponse<JwtAuthenticationResponse> =
         await axios.post(`${API_BASE_URL}/auth/login`, {
           username,
           password,
-          rememberMe, // 추가됨
+          rememberMe: false, // 하드코딩
         });
 
       const {
@@ -168,7 +168,8 @@ const authService = {
         cellName: cellName,
       };
 
-      _setTokens(accessToken, refreshToken, user, rememberMe);
+      // ✅ [변경] rememberMe 기능을 비활성화하기 위해 항상 false 전달
+      _setTokens(accessToken, refreshToken, user, false); // 하드코딩
 
       // ✅ [추가] 다른 탭에 토큰 업데이트 전파
       tokenChannel.postMessage({

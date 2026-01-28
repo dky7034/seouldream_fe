@@ -177,6 +177,7 @@ const LoginPage: React.FC = () => {
           </div>
 
           {/* 옵션 영역: 로그인 유지 */}
+          {/* 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <label className="flex items-center space-x-2">
               <input
@@ -188,16 +189,8 @@ const LoginPage: React.FC = () => {
               />
               <span className="text-xs text-gray-600">로그인 상태 유지</span>
             </label>
-
-            {/* 향후 비밀번호 찾기 버튼 자리 */}
-            {/* <button
-              type="button"
-              className="text-xs font-medium text-indigo-400 cursor-default"
-              disabled
-            >
-              비밀번호 찾기 준비 중
-            </button> */}
           </div>
+          */}
 
           {/* 로그인 버튼 */}
           <div>
