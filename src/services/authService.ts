@@ -83,8 +83,13 @@ const _getTokens = (): {
   try {
     user = JSON.parse(userStr) as User;
   } catch (e) {
-    console.error("User parsing failed", e);
-    _clearTokens();
+    console.error(
+      "Failed to parse user data from storage. The data might be corrupt. Treating as logged out for this session.",
+      e
+    );
+    // 파싱 실패 시 모든 토큰을 지우면 디버깅이 불가능해지므로,
+    // 현재 세션만 로그아웃 처리하고 토큰은 유지시킨다.
+    return { accessToken: null, refreshToken: null, user: null };
   }
 
   return { accessToken, refreshToken, user };
