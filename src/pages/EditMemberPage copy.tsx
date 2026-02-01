@@ -69,11 +69,9 @@ const EditMemberPage: React.FC = () => {
         const [memberData, allTeamsPage, memberTeamsData, allCellsPage] =
           await Promise.all([
             memberService.getMemberById(memberIdNum),
-            // 팀 목록도 잘린다면 여기도 size를 늘려야 합니다.
-            teamService.getAllTeams({ size: 1000 }),
+            teamService.getAllTeams({}),
             memberService.getMemberTeams(memberIdNum),
-            // ✅ [수정됨] size를 1000 등 충분히 큰 숫자로 지정하여 전체 목록을 가져옵니다.
-            cellService.getAllCells({ page: 0, size: 1000 }),
+            cellService.getAllCells({}),
           ]);
 
         setOriginalMemberName(memberData.name);
@@ -111,18 +109,18 @@ const EditMemberPage: React.FC = () => {
 
   const cellOptions = useMemo(
     () => cells.map((c) => ({ value: c.id, label: c.name })),
-    [cells],
+    [cells]
   );
 
   const teamOptions = useMemo(
     () => allTeams.map((t) => ({ value: t.id, label: t.name })),
-    [allTeams],
+    [allTeams]
   );
 
   const handleFormChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >,
+    >
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -221,10 +219,10 @@ const EditMemberPage: React.FC = () => {
         const newTeamIds = new Set(selectedTeamIds);
 
         const teamsToRemove = Array.from(currentTeamIds).filter(
-          (teamId) => !newTeamIds.has(teamId),
+          (teamId) => !newTeamIds.has(teamId)
         );
         const teamsToAdd = Array.from(newTeamIds).filter(
-          (teamId) => !currentTeamIds.has(teamId),
+          (teamId) => !currentTeamIds.has(teamId)
         );
 
         for (const teamId of teamsToRemove) {
@@ -407,7 +405,7 @@ const EditMemberPage: React.FC = () => {
                   value={formData.cellId}
                   onChange={(value) =>
                     handleCellSelect(
-                      typeof value === "number" ? value : undefined,
+                      typeof value === "number" ? value : undefined
                     )
                   }
                   placeholder="셀을 선택하세요..."
