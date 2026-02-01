@@ -85,7 +85,8 @@ const AddUserPage: React.FC = () => {
 
     const fetchCells = async () => {
       try {
-        const allCells = await cellService.getAllCells({});
+        // ✅ [수정됨] 전체 셀 목록을 가져오기 위해 size를 1000으로 설정
+        const allCells = await cellService.getAllCells({ size: 1000 });
         setCells(allCells.content.filter((c) => c.active));
       } catch (err) {
         console.error("Failed to fetch cells:", err);

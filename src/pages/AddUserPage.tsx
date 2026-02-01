@@ -21,16 +21,6 @@ const useDebounce = (value: string, delay: number): string => {
   return debouncedValue;
 };
 
-// ✅ username 자동 생성
-const generateUsername = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return `u_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
-  }
-  const rand = Math.random().toString(36).slice(2, 10);
-  const time = Date.now().toString(36);
-  return `u_${time}_${rand}`;
-};
-
 const DEFAULT_PASSWORD = "password";
 
 const AddUserPage: React.FC = () => {
@@ -38,16 +28,14 @@ const AddUserPage: React.FC = () => {
   const location = useLocation();
   const { user } = useAuth();
 
-  // ✅ [변경 1] 오늘 날짜 계산 로직 제거 (초기값으로 안 씀)
-
   const [formData, setFormData] = useState<CreateMemberRequest>({
     name: "",
-    username: generateUsername(),
+    username: "", // ✅ [변경] 초기값 빈 문자열 (직접 입력)
     password: DEFAULT_PASSWORD,
     email: "",
     phone: "",
     gender: "MALE",
-    birthDate: "", // ✅ [변경 2] 초기값을 빈 문자열로 설정 (사용자 선택 강제)
+    birthDate: "",
     cellId: undefined,
     role: "MEMBER",
     joinYear: new Date().getFullYear(),
@@ -67,6 +55,8 @@ const AddUserPage: React.FC = () => {
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(
     null,
   );
+
+  // 입력된 username에 대해 0.5초 딜레이 후 중복 체크 수행
   const debouncedUsername = useDebounce(formData.username, 500);
 
   useEffect(() => {
@@ -85,7 +75,7 @@ const AddUserPage: React.FC = () => {
 
     const fetchCells = async () => {
       try {
-        // ✅ [수정됨] 전체 셀 목록을 가져오기 위해 size를 1000으로 설정
+        // ✅ 전체 셀 목록 조회 (size: 1000)
         const allCells = await cellService.getAllCells({ size: 1000 });
         setCells(allCells.content.filter((c) => c.active));
       } catch (err) {
@@ -95,9 +85,12 @@ const AddUserPage: React.FC = () => {
     fetchCells();
   }, [user, navigate, location.search]);
 
+  // ✅ 아이디 중복 확인 효과 (Debounce 적용)
   useEffect(() => {
+    // 아이디가 비어있으면 체크하지 않음
     if (!debouncedUsername) {
       setUsernameAvailable(null);
+      setFormErrors((prev) => ({ ...prev, username: undefined }));
       return;
     }
 
@@ -118,10 +111,7 @@ const AddUserPage: React.FC = () => {
       .catch((err) => {
         console.error("아이디 중복 확인 실패:", err);
         setUsernameAvailable(null);
-        setFormErrors((prev) => ({
-          ...prev,
-          username: "아이디 중복 여부를 확인할 수 없습니다.",
-        }));
+        // 네트워크 에러 등은 일단 에러 메시지로 표시하지 않거나 필요 시 처리
       })
       .finally(() => setIsCheckingUsername(false));
   }, [debouncedUsername]);
@@ -145,6 +135,7 @@ const AddUserPage: React.FC = () => {
       [name]: name === "joinYear" ? Number(value) : value,
     }));
 
+    // 아이디가 변경되면 기존 중복 확인 결과 초기화
     if (name === "username") {
       setUsernameAvailable(null);
     }
@@ -157,19 +148,14 @@ const AddUserPage: React.FC = () => {
     setFormErrors((prev) => ({ ...prev, cellId: undefined }));
   };
 
-  const regenerateUsername = () => {
-    const next = generateUsername();
-    setFormData((prev) => ({ ...prev, username: next }));
-    setUsernameAvailable(null);
-    setFormErrors((prev) => ({ ...prev, username: undefined }));
-  };
-
   const validateForm = (): FormErrors => {
     const newErrors: FormErrors = {};
 
     if (!formData.name) newErrors.name = "이름은 필수입니다.";
 
     if (!formData.username) newErrors.username = "아이디는 필수입니다.";
+    // 한글 등 불가능한 문자 체크가 필요하다면 여기서 정규식 추가 (예: /^[a-zA-Z0-9]+$/)
+
     if (usernameAvailable === false)
       newErrors.username = "이미 사용 중인 아이디입니다.";
 
@@ -185,9 +171,7 @@ const AddUserPage: React.FC = () => {
     else if (!/^\d+$/.test(formData.phone))
       newErrors.phone = "연락처는 숫자만 입력해 주세요.";
 
-    // ✅ 여기서 birthDate가 비어있으면 에러 처리됨
     if (!formData.birthDate) newErrors.birthDate = "생년월일은 필수입니다.";
-
     if (!formData.joinYear) newErrors.joinYear = "등록연도는 필수입니다.";
 
     return newErrors;
@@ -197,20 +181,17 @@ const AddUserPage: React.FC = () => {
     e.preventDefault();
     setSubmitError(null);
 
-    const payload: CreateMemberRequest = {
-      ...formData,
-      username: formData.username || generateUsername(),
-      password: DEFAULT_PASSWORD,
-      // ✅ [변경 3] fallback 제거 (validateForm에서 빈 값 체크하므로 그대로 전송)
-      birthDate: formData.birthDate,
-    };
-    setConfirmPassword(DEFAULT_PASSWORD);
-
     const validationErrors = validateForm();
     if (Object.keys(validationErrors).length > 0) {
       setFormErrors(validationErrors);
       return;
     }
+
+    const payload: CreateMemberRequest = {
+      ...formData,
+      password: DEFAULT_PASSWORD,
+    };
+    setConfirmPassword(DEFAULT_PASSWORD);
 
     setLoading(true);
     try {
@@ -273,47 +254,61 @@ const AddUserPage: React.FC = () => {
                 아이디 <span className="text-red-500">*</span>
               </label>
 
-              <div className="mt-1 flex flex-col sm:flex-row sm:items-stretch gap-2">
-                <div className="relative flex-1 min-w-0">
-                  <input
-                    name="username"
-                    type="text"
-                    required
-                    value={formData.username}
-                    readOnly
-                    className="block w-full h-10 px-3 border border-gray-300 rounded-md shadow-sm text-sm bg-gray-50
-                               focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                  {isCheckingUsername && (
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-gray-500 pointer-events-none">
-                      확인 중...
-                    </div>
-                  )}
-                </div>
+              {/* ✅ [변경] 일반 Input으로 변경, 버튼 제거 */}
+              <div className="mt-1 relative">
+                <input
+                  name="username"
+                  type="text"
+                  required
+                  value={formData.username}
+                  onChange={handleFormChange}
+                  placeholder="사용할 아이디를 입력하세요"
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm
+                             focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                />
 
-                <button
-                  type="button"
-                  onClick={regenerateUsername}
-                  className="h-10 px-4 rounded-md text-sm font-medium text-gray-800 bg-gray-200 hover:bg-gray-300
-                             whitespace-nowrap flex items-center justify-center
-                             focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400
-                             disabled:opacity-60 disabled:cursor-not-allowed"
-                  disabled={loading || isCheckingUsername}
-                >
-                  재생성
-                </button>
+                {/* 로딩 인디케이터 (우측 끝) */}
+                {isCheckingUsername && (
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-gray-500 pointer-events-none">
+                    <svg
+                      className="animate-spin h-4 w-4 text-indigo-500"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                  </div>
+                )}
               </div>
 
+              {/* 상태 메시지 표시 */}
               {formErrors.username && (
                 <p className="mt-1 text-xs sm:text-sm text-red-600">
                   {formErrors.username}
                 </p>
               )}
-              {usernameAvailable === true && !formErrors.username && (
-                <p className="mt-1 text-xs sm:text-sm text-green-600">
-                  사용 가능한 아이디입니다.
-                </p>
-              )}
+              {/* 중복 체크 완료 & 사용 가능할 때 녹색 문구 */}
+              {!isCheckingUsername &&
+                formData.username &&
+                usernameAvailable === true &&
+                !formErrors.username && (
+                  <p className="mt-1 text-xs sm:text-sm text-green-600">
+                    사용 가능한 아이디입니다.
+                  </p>
+                )}
             </div>
 
             <div className="md:col-span-2">
@@ -326,7 +321,7 @@ const AddUserPage: React.FC = () => {
           </div>
         </fieldset>
 
-        {/* 개인 정보 */}
+        {/* 개인 정보 (이하 동일) */}
         <fieldset className="space-y-4 p-3 sm:p-4 border border-gray-200 rounded-xl">
           <legend className="px-1 text-base sm:text-lg font-semibold text-gray-900">
             개인 정보
@@ -425,13 +420,10 @@ const AddUserPage: React.FC = () => {
               </select>
             </div>
 
-            {/* 생년월일 (초기값 비움) */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 생년월일 <span className="text-red-500">*</span>
               </label>
-
-              {/* ✅ input들과 동일한 간격: mt-1 */}
               <div className="mt-1">
                 <KoreanCalendarPicker
                   value={formData.birthDate}
@@ -446,7 +438,6 @@ const AddUserPage: React.FC = () => {
                   yearCols={4}
                 />
               </div>
-
               {formErrors.birthDate && (
                 <p className="mt-1 text-xs sm:text-sm text-red-600">
                   {formErrors.birthDate}
@@ -527,20 +518,6 @@ const AddUserPage: React.FC = () => {
               </div>
             </div>
           </div>
-
-          {/* <div className="mt-2">
-            <label className="block text-sm font-medium text-gray-700">
-              메모
-            </label>
-            <textarea
-              name="note"
-              rows={3}
-              value={formData.note}
-              onChange={handleFormChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm
-                         focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div> */}
         </fieldset>
 
         {/* 버튼 */}
@@ -562,7 +539,9 @@ const AddUserPage: React.FC = () => {
                        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500
                        disabled:opacity-60 disabled:cursor-not-allowed"
             disabled={
-              loading || isCheckingUsername || usernameAvailable === false
+              loading ||
+              isCheckingUsername ||
+              (!!formData.username && usernameAvailable === false)
             }
           >
             {loading ? "저장 중..." : "멤버 생성"}
