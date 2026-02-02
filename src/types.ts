@@ -173,6 +173,8 @@ export interface UpdateCellRequest {
   viceLeaderId?: number | null;
   description?: string;
   active?: boolean;
+  // ✅ [추가] 셀 구성원(멤버) ID 목록 (이 목록에 없는 멤버는 셀에서 제외됨)
+  memberIds?: number[];
 }
 
 export type AttendanceStatus = "PRESENT" | "ABSENT";
