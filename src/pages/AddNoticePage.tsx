@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+// src/pages/AddNoticePage.tsx
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { noticeService } from "../services/noticeService";
 import type { CreateNoticeRequest } from "../types";
@@ -12,16 +13,16 @@ const AddNoticePage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // ✅ EXECUTIVE가 아니면 목록으로 돌려보내기 (렌더 중 navigate 방지)
+  // ✅ 권한 체크: EXECUTIVE가 아니면 목록으로 리다이렉트
   useEffect(() => {
-    if (!user) return; // 아직 유저 로딩 중일 수 있음
+    if (!user) return; // 유저 정보 로딩 대기
 
     if (user.role !== "EXECUTIVE") {
       navigate("/admin/notices");
     }
   }, [user, navigate]);
 
-  // ✅ 1) 아직 user 정보 로딩 중일 때: 모바일 카드형 로딩 UI
+  // ✅ 1) 유저 정보 로딩 중 UI
   if (!user) {
     return (
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -32,28 +33,31 @@ const AddNoticePage: React.FC = () => {
     );
   }
 
-  // ✅ 2) user는 있는데 EXECUTIVE가 아닐 때 (위 useEffect에서 리다이렉트 진행 중)
+  // ✅ 2) 권한이 없는 경우 렌더링 차단
   if (user.role !== "EXECUTIVE") {
     return null;
   }
 
-  // ✅ 3) EXECUTIVE만 여기 도달
+  // ✅ 공지사항 등록 핸들러
   const handleSubmit = async (formData: NoticeFormData) => {
     setLoading(true);
     setSubmitError(null);
     try {
       const dataToSend: CreateNoticeRequest = {
         ...(formData as CreateNoticeRequest),
-        createdById: user.id,
+        createdById: user.id, // 현재 로그인한 유저 ID 추가
       };
 
       await noticeService.createNotice(dataToSend);
-      navigate("/admin/notices");
-    } catch (err: any) {
-      setSubmitError(
-        err?.response?.data?.message || "공지사항 생성에 실패했습니다."
-      );
+      navigate("/admin/notices"); // 등록 성공 시 목록으로 이동
+    } catch (err: unknown) {
       console.error("공지사항 생성 오류:", err);
+
+      // ✅ 에러 해결: unknown 타입을 안전하게 캐스팅하여 메시지 추출
+      const errorMessage =
+        (err as any)?.response?.data?.message ||
+        "공지사항 생성에 실패했습니다.";
+      setSubmitError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -64,7 +68,7 @@ const AddNoticePage: React.FC = () => {
       onSubmit={handleSubmit}
       loading={loading}
       submitError={submitError}
-      isEditing={false}
+      isEditing={false} // 등록 모드
     />
   );
 };

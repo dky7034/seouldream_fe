@@ -68,14 +68,17 @@ const EditNoticePage: React.FC = () => {
     try {
       await noticeService.updateNotice(
         editingNotice.id,
-        formData as UpdateNoticeRequest
+        formData as UpdateNoticeRequest,
       );
       navigate("/admin/notices");
-    } catch (err: any) {
+      // ✅ 수정 후 (타입 안정성 강화)
+    } catch (err: unknown) {
       console.error("공지사항 수정 오류:", err);
-      setSubmitError(
-        err?.response?.data?.message || "공지사항 수정에 실패했습니다."
-      );
+      // unknown 타입을 안전하게 접근하기 위해 타입 가드 사용
+      const errorMessage =
+        (err as any)?.response?.data?.message ||
+        "공지사항 수정에 실패했습니다.";
+      setSubmitError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
