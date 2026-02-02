@@ -1,3 +1,4 @@
+// src/pages/CellDetailPage.tsx
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { cellService } from "../services/cellService";
@@ -727,6 +728,7 @@ const CellDetailPage: React.FC = () => {
   const [cell, setCell] = useState<CellDto | null>(null);
 
   const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false); // 🔹 삭제 로딩 상태 추가
   const [isAddMemberModalOpen, setAddMemberModalOpen] = useState(false);
 
   // Filter States
@@ -760,13 +762,11 @@ const CellDetailPage: React.FC = () => {
     return targetYm >= sYm && targetYm <= eYm;
   };
 
-  // ✅ [수정됨] 학기 목록 로딩 로직 (활성 학기만)
   useEffect(() => {
     const loadSemesters = async () => {
       if (!user) return;
 
       try {
-        // ✅ [핵심] 항상 '활성 학기(true)'만 조회하여 표시
         const data = await semesterService.getAllSemesters(true);
 
         const sortedData = data.sort(
@@ -775,7 +775,6 @@ const CellDetailPage: React.FC = () => {
         );
         setSemesters(sortedData);
 
-        // 연도 데이터 추출
         const years = Array.from(
           new Set(sortedData.map((s) => new Date(s.startDate).getFullYear())),
         ).sort((a, b) => b - a);
@@ -793,7 +792,6 @@ const CellDetailPage: React.FC = () => {
             setActiveSemester(sortedData[0]);
             setSelectedYear(new Date(sortedData[0].startDate).getFullYear());
           }
-          // 기본값 설정
           setUnitType("semester");
           setSelectedMonth(null);
         }
@@ -917,7 +915,6 @@ const CellDetailPage: React.FC = () => {
     if (type === "semester") {
       setSelectedMonth(null);
 
-      // [수정 로직]
       const now = new Date();
       const currentYearSemesters = semesters.filter(
         (s) => new Date(s.startDate).getFullYear() === selectedYear,
@@ -956,20 +953,38 @@ const CellDetailPage: React.FC = () => {
     }
   };
 
+  // ✅ [수정됨] 안전한 삭제 핸들러
   const handleDelete = async () => {
     if (!cell) return;
+
+    // 이미 삭제 중이면 중복 실행 방지
+    if (isDeleting) return;
+
+    setIsDeleting(true);
+
     try {
       await cellService.deleteCell(cell.id);
-      navigate("/admin/cells");
+
+      // 성공 시 모달 닫기 및 알림
+      setDeleteModalOpen(false);
+      alert("셀이 삭제되었습니다.");
+
+      // 뒤로가기 시 삭제된 페이지로 오지 않도록 replace 처리
+      navigate("/admin/cells", { replace: true });
     } catch (err: any) {
-      let errorMessage = "셀 삭제 중 오류가 발생했습니다.";
-      if (err.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      }
+      console.error("Delete failed:", err);
+      const errorMessage =
+        err.response?.data?.message ||
+        "셀 삭제 중 오류가 발생했습니다. (멤버가 남아있거나 서버 오류일 수 있습니다.)";
       setError(errorMessage);
+      alert(errorMessage);
+    } finally {
+      setIsDeleting(false);
+      // 에러가 났더라도 모달은 닫아주는 것이 사용자 경험상 좋습니다 (선택 사항)
       setDeleteModalOpen(false);
     }
   };
+
   const handleAddMemberToCell = async (memberIds: number[]) => {
     if (!cellIdNum) return;
     try {
@@ -1024,10 +1039,14 @@ const CellDetailPage: React.FC = () => {
     <div className="bg-gray-50 min-h-screen pb-20">
       <ConfirmModal
         isOpen={isDeleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
+        onClose={() => !isDeleting && setDeleteModalOpen(false)} // 삭제 중 닫기 방지
         onConfirm={handleDelete}
         title="셀 삭제"
-        message={`'${cell.name}' 셀을 삭제하시겠습니까? 소속된 멤버는 '소속 셀 없음' 상태가 됩니다.`}
+        message={
+          isDeleting
+            ? "삭제 처리 중입니다..."
+            : `'${cell.name}' 셀을 삭제하시겠습니까? 소속된 멤버는 자동으로 '소속 셀 없음' 상태가 됩니다.`
+        }
       />
       <AddMemberToCellModal
         isOpen={isAddMemberModalOpen}
@@ -1060,7 +1079,8 @@ const CellDetailPage: React.FC = () => {
                 </button>{" "}
                 <button
                   onClick={() => setDeleteModalOpen(true)}
-                  className="bg-white border border-red-200 text-red-600 px-4 py-2 rounded-lg hover:bg-red-50 text-sm font-medium transition-colors shadow-sm"
+                  disabled={isDeleting}
+                  className="bg-white border border-red-200 text-red-600 px-4 py-2 rounded-lg hover:bg-red-50 text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
                 >
                   삭제
                 </button>{" "}

@@ -29,7 +29,7 @@ import {
   MegaphoneIcon,
 } from "@heroicons/react/24/solid";
 
-// ───────────────── [컴포넌트] AddMemberToCellModal (변경 없음) ─────────────────
+// ───────────────── [컴포넌트] AddMemberToCellModal ─────────────────
 const AddMemberToCellModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
@@ -58,7 +58,7 @@ const AddMemberToCellModal: React.FC<{
           size: 1000,
         });
         const filteredContent = page.content.filter(
-          (m) => m.role !== "EXECUTIVE"
+          (m) => m.role !== "EXECUTIVE",
         );
         setCandidateMembers(filteredContent);
       } catch (error) {
@@ -75,19 +75,19 @@ const AddMemberToCellModal: React.FC<{
       candidateMembers.filter((member) =>
         formatNameWithBirthdate(member)
           .toLowerCase()
-          .includes(searchTerm.toLowerCase())
+          .includes(searchTerm.toLowerCase()),
       ),
-    [candidateMembers, searchTerm]
+    [candidateMembers, searchTerm],
   );
   const selectedMembers = useMemo(
     () => candidateMembers.filter((m) => selectedMemberIds.includes(m.id)),
-    [candidateMembers, selectedMemberIds]
+    [candidateMembers, selectedMemberIds],
   );
   const handleToggleMember = (memberId: number) => {
     setSelectedMemberIds((prev) =>
       prev.includes(memberId)
         ? prev.filter((id) => id !== memberId)
-        : [...prev, memberId]
+        : [...prev, memberId],
     );
   };
   const handleRemoveMember = (memberId: number) => {
@@ -208,7 +208,7 @@ const AddMemberToCellModal: React.FC<{
   );
 };
 
-// ───────────────── [컴포넌트] CellReportHistoryItem (변경 없음) ─────────────────
+// ───────────────── [컴포넌트] CellReportHistoryItem ─────────────────
 const CellReportHistoryItem: React.FC<{
   cellId: number;
   date: string;
@@ -364,7 +364,7 @@ const CellReportHistoryItem: React.FC<{
   );
 };
 
-// ───────────────── [컴포넌트] CellReportHistoryContainer (변경 없음) ─────────────────
+// ───────────────── [컴포넌트] CellReportHistoryContainer ─────────────────
 const CellReportHistoryContainer: React.FC<{
   cellId: number;
   startDate: string;
@@ -413,7 +413,7 @@ const CellReportHistoryContainer: React.FC<{
   );
 };
 
-// ───────────────── [컴포넌트] CellAttendanceMatrixCard (변경 없음) ─────────────────
+// ───────────────── [컴포넌트] CellAttendanceMatrixCard ─────────────────
 const CellAttendanceMatrixCard: React.FC<{
   cellId: number;
   sortedMembers: MemberDto[];
@@ -444,7 +444,6 @@ const CellAttendanceMatrixCard: React.FC<{
   selectedMonth,
   onMonthSelect,
   matrixAttendances,
-  // periodSummary,
   startDate,
   endDate,
 }) => {
@@ -492,7 +491,7 @@ const CellAttendanceMatrixCard: React.FC<{
       if (att.member?.id && att.date)
         attendanceMap.set(
           `${att.member.id}-${att.date.slice(0, 10)}`,
-          att.status
+          att.status,
         );
     });
 
@@ -500,8 +499,8 @@ const CellAttendanceMatrixCard: React.FC<{
       const joinDate = member.cellAssignmentDate
         ? new Date(member.cellAssignmentDate)
         : member.createdAt
-        ? new Date(member.createdAt)
-        : new Date("2000-01-01");
+          ? new Date(member.createdAt)
+          : new Date("2000-01-01");
       joinDate.setHours(0, 0, 0, 0);
       const effectiveStart = filterStart < joinDate ? joinDate : filterStart;
       if (effectiveStart > effectiveEnd) return;
@@ -517,7 +516,7 @@ const CellAttendanceMatrixCard: React.FC<{
         // 연간 모드일 때만 학기 체크 (방학 제외)
         if (unitType === "year" && semesters) {
           const isInSemester = semesters.some(
-            (s) => currentDateStr >= s.startDate && currentDateStr <= s.endDate
+            (s) => currentDateStr >= s.startDate && currentDateStr <= s.endDate,
           );
           if (!isInSemester) isValidDate = false;
         }
@@ -535,7 +534,7 @@ const CellAttendanceMatrixCard: React.FC<{
 
     const unchecked = Math.max(
       0,
-      totalPossibleChecks - calculatedTotalRecorded
+      totalPossibleChecks - calculatedTotalRecorded,
     );
     const rate =
       totalPossibleChecks > 0
@@ -561,7 +560,7 @@ const CellAttendanceMatrixCard: React.FC<{
         createdAt: m.createdAt,
         joinYear: m.joinYear,
       })),
-    [sortedMembers]
+    [sortedMembers],
   );
 
   return (
@@ -619,13 +618,12 @@ const CellAttendanceMatrixCard: React.FC<{
                     {type === "month"
                       ? "월별"
                       : type === "semester"
-                      ? "학기"
-                      : "연간"}
+                        ? "학기"
+                        : "연간"}
                   </button>
                 ))}
               </div>
             </div>
-            {/* 👇 [여기]를 위 코드로 교체하세요 👇 */}
             <div className="flex flex-wrap items-center justify-between sm:justify-end gap-y-2 gap-x-3 text-xs text-gray-500 bg-white px-3.5 py-2.5 rounded-xl border border-gray-200 shadow-sm w-full sm:w-auto">
               <div className="flex items-center">
                 <FaClock className="mr-1.5 text-indigo-400 flex-shrink-0" />
@@ -717,7 +715,7 @@ const CellAttendanceMatrixCard: React.FC<{
   );
 };
 
-// ───────────────── [메인] CellDetailPage (✅ 수정됨: 활성 학기 필터링) ─────────────────
+// ───────────────── [메인] CellDetailPage ─────────────────
 const CellDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -734,19 +732,19 @@ const CellDetailPage: React.FC = () => {
   // Filter States
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const [activeSemester, setActiveSemester] = useState<SemesterDto | null>(
-    null
+    null,
   );
   const [unitType, setUnitType] = useState<"semester" | "month" | "year">(
-    "semester"
+    "semester",
   );
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [selectedYear, setSelectedYear] = useState<number>(
-    new Date().getFullYear()
+    new Date().getFullYear(),
   );
 
   const [matrixAttendances, setMatrixAttendances] = useState<AttendanceDto[]>(
-    []
+    [],
   );
   const [periodSummary, setPeriodSummary] = useState<any>(null);
 
@@ -762,27 +760,31 @@ const CellDetailPage: React.FC = () => {
     return targetYm >= sYm && targetYm <= eYm;
   };
 
+  // ✅ [수정됨] 학기 목록 로딩 로직 (활성 학기만)
   useEffect(() => {
     const loadSemesters = async () => {
+      if (!user) return;
+
       try {
-        // ✅ [수정] 활성화된 학기만 불러오기 (true 전달)
+        // ✅ [핵심] 항상 '활성 학기(true)'만 조회하여 표시
         const data = await semesterService.getAllSemesters(true);
+
         const sortedData = data.sort(
           (a, b) =>
-            new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+            new Date(b.startDate).getTime() - new Date(a.startDate).getTime(),
         );
         setSemesters(sortedData);
 
-        // ✅ [수정] 연도 데이터도 활성화된 학기 기준으로 추출
+        // 연도 데이터 추출
         const years = Array.from(
-          new Set(sortedData.map((s) => new Date(s.startDate).getFullYear()))
+          new Set(sortedData.map((s) => new Date(s.startDate).getFullYear())),
         ).sort((a, b) => b - a);
         setAvailableYears(years);
 
         if (sortedData.length > 0) {
           const now = new Date();
           const currentSemester = sortedData.find((sem) =>
-            isDateInSemesterMonthRange(now, sem)
+            isDateInSemesterMonthRange(now, sem),
           );
           if (currentSemester) {
             setActiveSemester(currentSemester);
@@ -791,6 +793,7 @@ const CellDetailPage: React.FC = () => {
             setActiveSemester(sortedData[0]);
             setSelectedYear(new Date(sortedData[0].startDate).getFullYear());
           }
+          // 기본값 설정
           setUnitType("semester");
           setSelectedMonth(null);
         }
@@ -798,8 +801,9 @@ const CellDetailPage: React.FC = () => {
         console.error("학기 로딩 실패", err);
       }
     };
+
     loadSemesters();
-  }, []);
+  }, [user]);
 
   const periodRange = useMemo(() => {
     if (unitType === "year")
@@ -818,7 +822,7 @@ const CellDetailPage: React.FC = () => {
     const monthStartStr = `${targetYear}-${String(m).padStart(2, "0")}-01`;
     const lastDayObj = new Date(targetYear, m, 0);
     const monthEndStr = `${targetYear}-${String(m).padStart(2, "0")}-${String(
-      lastDayObj.getDate()
+      lastDayObj.getDate(),
     ).padStart(2, "0")}`;
     const finalStart = monthStartStr < semStart ? semStart : monthStartStr;
     const finalEnd = monthEndStr > semEnd ? semEnd : monthEndStr;
@@ -853,10 +857,6 @@ const CellDetailPage: React.FC = () => {
   const fetchPeriodData = useCallback(async () => {
     if (!cellIdNum || !periodRange.startDate) return;
     try {
-      // console.log(
-      //   `[Fetch Data] Fetching for range: ${periodRange.startDate} ~ ${periodRange.endDate}`
-      // );
-
       const summary = await cellService.getCellAttendanceSummary(cellIdNum, {
         startDate: periodRange.startDate,
         endDate: periodRange.endDate,
@@ -907,26 +907,44 @@ const CellDetailPage: React.FC = () => {
   const handleYearChange = (year: number) => {
     setSelectedYear(year);
     const targetSem = semesters.find(
-      (s) => new Date(s.startDate).getFullYear() === year
+      (s) => new Date(s.startDate).getFullYear() === year,
     );
     if (targetSem) setActiveSemester(targetSem);
   };
   const handleUnitTypeChange = (type: "semester" | "month" | "year") => {
     setUnitType(type);
+
     if (type === "semester") {
       setSelectedMonth(null);
-      const targetSem = semesters.find(
-        (s) => new Date(s.startDate).getFullYear() === selectedYear
+
+      // [수정 로직]
+      const now = new Date();
+      const currentYearSemesters = semesters.filter(
+        (s) => new Date(s.startDate).getFullYear() === selectedYear,
       );
-      if (targetSem) setActiveSemester(targetSem);
+      let targetSem = currentYearSemesters.find((s) =>
+        isDateInSemesterMonthRange(now, s),
+      );
+      if (!targetSem && currentYearSemesters.length > 0) {
+        targetSem = currentYearSemesters[0];
+      }
+      if (!targetSem && semesters.length > 0) {
+        targetSem = semesters[0];
+        setSelectedYear(new Date(targetSem.startDate).getFullYear());
+      }
+      if (targetSem) {
+        setActiveSemester(targetSem);
+      }
       return;
     }
+
     if (type === "year") {
       setSelectedMonth(null);
       if (activeSemester)
         setSelectedYear(new Date(activeSemester.startDate).getFullYear());
       return;
     }
+
     if (activeSemester) {
       const now = new Date();
       if (isDateInSemesterMonthRange(now, activeSemester)) {
@@ -957,8 +975,8 @@ const CellDetailPage: React.FC = () => {
     try {
       await Promise.all(
         memberIds.map((memberId) =>
-          memberService.updateMember(memberId, { cellId: cellIdNum })
-        )
+          memberService.updateMember(memberId, { cellId: cellIdNum }),
+        ),
       );
       fetchCellDetails();
     } catch (error) {
@@ -972,7 +990,7 @@ const CellDetailPage: React.FC = () => {
     exportService.exportCellAttendances(
       cell.id,
       exportStartDate,
-      exportEndDate
+      exportEndDate,
     );
 
   const sortedMembers = useMemo(() => {
@@ -982,7 +1000,7 @@ const CellDetailPage: React.FC = () => {
     const leader = cell.members.find((m) => m.id === leaderId);
     const viceLeader = cell.members.find((m) => m.id === viceLeaderId);
     const others = cell.members.filter(
-      (m) => m.id !== leaderId && m.id !== viceLeaderId
+      (m) => m.id !== leaderId && m.id !== viceLeaderId,
     );
     others.sort((a, b) => a.name.localeCompare(b.name));
     const list: MemberDto[] = [];
