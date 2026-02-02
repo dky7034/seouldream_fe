@@ -26,10 +26,10 @@ const NoticeDetailPage: React.FC = () => {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<boolean>(false);
 
-  // ✅ [추가] 날짜 포맷팅 함수 (시간 포함 & Z 제거로 밀림 방지)
+  // ✅ 날짜 포맷팅 함수 (Z 제거로 날짜 밀림 방지 + 시간 표시)
   const safeFormatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return "-";
-    // 서버가 주는 시간 그대로 사용 (KST 가정)
+    // 서버가 주는 시간(KST) 그대로 사용
     const date = new Date(dateStr);
 
     if (isNaN(date.getTime())) return "-";
@@ -40,14 +40,7 @@ const NoticeDetailPage: React.FC = () => {
     const hour = String(date.getHours()).padStart(2, "0");
     const minute = String(date.getMinutes()).padStart(2, "0");
 
-    // 상세 페이지는 시간까지 보여주는 것이 좋습니다.
     return `${year}.${month}.${day} ${hour}:${minute}`;
-  };
-
-  // ✅ [추가] 수정 여부 확인 함수
-  const isEdited = (notice: NoticeDto) => {
-    if (!notice.updatedAt || !notice.createdAt) return false;
-    return notice.createdAt !== notice.updatedAt;
   };
 
   useEffect(() => {
@@ -87,6 +80,7 @@ const NoticeDetailPage: React.FC = () => {
     setDeleteError(null);
   };
 
+  // ✅ any -> unknown 변경 (Lint 에러 해결)
   const handleConfirmDelete = async () => {
     if (!notice) return;
     try {
@@ -95,7 +89,6 @@ const NoticeDetailPage: React.FC = () => {
       await noticeService.deleteNotice(notice.id);
       navigate("/admin/notices");
     } catch (err: unknown) {
-      // ✅ any -> unknown 변경
       const errorMessage =
         (err as any)?.response?.data?.message ||
         "공지사항 삭제에 실패했습니다.";
@@ -157,23 +150,10 @@ const NoticeDetailPage: React.FC = () => {
                   </div>
                   <div className="hidden sm:block w-px h-3 bg-gray-300"></div>
 
-                  {/* ✅ 날짜 및 수정됨 표시 영역 */}
                   <div className="flex items-center gap-1.5">
                     <CalendarDaysIcon className="h-4 w-4 text-gray-400" />
-                    <span className="flex items-center gap-2">
-                      {/* 작성일 표시 */}
-                      <span>{safeFormatDate(notice.createdAt)}</span>
-
-                      {/* 수정 여부 표시 */}
-                      {isEdited(notice) && (
-                        <span
-                          className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-md border border-gray-200"
-                          title={`최종 수정: ${safeFormatDate(notice.updatedAt)}`}
-                        >
-                          (수정됨)
-                        </span>
-                      )}
-                    </span>
+                    {/* ✅ 수정됨 표시 제거, 작성일만 깔끔하게 표시 */}
+                    <span>{safeFormatDate(notice.createdAt)}</span>
                   </div>
                 </div>
 
@@ -201,14 +181,16 @@ const NoticeDetailPage: React.FC = () => {
             <div className="prose prose-sm sm:prose max-w-none text-gray-800 break-words leading-relaxed overflow-hidden">
               <ReactMarkdown
                 components={{
-                  img: ({ node, ...props }) => (
+                  // ✅ node 파라미터 제거 (Lint 경고 해결)
+                  img: ({ ...props }) => (
                     <img
                       {...props}
                       className="rounded-xl w-full h-auto shadow-sm my-4"
                       alt={props.alt || "content-image"}
                     />
                   ),
-                  a: ({ node, ...props }) => (
+                  // ✅ node 파라미터 제거 (Lint 경고 해결)
+                  a: ({ ...props }) => (
                     <a
                       {...props}
                       className="text-indigo-600 hover:text-indigo-800 underline break-all font-medium"
