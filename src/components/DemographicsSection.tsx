@@ -81,7 +81,6 @@ export const DemographicsSection: React.FC<Props> = ({
 }) => {
   /**
    * 1) 유효 데이터 필터링 (인원이 0명인 연도 제외)
-   * - 차트에 표시할 때 빈 공간(0명)을 제거하기 위함
    */
   const validDistribution = useMemo(() => {
     return data.distribution.filter(
@@ -91,21 +90,21 @@ export const DemographicsSection: React.FC<Props> = ({
 
   /**
    * 2) 차트 너비 동적 계산
-   * - 필터링된 데이터 개수(validDistribution.length)를 기준으로 너비 설정
    */
   const minChartWidth = Math.max(validDistribution.length * 45, 800);
 
-  // 3) 미배정 인원 계산 (음수 방지)
+  /**
+   * 3) 미배정 인원 계산 (수정됨)
+   * - 기존 오류: 임원(executiveCount)을 중복 차감하여 0 또는 음수가 나옴
+   * - 수정: 전체 인원 - 셀 배정 인원 = 미배정 인원
+   */
   const unassignedCount = Math.max(
     0,
-    data.totalMemberCount - data.cellMemberCount - (data.executiveCount ?? 0),
+    data.totalMemberCount - data.cellMemberCount,
   );
 
   /**
    * 4) 그룹별 성별 상세 집계
-   * - 정책: 한국나이 28세 이하 = 대학부 / 29세 이상 = 청년부
-   * - 한국나이 공식: (현재연도 - 출생연도) + 1
-   * - 통계는 전체 데이터(data.distribution)를 기준으로 집계합니다.
    */
   const groupStats = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -230,7 +229,6 @@ export const DemographicsSection: React.FC<Props> = ({
         <div className="w-full overflow-x-auto pb-2 scrollbar-hide">
           <div style={{ height: "400px", minWidth: `${minChartWidth}px` }}>
             <ResponsiveContainer width="100%" height="100%">
-              {/* 변경점: data에 validDistribution 전달 */}
               <BarChart
                 data={validDistribution}
                 margin={{ top: 30, right: 10, left: 0, bottom: 5 }}
