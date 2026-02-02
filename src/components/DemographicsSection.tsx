@@ -146,7 +146,7 @@ export const DemographicsSection: React.FC<Props> = ({
         />
 
         <SummaryCard
-          label="임원단"
+          label="관리자"
           value={data.executiveCount ?? 0}
           icon={<FaCrown className="text-purple-400" />}
           highlightColor="text-purple-700"
