@@ -83,7 +83,7 @@ const AdminUsersPage: React.FC = () => {
 
       setSearchParams(params, { replace: true });
     },
-    [filters, sortConfig, currentPage, setSearchParams]
+    [filters, sortConfig, currentPage, setSearchParams],
   );
 
   // --- 멤버 목록 조회 ---
@@ -190,7 +190,7 @@ const AdminUsersPage: React.FC = () => {
 
   const cellOptions = useMemo(
     () => cells.map((c) => ({ value: c.id, label: c.name })),
-    [cells]
+    [cells],
   );
 
   // --- 핸들러 ---
@@ -227,7 +227,7 @@ const AdminUsersPage: React.FC = () => {
       fetchMembers();
     } catch (err: any) {
       setDeleteError(
-        err?.response?.data?.message || "멤버 삭제에 실패했습니다."
+        err?.response?.data?.message || "멤버 삭제에 실패했습니다.",
       );
     }
   };
@@ -370,7 +370,7 @@ const AdminUsersPage: React.FC = () => {
                 className="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white shadow-sm"
               >
                 <option value="all">모든 역할</option>
-                <option value="EXECUTIVE">임원</option>
+                <option value="EXECUTIVE">관리자</option>
                 <option value="CELL_LEADER">셀장</option>
                 <option value="MEMBER">셀원</option>
               </select>
@@ -404,7 +404,7 @@ const AdminUsersPage: React.FC = () => {
                 memberPage.content.map((member) => {
                   const displayName = formatDisplayName(
                     member,
-                    memberPage.content
+                    memberPage.content,
                   );
                   const cellName =
                     member.role === "CELL_LEADER"
@@ -448,8 +448,8 @@ const AdminUsersPage: React.FC = () => {
                               member.role === "EXECUTIVE"
                                 ? "bg-red-100 text-red-700"
                                 : member.role === "CELL_LEADER"
-                                ? "bg-yellow-100 text-yellow-700"
-                                : "bg-green-100 text-green-700"
+                                  ? "bg-yellow-100 text-yellow-700"
+                                  : "bg-green-100 text-green-700"
                             }`}
                           >
                             {translateRole(member.role)}
@@ -582,8 +582,8 @@ const AdminUsersPage: React.FC = () => {
                                 member.role === "EXECUTIVE"
                                   ? "bg-red-100 text-red-700"
                                   : member.role === "CELL_LEADER"
-                                  ? "bg-yellow-100 text-yellow-700"
-                                  : "bg-green-100 text-green-700"
+                                    ? "bg-yellow-100 text-yellow-700"
+                                    : "bg-green-100 text-green-700"
                               }`}
                             >
                               {translateRole(member.role)}
@@ -665,7 +665,7 @@ const AdminUsersPage: React.FC = () => {
                 <span className="font-bold text-gray-900">
                   {memberToDelete && memberPage
                     ? formatDisplayName(memberToDelete, memberPage.content)
-                    : memberToDelete?.name ?? ""}
+                    : (memberToDelete?.name ?? "")}
                 </span>
                 &quot; 멤버를 삭제하시겠습니까?
               </p>

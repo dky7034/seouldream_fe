@@ -118,7 +118,7 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
 
   // ✅ [수정] 접근 가능 여부 체크 함수 (단순 boolean 반환)
   const canAccessDetail = (memberId: number) => {
-    if (user.role === "EXECUTIVE") return true; // 임원은 모두 가능
+    if (user.role === "EXECUTIVE") return true; // 관리자 모두 가능
     if (user.role === "CELL_LEADER") {
       return memberId === user.memberId; // 셀장은 본인만 가능
     }
@@ -221,8 +221,8 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                               member.role === "EXECUTIVE"
                                 ? "bg-red-50 text-red-700"
                                 : member.role === "CELL_LEADER"
-                                ? "bg-yellow-50 text-yellow-700"
-                                : "bg-green-50 text-green-700"
+                                  ? "bg-yellow-50 text-yellow-700"
+                                  : "bg-green-50 text-green-700"
                             }`}
                           >
                             {translateRole(member.role)}
@@ -313,7 +313,7 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                     : member.name;
                   const displayBirthDate = safeFormatDate(member.birthDate);
                   const displayAssignedDate = safeFormatDate(
-                    member.cellAssignmentDate
+                    member.cellAssignmentDate,
                   );
                   const ageDisplay =
                     member.age !== undefined && member.age !== null
@@ -356,8 +356,8 @@ const CellMembersManager: React.FC<CellMembersManagerProps> = ({
                             member.role === "EXECUTIVE"
                               ? "bg-red-100 text-red-800"
                               : member.role === "CELL_LEADER"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : "bg-green-100 text-green-800"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-green-100 text-green-800"
                           }`}
                         >
                           {translateRole(member.role)}

@@ -111,7 +111,7 @@ function App() {
                 element={<NoticeDetailPage />}
               />
 
-              {/* --- [임원(EXECUTIVE) 전용] --- */}
+              {/* --- [관리자(EXECUTIVE) 전용] --- */}
               <Route element={<ExecOnlyRoute />}>
                 {/* 통계 및 리포트 페이지 */}
                 <Route path="/admin/statistics" element={<StatisticsPage />} />

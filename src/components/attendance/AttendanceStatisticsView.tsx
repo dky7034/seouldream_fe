@@ -198,9 +198,9 @@ const AttendanceStatisticsView: React.FC<AttendanceStatisticsViewProps> = ({
   const fetchSemesters = useCallback(async () => {
     try {
       // ✅ [수정] 권한별 로딩 정책 분리
-      // 임원: 모든 학기 (과거 분석용)
+      // 관리자: 모든 학기 (과거 분석용)
       // 셀장: 활성 학기만 (현재 관리용)
-      const fetchActiveOnly = !isExecutive; // 셀장이면 true, 임원이면 false
+      const fetchActiveOnly = !isExecutive; // 셀장이면 true, 관리자면 false
 
       const data = await semesterService.getAllSemesters(fetchActiveOnly);
 
