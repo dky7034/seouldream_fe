@@ -1022,7 +1022,7 @@ const AdminAttendancesPage: React.FC = () => {
                 필터 초기화
               </button>
 
-              <label className="flex items-center gap-2 cursor-pointer select-none group">
+              {/* <label className="flex items-center gap-2 cursor-pointer select-none group">
                 <div className="relative">
                   <input
                     type="checkbox"
@@ -1034,10 +1034,10 @@ const AdminAttendancesPage: React.FC = () => {
                   />
                   <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
                 </div>
-                {/* <span className="text-sm font-bold text-gray-500 group-hover:text-gray-800 transition-colors whitespace-nowrap">
+                <span className="text-sm font-bold text-gray-500 group-hover:text-gray-800 transition-colors whitespace-nowrap">
                   임원단 포함
-                </span> */}
-              </label>
+                </span>
+              </label> */}
             </div>
           </div>
         </div>
