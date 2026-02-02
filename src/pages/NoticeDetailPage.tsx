@@ -1,3 +1,4 @@
+// src/pages/NoticeDetailPage.tsx
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { noticeService } from "../services/noticeService";
@@ -8,7 +9,7 @@ import {
   MapPinIcon,
   UserCircleIcon,
   CalendarDaysIcon,
-} from "@heroicons/react/24/solid"; // 아이콘 추가
+} from "@heroicons/react/24/solid";
 import ReactMarkdown from "react-markdown";
 
 const NoticeDetailPage: React.FC = () => {
@@ -24,6 +25,30 @@ const NoticeDetailPage: React.FC = () => {
     useState<boolean>(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<boolean>(false);
+
+  // ✅ [추가] 날짜 포맷팅 함수 (시간 포함 & Z 제거로 밀림 방지)
+  const safeFormatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return "-";
+    // 서버가 주는 시간 그대로 사용 (KST 가정)
+    const date = new Date(dateStr);
+
+    if (isNaN(date.getTime())) return "-";
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hour = String(date.getHours()).padStart(2, "0");
+    const minute = String(date.getMinutes()).padStart(2, "0");
+
+    // 상세 페이지는 시간까지 보여주는 것이 좋습니다.
+    return `${year}.${month}.${day} ${hour}:${minute}`;
+  };
+
+  // ✅ [추가] 수정 여부 확인 함수
+  const isEdited = (notice: NoticeDto) => {
+    if (!notice.updatedAt || !notice.createdAt) return false;
+    return notice.createdAt !== notice.updatedAt;
+  };
 
   useEffect(() => {
     const fetchNotice = async () => {
@@ -69,10 +94,12 @@ const NoticeDetailPage: React.FC = () => {
       setDeleteError(null);
       await noticeService.deleteNotice(notice.id);
       navigate("/admin/notices");
-    } catch (err: any) {
-      setDeleteError(
-        err?.response?.data?.message || "공지사항 삭제에 실패했습니다."
-      );
+    } catch (err: unknown) {
+      // ✅ any -> unknown 변경
+      const errorMessage =
+        (err as any)?.response?.data?.message ||
+        "공지사항 삭제에 실패했습니다.";
+      setDeleteError(errorMessage);
     } finally {
       setDeleting(false);
     }
@@ -108,13 +135,11 @@ const NoticeDetailPage: React.FC = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen pb-10">
-      {/* Container: 모바일 여백(px-4) vs 데스크탑 여백(px-6) 조정 */}
       <div className="container mx-auto px-4 py-6 sm:px-6 sm:py-10 max-w-4xl">
         <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-2xl overflow-hidden">
           <div className="px-5 py-6 sm:px-10 sm:py-10">
-            {/* 1. Header Section 개선 */}
+            {/* Header Section */}
             <div className="border-b border-gray-100 pb-6 mb-6">
-              {/* Title: break-keep 적용으로 한글 단어 잘림 방지 */}
               <h1 className="flex items-start text-xl sm:text-3xl font-bold text-gray-900 leading-snug break-keep mb-4">
                 {notice.pinned && (
                   <MapPinIcon className="h-6 w-6 text-indigo-500 mr-2 flex-shrink-0 mt-0.5" />
@@ -122,9 +147,7 @@ const NoticeDetailPage: React.FC = () => {
                 {notice.title}
               </h1>
 
-              {/* Meta & Buttons Wrapper: 모바일에서는 위아래 배치 대신, 양옆 배치를 시도하거나 깔끔하게 줄바꿈 */}
               <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-                {/* Metadata: 아이콘 활용하여 가독성 높임 */}
                 <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs sm:text-sm text-gray-500">
                   <div className="flex items-center gap-1.5">
                     <UserCircleIcon className="h-4 w-4 text-gray-400" />
@@ -132,15 +155,29 @@ const NoticeDetailPage: React.FC = () => {
                       {notice.createdBy?.name ?? "알 수 없음"}
                     </span>
                   </div>
-                  <div className="hidden sm:block w-px h-3 bg-gray-300"></div>{" "}
-                  {/* 모바일엔 숨기고 데스크탑엔 구분선 */}
+                  <div className="hidden sm:block w-px h-3 bg-gray-300"></div>
+
+                  {/* ✅ 날짜 및 수정됨 표시 영역 */}
                   <div className="flex items-center gap-1.5">
                     <CalendarDaysIcon className="h-4 w-4 text-gray-400" />
-                    <span>{new Date(notice.createdAt).toLocaleString()}</span>
+                    <span className="flex items-center gap-2">
+                      {/* 작성일 표시 */}
+                      <span>{safeFormatDate(notice.createdAt)}</span>
+
+                      {/* 수정 여부 표시 */}
+                      {isEdited(notice) && (
+                        <span
+                          className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-md border border-gray-200"
+                          title={`최종 수정: ${safeFormatDate(notice.updatedAt)}`}
+                        >
+                          (수정됨)
+                        </span>
+                      )}
+                    </span>
                   </div>
                 </div>
 
-                {/* Buttons: 임원일 때만 표시 */}
+                {/* Buttons */}
                 {isExecutive && (
                   <div className="flex gap-2 shrink-0">
                     <button
@@ -160,22 +197,21 @@ const NoticeDetailPage: React.FC = () => {
               </div>
             </div>
 
-            {/* 2. Content Section 개선 */}
-            {/* prose-sm: 모바일 폰트 크기 최적화, break-all/break-words 조화 */}
+            {/* Content Section */}
             <div className="prose prose-sm sm:prose max-w-none text-gray-800 break-words leading-relaxed overflow-hidden">
               <ReactMarkdown
                 components={{
                   img: ({ node, ...props }) => (
                     <img
                       {...props}
-                      className="rounded-xl w-full h-auto shadow-sm my-4" // 모바일에서 이미지 꽉 차게
+                      className="rounded-xl w-full h-auto shadow-sm my-4"
                       alt={props.alt || "content-image"}
                     />
                   ),
                   a: ({ node, ...props }) => (
                     <a
                       {...props}
-                      className="text-indigo-600 hover:text-indigo-800 underline break-all font-medium" // 긴 링크 줄바꿈 처리
+                      className="text-indigo-600 hover:text-indigo-800 underline break-all font-medium"
                       target="_blank"
                       rel="noopener noreferrer"
                     />
@@ -188,11 +224,10 @@ const NoticeDetailPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 3. Bottom Button 개선 */}
+        {/* Bottom Button */}
         <div className="mt-6 text-center sm:text-left">
           <button
             onClick={() => navigate("/admin/notices")}
-            // 모바일(기본): w-full (터치하기 쉽게), 데스크탑(sm): w-auto
             className="w-full sm:w-auto bg-white text-gray-700 px-6 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 text-sm font-bold shadow-sm transition-all"
           >
             목록으로 돌아가기
@@ -200,7 +235,7 @@ const NoticeDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Delete Modal: 모바일 폭 대응 (w-[90%] or mx-4) */}
+      {/* Delete Modal */}
       {showDeleteConfirmModal && (
         <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-sm transform transition-all">
