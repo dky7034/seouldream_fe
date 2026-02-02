@@ -5,7 +5,7 @@ import type { NoticeTarget } from "../types";
 export const translateRole = (role: string): string => {
   switch (role) {
     case "EXECUTIVE":
-      return "임원단";
+      return "관리자";
     case "CELL_LEADER":
       return "셀장";
     case "MEMBER":
@@ -19,7 +19,7 @@ export const translateRole = (role: string): string => {
 export const NOTICE_TARGET_MAP: { [key in NoticeTarget]: string } = {
   ALL: "전체",
   CELL_LEADER: "셀장",
-  EXECUTIVE: "임원단",
+  EXECUTIVE: "관리자",
   CELL: "특정 셀",
 };
 
@@ -30,7 +30,7 @@ export const translateNoticeTarget = (target: NoticeTarget): string => {
 // 유저가 특정 role 중 하나라도 갖고 있는지 체크
 export function checkUserRole(
   user: { role?: string | null } | null | undefined,
-  allowedRoles: string[]
+  allowedRoles: string[],
 ): boolean {
   if (!user || !user.role) return false;
   return allowedRoles.includes(user.role);

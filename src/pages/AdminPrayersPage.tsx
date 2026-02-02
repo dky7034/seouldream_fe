@@ -106,7 +106,7 @@ const AdminPrayersPage: React.FC = () => {
     setSortConfig((prev) =>
       prev.key === key && prev.direction === direction
         ? prev
-        : { key, direction }
+        : { key, direction },
     );
     setCurrentPage((prev) => (prev === safePage ? prev : safePage));
   }, [searchParams]);
@@ -224,8 +224,8 @@ const AdminPrayersPage: React.FC = () => {
 
     const cleanedParams = Object.fromEntries(
       Object.entries(params).filter(
-        ([, v]) => v !== null && v !== "" && v !== undefined
-      )
+        ([, v]) => v !== null && v !== "" && v !== undefined,
+      ),
     ) as GetPrayersParams;
 
     return cleanedParams;
@@ -256,7 +256,7 @@ const AdminPrayersPage: React.FC = () => {
       (viewMode === "memberSummary" || viewMode === "cellSummary")
     ) {
       setLoading(false);
-      setError("멤버/셀 요약 뷰는 임원단(EXECUTIVE)만 조회할 수 있습니다.");
+      setError("멤버/셀 요약 뷰는 관리자(EXECUTIVE)만 조회할 수 있습니다.");
       return;
     }
     if (isCellLeader && !user.cellId) {
@@ -436,7 +436,7 @@ const AdminPrayersPage: React.FC = () => {
 
   const handleUnitValueClick = (
     unit: "month" | "quarter" | "half",
-    value: number
+    value: number,
   ) => {
     setFilters((prev) => ({
       ...prev,
@@ -477,7 +477,7 @@ const AdminPrayersPage: React.FC = () => {
   const periodSummary = useMemo(() => {
     if (filterType === "range" && filters.startDate && filters.endDate) {
       return `기간: ${formatShortDate(filters.startDate)} ~ ${formatShortDate(
-        filters.endDate
+        filters.endDate,
       )}`;
     }
 
@@ -598,7 +598,7 @@ const AdminPrayersPage: React.FC = () => {
       | { id: number; name: string; birthDate?: string }
       | MemberDto
       | null
-      | undefined
+      | undefined,
   ): string => {
     if (!memberLike) return "";
     return memberLike.name;
@@ -766,7 +766,7 @@ const AdminPrayersPage: React.FC = () => {
                     onChange={(e) =>
                       handleFilterChange(
                         "year",
-                        e.target.value ? Number(e.target.value) : ""
+                        e.target.value ? Number(e.target.value) : "",
                       )
                     }
                     className="mt-1 block w-full border-gray-300 rounded-md shadow-sm h-[42px] px-3 text-sm"
@@ -865,7 +865,7 @@ const AdminPrayersPage: React.FC = () => {
                   onChange={(val) =>
                     handleFilterChange(
                       "cell",
-                      val != null ? String(val) : "all"
+                      val != null ? String(val) : "all",
                     )
                   }
                   placeholder="셀 필터"
@@ -880,7 +880,7 @@ const AdminPrayersPage: React.FC = () => {
                   onChange={(val) =>
                     handleFilterChange(
                       "member",
-                      val != null ? String(val) : "all"
+                      val != null ? String(val) : "all",
                     )
                   }
                   placeholder="멤버 필터"
@@ -895,7 +895,7 @@ const AdminPrayersPage: React.FC = () => {
                   onChange={(val) =>
                     handleFilterChange(
                       "creator",
-                      val != null ? String(val) : "all"
+                      val != null ? String(val) : "all",
                     )
                   }
                   placeholder="작성자 필터"
@@ -981,7 +981,7 @@ const AdminPrayersPage: React.FC = () => {
                                     type="button"
                                     onClick={() =>
                                       navigate(
-                                        `/admin/prayers/members/${prayer.member.id}`
+                                        `/admin/prayers/members/${prayer.member.id}`,
                                       )
                                     }
                                     className="text-indigo-600 hover:text-indigo-900 underline-offset-2 hover:underline"
@@ -999,7 +999,7 @@ const AdminPrayersPage: React.FC = () => {
                                     navigate(
                                       `/admin/prayers/cells/${
                                         prayer.member!.cell!.id
-                                      }`
+                                      }`,
                                     )
                                   }
                                   className="mt-0.5 block text-[11px] text-gray-500 underline-offset-2 hover:underline text-left"
@@ -1014,7 +1014,7 @@ const AdminPrayersPage: React.FC = () => {
                               </p>
                               <p className="text-[11px] text-gray-700">
                                 {new Date(
-                                  prayer.createdAt
+                                  prayer.createdAt,
                                 ).toLocaleDateString()}
                               </p>
                               {prayer.isDeleted && (
@@ -1044,7 +1044,7 @@ const AdminPrayersPage: React.FC = () => {
                               </p>
                               <p className="text-[11px] text-gray-700 font-medium">
                                 {getDisplayNameForMember(
-                                  prayer.createdBy as any
+                                  prayer.createdBy as any,
                                 ) || "-"}
                               </p>
                             </div>
@@ -1119,7 +1119,7 @@ const AdminPrayersPage: React.FC = () => {
                                       type="button"
                                       onClick={() =>
                                         navigate(
-                                          `/admin/prayers/members/${prayer.member.id}`
+                                          `/admin/prayers/members/${prayer.member.id}`,
                                         )
                                       }
                                       className="text-indigo-600 hover:text-indigo-900 underline-offset-2 hover:underline text-left"
@@ -1134,7 +1134,7 @@ const AdminPrayersPage: React.FC = () => {
                                           navigate(
                                             `/admin/prayers/cells/${
                                               prayer.member!.cell!.id
-                                            }`
+                                            }`,
                                           )
                                         }
                                         className="mt-0.5 text-[11px] text-gray-500 underline-offset-2 hover:underline text-left"
@@ -1157,12 +1157,12 @@ const AdminPrayersPage: React.FC = () => {
                               </td>
                               <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
                                 {getDisplayNameForMember(
-                                  prayer.createdBy as any
+                                  prayer.createdBy as any,
                                 )}
                               </td>
                               <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
                                 {new Date(
-                                  prayer.createdAt
+                                  prayer.createdAt,
                                 ).toLocaleDateString()}
                               </td>
                               <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
@@ -1239,7 +1239,7 @@ const AdminPrayersPage: React.FC = () => {
                                 type="button"
                                 onClick={() =>
                                   navigate(
-                                    `/admin/prayers/members/${row.memberId}`
+                                    `/admin/prayers/members/${row.memberId}`,
                                   )
                                 }
                                 className="text-indigo-600 hover:text-indigo-900 underline-offset-2 hover:underline"
@@ -1253,7 +1253,7 @@ const AdminPrayersPage: React.FC = () => {
                                   type="button"
                                   onClick={() =>
                                     navigate(
-                                      `/admin/prayers/cells/${row.cellId}`
+                                      `/admin/prayers/cells/${row.cellId}`,
                                     )
                                   }
                                   className="text-gray-700 underline-offset-2 hover:underline"
@@ -1269,7 +1269,7 @@ const AdminPrayersPage: React.FC = () => {
                             </td>
                             <td className="px-3 sm:px-6 py-2 sm:py-3 whitespace-nowrap">
                               {new Date(
-                                row.latestCreatedAt
+                                row.latestCreatedAt,
                               ).toLocaleDateString()}
                             </td>
                           </tr>
@@ -1335,7 +1335,7 @@ const AdminPrayersPage: React.FC = () => {
                             </td>
                             <td className="px-3 sm:px-6 py-2 sm:py-3 whitespace-nowrap">
                               {new Date(
-                                row.latestCreatedAt
+                                row.latestCreatedAt,
                               ).toLocaleDateString()}
                             </td>
                           </tr>

@@ -461,7 +461,7 @@ const DashboardPage: React.FC = () => {
   const isExecutive = user?.role === "EXECUTIVE";
   const isCellLeader = user?.role === "CELL_LEADER";
 
-  // 임원단 학기 목록 로딩 & 자동 학기 선택
+  // 관리자 학기 목록 로딩 & 자동 학기 선택
   useEffect(() => {
     let alive = true;
     if (!isExecutive) return;

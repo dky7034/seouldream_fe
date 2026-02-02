@@ -102,7 +102,7 @@ const calculateMemberStats = (
   member: CellMemberAttendanceSummaryDto,
   attendanceMap: Map<string, "PRESENT" | "ABSENT">,
   startDate: string,
-  endDate: string
+  endDate: string,
 ) => {
   if (!startDate || !endDate) return { present: 0, absent: 0, unchecked: 0 };
   const pStart = parseLocal(startDate);
@@ -116,7 +116,7 @@ const calculateMemberStats = (
   const effectiveEnd = pEnd < today ? pEnd : today;
 
   const baseDateStr = normalizeISODate(
-    member.cellAssignmentDate || `${member.joinYear}-01-01`
+    member.cellAssignmentDate || `${member.joinYear}-01-01`,
   );
   const baseDate = parseLocal(baseDateStr) || new Date(member.joinYear, 0, 1);
   const effectiveStart = pStart < baseDate ? baseDate : pStart;
@@ -222,7 +222,7 @@ const MatrixStatusLegend: React.FC<{ label: string }> = React.memo(
         </div>
       </div>
     </div>
-  )
+  ),
 );
 
 // ───────────────── [컴포넌트] CellMemberList (수정됨: 본인만 클릭 허용) ─────────────────
@@ -241,10 +241,10 @@ const CellMemberList: React.FC<{
       () =>
         members && members.length > 0
           ? [...members].sort((a, b) =>
-              a.memberName.localeCompare(b.memberName, "ko")
+              a.memberName.localeCompare(b.memberName, "ko"),
             )
           : [],
-      [members]
+      [members],
     );
 
     const attendanceMap = useMemo(() => {
@@ -269,7 +269,7 @@ const CellMemberList: React.FC<{
           m,
           attendanceMap,
           startDate,
-          endDate
+          endDate,
         );
         statsMap.set(m.memberId, stats);
       });
@@ -499,7 +499,7 @@ const CellMemberList: React.FC<{
         </div>
       </div>
     );
-  }
+  },
 );
 
 // --------------------
@@ -518,18 +518,18 @@ const CellLeaderDashboard: React.FC = () => {
 
   // 동명이인 처리를 위한 맵
   const [displayNameMap, setDisplayNameMap] = useState<Map<number, string>>(
-    new Map()
+    new Map(),
   );
 
   // Matrix & Date States
   const [matrixDate, setMatrixDate] = useState(new Date());
   const [matrixAttendances, setMatrixAttendances] = useState<AttendanceDto[]>(
-    []
+    [],
   );
   const [matrixLoading, setMatrixLoading] = useState(false);
 
   const [activeSemester, setActiveSemester] = useState<SemesterDto | null>(
-    null
+    null,
   );
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const [unitType, setUnitType] = useState<UnitType>("semester");
@@ -551,14 +551,14 @@ const CellLeaderDashboard: React.FC = () => {
         // ✅ 최신순 정렬 (내림차순)
         const sortedData = [...data].sort(
           (a, b) =>
-            new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+            new Date(b.startDate).getTime() - new Date(a.startDate).getTime(),
         );
         setSemesters(sortedData);
 
         if (sortedData.length > 0) {
           const todayStr = toLocalISODate(new Date());
           const currentSemester = sortedData.find(
-            (sem) => todayStr >= sem.startDate && todayStr <= sem.endDate
+            (sem) => todayStr >= sem.startDate && todayStr <= sem.endDate,
           );
           setActiveSemester(currentSemester || sortedData[0]);
         }
@@ -599,7 +599,7 @@ const CellLeaderDashboard: React.FC = () => {
               id: item.id,
               name: item.name,
               birthDate: item.birthDate,
-            }))
+            })),
           );
           map.set(m.id, formattedName);
         });
@@ -620,7 +620,7 @@ const CellLeaderDashboard: React.FC = () => {
       setSelectedMonth(null);
       setUnitType("semester");
     },
-    [semesters]
+    [semesters],
   );
 
   // 2) 기간 계산
@@ -748,16 +748,16 @@ const CellLeaderDashboard: React.FC = () => {
       ]);
 
       const sortedMembers = (memberList ?? []).sort((a, b) =>
-        a.memberName.localeCompare(b.memberName, "ko")
+        a.memberName.localeCompare(b.memberName, "ko"),
       );
       setMembers(sortedMembers);
 
       const thisWeekNoticeCount = noticesPage.content.filter((n: any) =>
-        isDateInThisWeek(n.createdAt)
+        isDateInThisWeek(n.createdAt),
       ).length;
 
       const thisWeekPrayerCount = prayersPage.content.filter((p: any) =>
-        isDateInThisWeek(p.createdAt)
+        isDateInThisWeek(p.createdAt),
       ).length;
 
       const mappedNotices: RecentNoticeInfo[] = noticesPage.content
@@ -865,12 +865,12 @@ const CellLeaderDashboard: React.FC = () => {
       const currentMonthDate = new Date(
         today.getFullYear(),
         today.getMonth(),
-        1
+        1,
       );
       const startMonthDate = new Date(
         semStart.getFullYear(),
         semStart.getMonth(),
-        1
+        1,
       );
       const endMonthDate = new Date(semEnd.getFullYear(), semEnd.getMonth(), 1);
       if (
@@ -884,7 +884,7 @@ const CellLeaderDashboard: React.FC = () => {
         setMatrixDate(semStart);
       }
     },
-    [activeSemester]
+    [activeSemester],
   );
 
   const handleMonthSelect = useCallback((m: number) => setSelectedMonth(m), []);
@@ -950,7 +950,7 @@ const CellLeaderDashboard: React.FC = () => {
 
       const activeMembers = members.filter((m) => {
         const baseDateStr = normalizeISODate(
-          m.cellAssignmentDate || `${m.joinYear}-01-01`
+          m.cellAssignmentDate || `${m.joinYear}-01-01`,
         );
         const base = parseLocal(baseDateStr) || new Date(m.joinYear, 0, 1);
         base.setHours(0, 0, 0, 0);
@@ -981,7 +981,7 @@ const CellLeaderDashboard: React.FC = () => {
           셀 배정 대기 중
         </h2>
         <p className="text-gray-500 text-center mb-6 leading-relaxed">
-          관리자(임원단)로부터 셀장 권한은 부여받았으나,
+          관리자로부터 셀장 권한은 부여받았으나,
           <br />
           아직 담당 셀이 지정되지 않았습니다.
           <br />

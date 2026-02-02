@@ -4,7 +4,7 @@ import { Outlet, useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
 const roleMap: Record<string, string> = {
-  EXECUTIVE: "임원단",
+  EXECUTIVE: "관리자",
   CELL_LEADER: "셀장",
   MEMBER: "셀원",
 };
