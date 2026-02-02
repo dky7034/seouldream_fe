@@ -20,7 +20,7 @@ import {
   MegaphoneIcon,
   PlusIcon,
   MapPinIcon,
-  ExclamationCircleIcon, // ✅ 에러 표시용 아이콘 사용
+  ExclamationCircleIcon, // ✅ 에러 표시용 아이콘 활성화
 } from "@heroicons/react/24/solid";
 
 type SortKey = "createdAt";
@@ -36,14 +36,12 @@ const AdminNoticesPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // ❌ [삭제] currentMonth는 사용하지 않으므로 삭제 (Lint 에러 해결)
-  // const now = new Date();
-  // const currentMonth = now.getMonth() + 1;
+  // ❌ [삭제] currentMonth 변수 삭제 (Lint 에러 해결)
 
   const [noticePage, setNoticePage] = useState<Page<NoticeDto> | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // ✅ [사용] error 상태를 화면에 렌더링하도록 수정 (Lint 에러 해결)
+  // ✅ [사용] error 상태를 UI에 표시하도록 수정 (Lint 에러 해결)
   const [error, setError] = useState<string | null>(null);
 
   const [availableYears, setAvailableYears] = useState<number[]>([]);
@@ -56,15 +54,19 @@ const AdminNoticesPage: React.FC = () => {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
 
-  // ✅ [사용] 학기 데이터가 없으면 학기 버튼 비활성화에 사용 (Lint 에러 해결)
+  // ✅ [사용] 학기 데이터 유무 확인용 변수 (Lint 에러 해결)
   const hasActiveSemesters = semesters.length > 0;
 
+  // ✅ [수정] 날짜 포맷팅 함수: Z 제거 (2월 3일로 밀리는 문제 해결)
   const safeFormatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return "-";
-    const targetStr =
-      dateStr.includes("T") && !dateStr.endsWith("Z") ? `${dateStr}Z` : dateStr;
 
-    const date = new Date(targetStr);
+    // 서버에서 이미 KST(한국 시간) 문자열을 준다고 가정하고 그대로 파싱합니다.
+    // 만약 "Z"를 강제로 붙이면 브라우저가 UTC로 인식하여 +9시간을 더해버립니다.
+    const date = new Date(dateStr);
+
+    if (isNaN(date.getTime())) return "-";
+
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
@@ -213,7 +215,6 @@ const AdminNoticesPage: React.FC = () => {
       const data = await noticeService.getAllNotices(params);
       setNoticePage(data);
     } catch (err) {
-      // catch에서 error 변수는 여기서만 쓰이고 state error는 setError로 설정됨
       setError("공지사항 목록을 불러오는 데 실패했습니다.");
     } finally {
       setLoading(false);
@@ -254,7 +255,7 @@ const AdminNoticesPage: React.FC = () => {
     setShowDeleteConfirm(true);
   };
 
-  // ✅ [수정] any 제거 및 unknown 타입 사용 (Lint 에러 해결)
+  // ✅ [수정] any 제거 -> unknown 타입 사용 (Lint 에러 해결)
   const handleConfirmDelete = async () => {
     if (!noticeToDelete) return;
     setDeleteError(null);
@@ -265,6 +266,7 @@ const AdminNoticesPage: React.FC = () => {
       fetchNotices();
     } catch (err: unknown) {
       console.error("삭제 실패:", err);
+      // 타입 가드 사용하여 안전하게 에러 메시지 추출
       const errorMessage = (err as any)?.response?.data?.message || "삭제 실패";
       setDeleteError(errorMessage);
     }
@@ -369,7 +371,7 @@ const AdminNoticesPage: React.FC = () => {
           )}
         </div>
 
-        {/* ✅ [추가] error 변수 사용: 목록 로딩 에러 표시 (Lint 에러 해결) */}
+        {/* ✅ [추가] error UI 렌더링 (Lint 에러 해결) */}
         {error && (
           <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm font-bold text-red-700 flex items-center gap-2">
             <ExclamationCircleIcon className="h-5 w-5" /> {error}
@@ -447,7 +449,7 @@ const AdminNoticesPage: React.FC = () => {
                             "",
                           );
                         }}
-                        // ✅ [수정] hasActiveSemesters 사용: 학기 버튼 비활성화 로직 추가 (Lint 에러 해결)
+                        // ✅ [사용] hasActiveSemesters 사용: 학기가 없으면 버튼 비활성화 (Lint 에러 해결)
                         disabled={type === "semester" && !hasActiveSemesters}
                         className={`px-3 py-2 text-sm font-bold rounded-lg border 
                           ${
@@ -706,7 +708,7 @@ const AdminNoticesPage: React.FC = () => {
                   취소
                 </button>
                 <button
-                  onClick={handleConfirmDelete} // ✅ [사용] 함수가 버튼에 확실히 연결됨 (Lint 에러 해결)
+                  onClick={handleConfirmDelete} // ✅ [사용] 함수 연결 확인 (Lint 에러 해결)
                   className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700"
                 >
                   삭제하기
