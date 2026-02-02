@@ -79,19 +79,33 @@ export const DemographicsSection: React.FC<Props> = ({
   data,
   onUnassignedClick,
 }) => {
-  // 1) 차트 너비 동적 계산 (데이터가 많으면 가로 스크롤)
-  const minChartWidth = Math.max(data.distribution.length * 45, 800);
+  /**
+   * 1) 유효 데이터 필터링 (인원이 0명인 연도 제외)
+   * - 차트에 표시할 때 빈 공간(0명)을 제거하기 위함
+   */
+  const validDistribution = useMemo(() => {
+    return data.distribution.filter(
+      (item) => item.maleCount + item.femaleCount > 0,
+    );
+  }, [data.distribution]);
 
-  // 2) 미배정 인원 계산 (음수 방지)
+  /**
+   * 2) 차트 너비 동적 계산
+   * - 필터링된 데이터 개수(validDistribution.length)를 기준으로 너비 설정
+   */
+  const minChartWidth = Math.max(validDistribution.length * 45, 800);
+
+  // 3) 미배정 인원 계산 (음수 방지)
   const unassignedCount = Math.max(
     0,
     data.totalMemberCount - data.cellMemberCount - (data.executiveCount ?? 0),
   );
 
   /**
-   * 3) 그룹별 성별 상세 집계 (distribution 데이터 기반)
+   * 4) 그룹별 성별 상세 집계
    * - 정책: 한국나이 28세 이하 = 대학부 / 29세 이상 = 청년부
    * - 한국나이 공식: (현재연도 - 출생연도) + 1
+   * - 통계는 전체 데이터(data.distribution)를 기준으로 집계합니다.
    */
   const groupStats = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -186,7 +200,7 @@ export const DemographicsSection: React.FC<Props> = ({
             subLabel="28세 이하"
             maleCount={groupStats.daehak.male}
             femaleCount={groupStats.daehak.female}
-            totalCount={groupStats.daehak.total} // 또는 data.countDaehak 사용 가능
+            totalCount={groupStats.daehak.total}
             colorClass="bg-indigo-50 border-indigo-100"
             iconColor="text-indigo-600"
             badgeColor="bg-indigo-100 text-indigo-700"
@@ -196,7 +210,7 @@ export const DemographicsSection: React.FC<Props> = ({
             subLabel="29세 이상"
             maleCount={groupStats.cheongnyeon.male}
             femaleCount={groupStats.cheongnyeon.female}
-            totalCount={groupStats.cheongnyeon.total} // 또는 data.countCheongnyeon 사용 가능
+            totalCount={groupStats.cheongnyeon.total}
             colorClass="bg-teal-50 border-teal-100"
             iconColor="text-teal-600"
             badgeColor="bg-teal-100 text-teal-700"
@@ -216,8 +230,9 @@ export const DemographicsSection: React.FC<Props> = ({
         <div className="w-full overflow-x-auto pb-2 scrollbar-hide">
           <div style={{ height: "400px", minWidth: `${minChartWidth}px` }}>
             <ResponsiveContainer width="100%" height="100%">
+              {/* 변경점: data에 validDistribution 전달 */}
               <BarChart
-                data={data.distribution}
+                data={validDistribution}
                 margin={{ top: 30, right: 10, left: 0, bottom: 5 }}
                 barSize={16}
               >
@@ -323,9 +338,6 @@ const SummaryCard = ({
   </div>
 );
 
-/**
- * 변경된 디자인의 그룹별 상세 카드
- */
 const DetailGroupCard = ({
   label,
   subLabel,
