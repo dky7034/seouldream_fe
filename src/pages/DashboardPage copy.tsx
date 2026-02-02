@@ -13,7 +13,6 @@ import {
   FaMinus,
   FaUserFriends,
   FaChevronRight,
-  FaCalendarAlt,
 } from "react-icons/fa";
 
 import { dashboardService } from "../services/dashboardService";
@@ -38,7 +37,6 @@ import type {
   IncompleteCheckReportDto,
   SemesterDto,
   AttendanceSummaryGroupBy,
-  AggregatedTrendDto,
   UnassignedMemberDto,
 } from "../types";
 
@@ -49,16 +47,15 @@ import CellStatusMap from "../components/dashboard/CellStatusMap";
 import { DemographicsSection } from "../components/DemographicsSection";
 
 // --- 타입 정의 ---
-type SummaryMode = "SEMESTER" | "YEAR";
 type IncompleteFilter = "WEEK" | "MONTH" | "SEMESTER";
 
 // 스크롤바 숨김 스타일
 const scrollbarHideStyle: React.CSSProperties = {
-  msOverflowStyle: "none" /* IE and Edge */,
-  scrollbarWidth: "none" /* Firefox */,
+  msOverflowStyle: "none",
+  scrollbarWidth: "none",
 };
 
-// ✅ 날짜 포맷팅 함수 (Display Only)
+// 날짜 포맷팅 함수 (Display Only)
 const safeFormatDate = (dateStr: string | null | undefined) => {
   if (!dateStr) return "-";
   const y = dateStr.substring(0, 4);
@@ -71,36 +68,30 @@ const safeFormatDate = (dateStr: string | null | undefined) => {
 
 const computeTrendRange = (
   isExecutive: boolean,
-  summaryMode: SummaryMode,
-  period: string,
   semesters: SemesterDto[],
   selectedSemesterId: number | null,
-  selectedYear: number,
 ) => {
   let range = { startDate: "", endDate: "" };
 
-  if (!isExecutive) {
-    range = getPeriodDates(period);
-  } else {
-    if (summaryMode === "YEAR") {
+  if (isExecutive) {
+    // 임원: 선택된 학기(혹은 현재 학기) 기준
+    const semester = semesters.find((s) => s.id === selectedSemesterId);
+    if (semester) {
+      range = { startDate: semester.startDate, endDate: semester.endDate };
+    } else {
+      // 학기 정보 없으면 올해 전체
+      const year = new Date().getFullYear();
       range = {
-        startDate: `${selectedYear}-01-01`,
-        endDate: `${selectedYear}-12-31`,
+        startDate: `${year}-01-01`,
+        endDate: `${year}-12-31`,
       };
-    } else if (summaryMode === "SEMESTER") {
-      const semester = semesters.find((s) => s.id === selectedSemesterId);
-      if (semester) {
-        range = { startDate: semester.startDate, endDate: semester.endDate };
-      } else {
-        range = {
-          startDate: `${selectedYear}-01-01`,
-          endDate: `${selectedYear}-12-31`,
-        };
-      }
     }
+  } else {
+    // 셀리더: 최근 3개월 (기존 로직 유지)
+    range = getPeriodDates("3m");
   }
 
-  // 🔹 Future Cap
+  // Future Cap (오늘 이후 데이터 조회 방지)
   const today = new Date();
   today.setHours(23, 59, 59, 999);
 
@@ -122,7 +113,6 @@ const computeIncompleteRange = (
 ) => {
   let requestedRange = { startDate: "", endDate: "" };
 
-  // 1) 기본 requestedRange 생성
   if (filter === "WEEK") {
     requestedRange = getThisWeekRange();
   } else if (filter === "MONTH") {
@@ -149,7 +139,7 @@ const computeIncompleteRange = (
     }
   }
 
-  // 2) 선택 학기 범위로 clamp (학기 밖 조회 방지)
+  // 선택 학기 범위로 clamp
   const selectedSemester = semesters.find((s) => s.id === selectedSemesterId);
 
   if (selectedSemester) {
@@ -161,7 +151,7 @@ const computeIncompleteRange = (
     }
   }
 
-  // 3) Future cap (오늘 이후로는 조회하지 않게)
+  // Future cap
   const today = new Date();
   today.setHours(23, 59, 59, 999);
 
@@ -173,7 +163,7 @@ const computeIncompleteRange = (
     }
   }
 
-  // ✅ 4) 핵심: startDate > endDate 역전 방지
+  // startDate > endDate 역전 방지
   if (requestedRange.startDate && requestedRange.endDate) {
     if (requestedRange.startDate > requestedRange.endDate) {
       if (selectedSemester) {
@@ -186,13 +176,11 @@ const computeIncompleteRange = (
         requestedRange.startDate = requestedRange.endDate;
         requestedRange.endDate = tmp;
       }
-
       const fixedEnd = new Date(requestedRange.endDate);
       fixedEnd.setHours(23, 59, 59, 999);
       if (fixedEnd > today) {
         requestedRange.endDate = toISODateString(new Date());
       }
-
       if (requestedRange.startDate > requestedRange.endDate) {
         requestedRange.endDate = requestedRange.startDate;
       }
@@ -202,98 +190,7 @@ const computeIncompleteRange = (
   return requestedRange;
 };
 
-const formatDateGroupLabel = (
-  groupBy: AttendanceSummaryGroupBy,
-  raw: string,
-): string => {
-  if (!raw) return raw;
-  if (groupBy === "SEMESTER") return raw;
-  if (groupBy === "YEAR") return `${raw}년`;
-  if (groupBy === "MONTH") {
-    const [y, m] = raw.split("-");
-    return `${y}년 ${parseInt(m)}월`;
-  }
-  if (groupBy === "WEEK") {
-    const [y, w] = raw.split("-W");
-    return `${y}년 ${w}주차`;
-  }
-  return safeFormatDate(raw);
-};
-
 // --- Sub Components ---
-const DashboardFilterToolbar: React.FC<{
-  summaryMode: SummaryMode;
-  onSummaryModeChange: (m: SummaryMode) => void;
-  groupBy: AttendanceSummaryGroupBy;
-  onGroupByChange: (g: AttendanceSummaryGroupBy) => void;
-  semesters: SemesterDto[];
-  selectedSemesterId: number | null;
-  onSemesterChange: (id: number) => void;
-}> = ({
-  summaryMode,
-  onSummaryModeChange,
-  groupBy,
-  onGroupByChange,
-  semesters,
-  selectedSemesterId,
-  onSemesterChange,
-}) => {
-  return (
-    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
-      <div className="flex flex-col sm:flex-row gap-2 sm:items-center flex-1">
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <FaCalendarAlt className="text-gray-400" />
-          </div>
-          <select
-            value={summaryMode}
-            onChange={(e) => onSummaryModeChange(e.target.value as SummaryMode)}
-            className="pl-9 pr-8 py-2 w-full sm:w-auto text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm cursor-pointer"
-          >
-            <option value="SEMESTER">학기별 조회</option>
-            <option value="YEAR">연간 조회 (올해)</option>
-          </select>
-        </div>
-
-        {summaryMode === "SEMESTER" && semesters.length > 0 && (
-          <select
-            value={selectedSemesterId ?? ""}
-            onChange={(e) => onSemesterChange(Number(e.target.value))}
-            className="py-2 pl-3 pr-8 w-full sm:w-auto text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm cursor-pointer"
-          >
-            {semesters.map((s) => (
-              <option key={s.id} value={s.id}>
-                {/* {s.name} ({s.startDate.substring(0, 4)}){" "} */}
-                {s.name} {s.isActive ? "(진행중)" : "(마감됨)"}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
-
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-gray-500 hidden sm:inline whitespace-nowrap">
-          그래프 단위:
-        </span>
-        <div className="flex bg-white rounded-md shadow-sm border border-gray-200 p-1 flex-shrink-0">
-          {(["DAY", "MONTH"] as const).map((opt) => (
-            <button
-              key={opt}
-              onClick={() => onGroupByChange(opt)}
-              className={`px-3 py-1 text-xs font-medium rounded whitespace-nowrap ${
-                groupBy === opt
-                  ? "bg-indigo-50 text-indigo-700 font-bold"
-                  : "text-gray-500 hover:bg-gray-50"
-              }`}
-            >
-              {opt === "DAY" ? "일" : "월"}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const Card: React.FC<{
   icon?: React.ReactNode;
@@ -320,7 +217,6 @@ const Card: React.FC<{
   </div>
 );
 
-// ✅ [수정] TopSummaryChips: 가로 스크롤 & 줄바꿈 방지
 const TopSummaryChips: React.FC<{ data: DashboardDto }> = ({ data }) => {
   const getAttendanceChangeIcon = (change: number) => {
     if (change > 0) return <FaArrowUp className="mr-2" />;
@@ -378,13 +274,13 @@ const OverallAttendanceSummaryCard: React.FC<{
   let present: number | undefined;
   let possible: number | undefined;
 
-  // 1) SummaryDto (periodSummaries + totalSummary) 형태
+  // 1) SummaryDto
   if ("totalSummary" in summary && summary.totalSummary) {
     rate = summary.totalSummary.attendanceRate;
     present = summary.totalSummary.totalPresent;
     possible = summary.totalSummary.totalPossible ?? undefined;
   }
-  // 2) StatDto 형태: 출석률만 표시(분자/분모는 표시하지 않음)
+  // 2) StatDto
   else if ("attendanceRate" in summary) {
     rate = summary.attendanceRate;
     present = undefined;
@@ -408,11 +304,9 @@ const OverallAttendanceSummaryCard: React.FC<{
             </div>
           </div>
         </div>
-
         <p className={`mt-1 text-2xl sm:text-3xl font-semibold ${rateColor}`}>
           {typeof rate === "number" ? `${rate.toFixed(0)}%` : "-"}
         </p>
-
         {typeof present === "number" && typeof possible === "number" && (
           <p className="text-xs text-gray-500 mt-1 whitespace-nowrap">
             ({present}명 출석 / 총 {possible}명 대상)
@@ -423,67 +317,6 @@ const OverallAttendanceSummaryCard: React.FC<{
   );
 };
 
-const AttendanceTrend: React.FC<{
-  data?: AggregatedTrendDto[] | null;
-  selectedGroupBy: AttendanceSummaryGroupBy;
-  title: string;
-  dateRange?: { startDate: string; endDate: string } | null;
-}> = ({ data, selectedGroupBy, title, dateRange }) => {
-  const items = data ?? [];
-
-  if (items.length === 0) {
-    return (
-      <div className="mt-4 h-24 flex items-center justify-center text-sm text-gray-500">
-        데이터가 없습니다.
-      </div>
-    );
-  }
-
-  const shouldLimit = selectedGroupBy === "DAY" || selectedGroupBy === "WEEK";
-  const MAX_ITEMS = 12;
-  const slicedData =
-    shouldLimit && items.length > MAX_ITEMS ? items.slice(-MAX_ITEMS) : items;
-
-  return (
-    <div className="mt-4">
-      <div className="flex justify-between items-center mb-2">
-        <h2 className="text-sm sm:text-base font-semibold text-gray-800 whitespace-nowrap">
-          {title}
-        </h2>
-        {dateRange && (
-          <span className="text-[10px] text-gray-400 whitespace-nowrap">
-            {safeFormatDate(dateRange.startDate)} ~{" "}
-            {safeFormatDate(dateRange.endDate)}
-          </span>
-        )}
-      </div>
-
-      <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-        {slicedData.map((item) => (
-          <div key={item.dateGroup} className="space-y-1">
-            <div className="flex justify-between text-[11px] sm:text-xs text-gray-600">
-              <span className="whitespace-nowrap">
-                {formatDateGroupLabel(selectedGroupBy, item.dateGroup)}
-              </span>
-              <span className="whitespace-nowrap">
-                {item.attendanceRate.toFixed(0)}% ({item.presentRecords}/
-                {item.totalRecords})
-              </span>
-            </div>
-            <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-2 rounded-full bg-blue-500"
-                style={{ width: `${item.attendanceRate}%` }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-// ✅ [수정] 테이블 텍스트 줄바꿈 방지
 const IncompleteAttendanceSection: React.FC<{
   reports: IncompleteCheckReportDto[];
 }> = ({ reports }) => {
@@ -551,7 +384,6 @@ const IncompleteAttendanceSection: React.FC<{
   );
 };
 
-// ✅ [수정] 탭 버튼 줄바꿈 방지
 const IncompleteFilterTabs: React.FC<{
   value: IncompleteFilter;
   onChange: (v: IncompleteFilter) => void;
@@ -596,10 +428,11 @@ const DashboardPage: React.FC = () => {
   const [dashboardData, setDashboardData] = useState<DashboardDto | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Filters
+  // Filters (Cell Leader only)
   const [period, setPeriod] = useState("3m");
   const [groupBy, setGroupBy] = useState<AttendanceSummaryGroupBy>("MONTH");
-  const [summaryMode, setSummaryMode] = useState<SummaryMode>("SEMESTER");
+
+  // Semesters (Executive only - auto select)
   const [semesters, setSemesters] = useState<SemesterDto[]>([]);
   const [selectedSemesterId, setSelectedSemesterId] = useState<number | null>(
     null,
@@ -628,7 +461,7 @@ const DashboardPage: React.FC = () => {
   const isExecutive = user?.role === "EXECUTIVE";
   const isCellLeader = user?.role === "CELL_LEADER";
 
-  // 임원단 학기 목록 로딩 로직 (모든 학기 표시)
+  // 임원단 학기 목록 로딩 & 자동 학기 선택
   useEffect(() => {
     let alive = true;
     if (!isExecutive) return;
@@ -672,14 +505,7 @@ const DashboardPage: React.FC = () => {
     };
   }, [isExecutive]);
 
-  const handleSummaryModeChange = (mode: SummaryMode) => {
-    setSummaryMode(mode);
-    setLoadingMain(true);
-  };
-  const handleSemesterChange = (id: number) => {
-    setSelectedSemesterId(id);
-    setLoadingMain(true);
-  };
+  // For Cell Leader only
   const handleGroupByChange = (g: AttendanceSummaryGroupBy) => {
     setGroupBy(g);
     setLoadingCharts(true);
@@ -700,56 +526,18 @@ const DashboardPage: React.FC = () => {
 
     const { startDate, endDate } = computeTrendRange(
       isExecutive,
-      summaryMode,
-      period,
       semesters,
       selectedSemesterId,
-      new Date().getFullYear(),
     );
 
     try {
+      // 1. 메인 대시보드 데이터 호출
       const mainData = await dashboardService.getDashboardData(period, {
         startDate,
         endDate,
       });
 
-      setLoadingCharts(true);
-      const chartPromise = statisticsService.getAttendanceTrend({
-        startDate,
-        endDate,
-        groupBy,
-      });
-
-      const summaryPromise = (async () => {
-        if (isExecutive && selectedSemesterId) {
-          if (summaryMode === "YEAR") {
-            const currentYear = new Date().getFullYear();
-            return await statisticsService.getOverallAttendance({
-              year: currentYear,
-            } as any);
-          }
-
-          const sm = semesters.find((s) => s.id === selectedSemesterId);
-          if (sm) {
-            const todayIso = toISODateString(new Date());
-            const cappedEnd =
-              sm.endDate && sm.endDate > todayIso ? todayIso : sm.endDate;
-
-            return await statisticsService.getOverallAttendance({
-              startDate: sm.startDate,
-              endDate: cappedEnd,
-            } as any);
-          }
-        }
-
-        return mainData.overallAttendanceSummary;
-      })();
-
-      const [trendData, finalSummary] = await Promise.all([
-        chartPromise,
-        summaryPromise,
-      ]);
-
+      // 2. 추가 데이터 병렬 호출
       setLoadingSub(true);
       const [noticesPage, prayersPage, unassignedData] = await Promise.all([
         noticeService.getAllNotices({ size: 1 }),
@@ -769,9 +557,6 @@ const DashboardPage: React.FC = () => {
 
       setDashboardData({
         ...mainData,
-        overallAttendanceSummary:
-          finalSummary ?? mainData.overallAttendanceSummary,
-        attendanceTrend: trendData,
         unassignedMemberCount: filteredUnassigned.length,
       });
 
@@ -785,15 +570,7 @@ const DashboardPage: React.FC = () => {
       setLoadingCharts(false);
       setLoadingSub(false);
     }
-  }, [
-    user,
-    period,
-    groupBy,
-    summaryMode,
-    selectedSemesterId,
-    semesters,
-    isExecutive,
-  ]);
+  }, [user, period, semesters, selectedSemesterId, isExecutive]);
 
   useEffect(() => {
     let alive = true;
@@ -838,17 +615,6 @@ const DashboardPage: React.FC = () => {
   if (error && !dashboardData)
     return <div className="p-8 text-center text-red-500">{error}</div>;
 
-  const summaryLabel = (() => {
-    if (!isExecutive) return "기간 총 출석률";
-    if (summaryMode === "YEAR")
-      return `${new Date().getFullYear()}년 전체 출석률`;
-    if (summaryMode === "SEMESTER") {
-      const s = semesters.find((x) => x.id === selectedSemesterId);
-      return s?.name ? `${s.name} 출석률` : "학기별";
-    }
-    return "기간별 출석률";
-  })();
-
   const incompleteRangeLabel = incompleteDateRange
     ? `${safeFormatDate(incompleteDateRange.startDate)} ~ ${safeFormatDate(
         incompleteDateRange.endDate,
@@ -884,20 +650,13 @@ const DashboardPage: React.FC = () => {
           <div className="xl:col-span-2 space-y-6">
             {isExecutive && (
               <Card
-                title="출석 통계"
+                title="출석 현황"
                 icon={<FaChartLine className="text-teal-500" />}
               >
-                <div className="mb-6">
-                  <DashboardFilterToolbar
-                    summaryMode={summaryMode}
-                    onSummaryModeChange={handleSummaryModeChange}
-                    groupBy={groupBy}
-                    onGroupByChange={handleGroupByChange}
-                    semesters={semesters}
-                    selectedSemesterId={selectedSemesterId}
-                    onSemesterChange={handleSemesterChange}
-                  />
-                </div>
+                {/* ✅ 필터 툴바 제거됨 (자동으로 현재 학기 기준)
+                   ✅ 전체 출석률 카드 제거됨 
+                   ✅ 추세 그래프 제거됨 
+                */}
 
                 {loadingCharts ? (
                   <div className="h-64 flex flex-col items-center justify-center text-gray-400">
@@ -906,28 +665,15 @@ const DashboardPage: React.FC = () => {
                   </div>
                 ) : (
                   <>
-                    <OverallAttendanceSummaryCard
-                      summary={dashboardData?.overallAttendanceSummary || null}
-                      label={summaryLabel}
-                    />
-                    <AttendanceTrend
-                      data={dashboardData?.attendanceTrend}
-                      selectedGroupBy={groupBy}
-                      title="출석률 추이"
-                      dateRange={computeTrendRange(
-                        isExecutive,
-                        summaryMode,
-                        period,
-                        semesters,
-                        selectedSemesterId,
-                        new Date().getFullYear(),
-                      )}
-                    />
-
-                    {dashboardData?.cellAttendanceSummaries && (
+                    {/* 바로 셀 현황 지도 표시 */}
+                    {dashboardData?.cellAttendanceSummaries ? (
                       <CellStatusMap
                         cellSummaries={dashboardData.cellAttendanceSummaries}
                       />
+                    ) : (
+                      <div className="py-10 text-center text-gray-400 text-sm">
+                        표시할 셀 데이터가 없습니다.
+                      </div>
                     )}
                   </>
                 )}
@@ -1198,21 +944,9 @@ const DashboardPage: React.FC = () => {
                     onChangeGroupBy={handleGroupByChange}
                   />
                 </div>
+                {/* 셀리더는 요약 카드와 추세 그래프 유지 */}
                 <OverallAttendanceSummaryCard
                   summary={dashboardData?.overallAttendanceSummary || null}
-                />
-                <AttendanceTrend
-                  data={dashboardData?.attendanceTrend}
-                  selectedGroupBy={groupBy}
-                  title="출석률 추이"
-                  dateRange={computeTrendRange(
-                    isExecutive,
-                    summaryMode,
-                    period,
-                    semesters,
-                    selectedSemesterId,
-                    new Date().getFullYear(),
-                  )}
                 />
               </Card>
             )}

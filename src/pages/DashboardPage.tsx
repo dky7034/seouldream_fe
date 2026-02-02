@@ -928,6 +928,12 @@ const DashboardPage: React.FC = () => {
                         </div>
                         <DemographicsSection
                           data={dashboardData.demographics}
+                          realUnassignedCount={unassignedList.length} // ✅ 수정됨: 정확한 인원수 전달
+                          onUnassignedClick={() => {
+                            document
+                              .getElementById("unassigned-section")
+                              ?.scrollIntoView({ behavior: "smooth" });
+                          }}
                         />
                       </div>
                     )}
