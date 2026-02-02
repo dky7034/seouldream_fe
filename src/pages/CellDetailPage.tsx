@@ -311,6 +311,8 @@ const CellReportHistoryItem: React.FC<{
                   <h4 className="text-sm font-bold text-gray-800 mb-3 pl-2 border-l-4 border-indigo-500 flex items-center">
                     멤버별 출석 & 기도제목
                   </h4>
+
+                  {/* [PC용] 기존 테이블 뷰 (md 이상에서만 보임) */}
                   <div className="hidden md:block overflow-hidden border border-gray-200 rounded-xl shadow-sm">
                     <table className="min-w-full divide-y divide-gray-200 text-sm">
                       <thead className="bg-gray-50">
@@ -350,6 +352,38 @@ const CellReportHistoryItem: React.FC<{
                         ))}
                       </tbody>
                     </table>
+                  </div>
+
+                  {/* [모바일용] 카드 리스트 뷰 (추가된 부분, md 미만에서만 보임) */}
+                  <div className="md:hidden space-y-3">
+                    {reportData.attendances.map((att) => (
+                      <div
+                        key={att.id}
+                        className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm"
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-bold text-gray-900 text-sm">
+                            {formatNameWithBirthdate(att.member)}
+                          </span>
+                          <span
+                            className={`inline-flex px-2 py-0.5 text-[11px] font-bold rounded-full ${
+                              att.status === "PRESENT"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {att.status === "PRESENT" ? "출석" : "결석"}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg whitespace-pre-wrap border border-gray-100">
+                          {att.prayerContent ? (
+                            att.prayerContent
+                          ) : (
+                            <span className="text-gray-400">기도제목 없음</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ) : (
