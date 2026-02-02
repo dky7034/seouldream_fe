@@ -20,7 +20,7 @@ import {
   MegaphoneIcon,
   PlusIcon,
   MapPinIcon,
-  ExclamationCircleIcon, // ✅ 에러 표시용 아이콘 활성화
+  ExclamationCircleIcon,
 } from "@heroicons/react/24/solid";
 
 type SortKey = "createdAt";
@@ -62,7 +62,6 @@ const AdminNoticesPage: React.FC = () => {
     if (!dateStr) return "-";
 
     // 서버에서 이미 KST(한국 시간) 문자열을 준다고 가정하고 그대로 파싱합니다.
-    // 만약 "Z"를 강제로 붙이면 브라우저가 UTC로 인식하여 +9시간을 더해버립니다.
     const date = new Date(dateStr);
 
     if (isNaN(date.getTime())) return "-";
@@ -73,10 +72,7 @@ const AdminNoticesPage: React.FC = () => {
     return `${year}.${month}.${day}`;
   };
 
-  const isEdited = (notice: NoticeDto) => {
-    if (!notice.updatedAt || !notice.createdAt) return false;
-    return notice.createdAt !== notice.updatedAt;
-  };
+  // ✅ [삭제] isEdited 함수 삭제 (수정됨 표시 로직 제거)
 
   const [filters, setFilters] = useState(() => {
     const title = searchParams.get("title") ?? "";
@@ -540,11 +536,7 @@ const AdminNoticesPage: React.FC = () => {
                       <span className="font-medium text-gray-700">
                         {safeFormatDate(notice.createdAt)}
                       </span>
-                      {isEdited(notice) && (
-                        <span className="ml-1 text-[10px] text-gray-400">
-                          (수정됨)
-                        </span>
-                      )}
+                      {/* ✅ 수정됨 표시 제거 */}
                     </span>
                     <span>
                       작성자:{" "}
@@ -623,14 +615,7 @@ const AdminNoticesPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 text-gray-500 whitespace-nowrap">
                         {safeFormatDate(notice.createdAt)}
-                        {isEdited(notice) && (
-                          <span
-                            className="ml-2 text-[10px] text-gray-400 font-normal"
-                            title={`최종 수정: ${safeFormatDate(notice.updatedAt)}`}
-                          >
-                            (수정됨)
-                          </span>
-                        )}
+                        {/* ✅ 수정됨 표시 제거 */}
                       </td>
                       <td className="px-6 py-4 text-gray-700 font-medium whitespace-nowrap">
                         {getFormattedName(
