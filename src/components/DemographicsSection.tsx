@@ -325,32 +325,44 @@ const DetailGroupCard = ({
   badgeColor: string;
 }) => (
   <div
-    className={`p-5 rounded-lg border ${colorClass} transition-all hover:shadow-sm`}
+    className={`p-4 sm:p-5 rounded-lg border ${colorClass} transition-all hover:shadow-sm`}
   >
-    <div className="flex justify-between items-center mb-4">
-      <div className="flex items-center gap-2">
+    {/* 상단 헤더 영역: 모바일에서도 한 줄로 유지 */}
+    <div className="flex items-center justify-between mb-4 gap-2">
+      <div className="flex items-center gap-1.5 min-w-0">
+        {/* 그룹 이름: shrink-0으로 글자 꺾임 방지 */}
         <span
-          className={`text-sm font-bold px-3 py-1 rounded-full ${iconColor} bg-white shadow-sm border border-gray-100`}
+          className={`shrink-0 text-xs sm:text-sm font-bold px-2.5 py-1 rounded-full ${iconColor} bg-white shadow-sm border border-gray-100 whitespace-nowrap`}
         >
           {label}
         </span>
-        <span className={`text-[10px] px-1.5 py-0.5 rounded ${badgeColor}`}>
+        {/* 나이 기준 뱃지: 아주 작은 화면에선 숨기거나 텍스트 조절 */}
+        <span
+          className={`shrink-0 text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded ${badgeColor} whitespace-nowrap`}
+        >
           {subLabel}
         </span>
       </div>
-      <span className="text-2xl font-extrabold text-gray-800">
-        {totalCount}명
+      {/* 총 인원수: 글자가 커서 겹치지 않게 조절 */}
+      <span className="text-xl sm:text-2xl font-extrabold text-gray-800 whitespace-nowrap">
+        {totalCount}
+        <span className="text-xs sm:text-sm font-medium ml-0.5">명</span>
       </span>
     </div>
 
-    <div className="grid grid-cols-2 gap-3 text-sm">
-      <div className="flex justify-between items-center bg-white/60 px-4 py-3 rounded-lg border border-gray-50/50">
-        <span className="text-gray-500 font-medium">남자</span>
-        <span className="font-bold text-blue-600">{maleCount}</span>
+    {/* 하단 성별 데이터 영역 */}
+    <div className="grid grid-cols-2 gap-2 sm:gap-3 text-sm">
+      <div className="flex justify-between items-center bg-white/60 px-3 py-2.5 sm:px-4 sm:py-3 rounded-lg border border-gray-50/50">
+        <span className="text-gray-500 font-medium text-xs sm:text-sm">
+          남자
+        </span>
+        <span className="font-bold text-blue-600 ml-1">{maleCount}</span>
       </div>
-      <div className="flex justify-between items-center bg-white/60 px-4 py-3 rounded-lg border border-gray-50/50">
-        <span className="text-gray-500 font-medium">여자</span>
-        <span className="font-bold text-pink-500">{femaleCount}</span>
+      <div className="flex justify-between items-center bg-white/60 px-3 py-2.5 sm:px-4 sm:py-3 rounded-lg border border-gray-50/50">
+        <span className="text-gray-500 font-medium text-xs sm:text-sm">
+          여자
+        </span>
+        <span className="font-bold text-pink-500 ml-1">{femaleCount}</span>
       </div>
     </div>
   </div>
