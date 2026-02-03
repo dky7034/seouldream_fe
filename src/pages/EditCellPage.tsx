@@ -18,7 +18,6 @@ const EditCellPage: React.FC = () => {
 
   const [isFetching, setIsFetching] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [isDeleting, setIsDeleting] = useState<boolean>(false); // 🔹 삭제 로딩 상태
   const [error, setError] = useState<string | null>(null);
 
   // 폼 데이터
@@ -109,7 +108,7 @@ const EditCellPage: React.FC = () => {
     const currentSelectedMembers = members.filter((m) =>
       selectedMemberIds.includes(m.id),
     );
-    let options = [...currentSelectedMembers];
+    const options = [...currentSelectedMembers];
     if (
       formData.viceLeaderId &&
       !options.some((m) => m.id === formData.viceLeaderId)
@@ -473,14 +472,14 @@ const EditCellPage: React.FC = () => {
               type="button"
               onClick={() => navigate(-1)}
               className="flex-1 sm:flex-none px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm font-medium"
-              disabled={isSubmitting || isDeleting}
+              disabled={isSubmitting}
             >
               취소
             </button>
             <button
               type="submit"
               className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-              disabled={isSubmitting || isDeleting}
+              disabled={isSubmitting}
             >
               {isSubmitting ? "저장 중..." : "저장"}
             </button>
