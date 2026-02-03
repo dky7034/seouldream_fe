@@ -632,8 +632,12 @@ export interface DemographicsDistributionDto {
   birthYear: number;
   maleCount: number;
   femaleCount: number;
+  // ✅ [추가] 백엔드에서 새로 만든 필드 추가
+  executiveMaleCount?: number; // 남자 관리자 수 (없을 수도 있으니 ? 붙임)
+  executiveFemaleCount?: number; // 여자 관리자 수
 }
 
+// 2. 전체 대시보드 인구통계 타입 (기존 유지)
 export interface DashboardDemographicsDto {
   totalCellCount: number;
   totalMemberCount: number;
@@ -641,11 +645,8 @@ export interface DashboardDemographicsDto {
   previousSemesterCount: number;
   executiveCount: number;
   cellLeaderCount: number;
-
-  // [변경] 기존 연령대 필드 삭제 -> 대학부/청년부 필드 추가
-  countDaehak: number; // 대학부 (한국나이 28세 이하)
-  countCheongnyeon: number; // 청년부 (한국나이 29세 이상)
-
+  countDaehak: number;
+  countCheongnyeon: number;
   distribution: DemographicsDistributionDto[];
 }
 

@@ -1,4 +1,3 @@
-// src/components/DemographicsSection.tsx
 import React, { useMemo } from "react";
 import {
   BarChart,
@@ -11,17 +10,20 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { FaCrown, FaUserTie, FaUserSlash, FaUserCheck } from "react-icons/fa";
-import type { DashboardDemographicsDto } from "../types";
+// ✅ types.ts에서 공식 타입 import
+import type {
+  DashboardDemographicsDto,
+  DemographicsDistributionDto,
+} from "../types";
 
 interface Props {
   data: DashboardDemographicsDto;
   onUnassignedClick?: () => void;
-  // ✅ 외부에서 계산된 정확한 미배정 인원수 (옵션)
   realUnassignedCount?: number;
 }
 
 // ---------------------------
-// 툴팁 컴포넌트
+// 툴팁 컴포넌트 (순수 인원 기준 표시)
 // ---------------------------
 type BirthYearTooltipProps = {
   active?: boolean;
@@ -29,6 +31,7 @@ type BirthYearTooltipProps = {
   payload?: Array<{
     dataKey?: string;
     value?: number | string;
+    payload?: any; // 원본 데이터 접근용
   }>;
 };
 
@@ -39,32 +42,49 @@ const BirthYearTooltip: React.FC<BirthYearTooltipProps> = ({
 }) => {
   if (!active || !payload || payload.length === 0) return null;
 
-  const getValue = (key: "maleCount" | "femaleCount") =>
+  // 차트의 Bar는 이미 계산된 'pureMale', 'pureFemale'을 사용합니다.
+  const getValue = (key: string) =>
     Number(payload.find((p) => p.dataKey === key)?.value ?? 0);
 
-  const male = getValue("maleCount");
-  const female = getValue("femaleCount");
-  const total = male + female;
+  const pureMale = getValue("pureMale");
+  const pureFemale = getValue("pureFemale");
+  const pureTotal = pureMale + pureFemale;
+
+  // ✅ 원본 데이터에서 관리자 수 확인 (공식 타입 사용)
+  const originalData = payload[0].payload as DemographicsDistributionDto;
+  const execMale = originalData.executiveMaleCount ?? 0;
+  const execFemale = originalData.executiveFemaleCount ?? 0;
+  const totalExec = execMale + execFemale;
 
   return (
     <div
       className="rounded-xl bg-white shadow-lg border border-gray-100 px-3 py-3"
-      style={{ minWidth: 160 }}
+      style={{ minWidth: 170 }}
     >
       <div className="text-sm font-bold text-gray-700 mb-2">{label}년생</div>
+
+      {/* 순수 총원 강조 */}
       <div className="flex justify-between items-center mb-2 pb-2 border-b border-gray-100">
-        <span className="text-gray-500 font-medium">총원</span>
-        <span className="font-extrabold text-gray-900">{total}명</span>
+        <span className="text-gray-500 font-medium text-xs">순수 인원</span>
+        <span className="font-extrabold text-indigo-600">{pureTotal}명</span>
       </div>
+
       <div className="space-y-1 text-sm">
         <div className="flex justify-between items-center">
           <span className="text-gray-500">남자</span>
-          <span className="font-bold text-blue-600">{male}명</span>
+          <span className="font-bold text-blue-600">{pureMale}명</span>
         </div>
         <div className="flex justify-between items-center">
           <span className="text-gray-500">여자</span>
-          <span className="font-bold text-pink-500">{female}명</span>
+          <span className="font-bold text-pink-500">{pureFemale}명</span>
         </div>
+
+        {/* 관리자가 있는 경우 툴팁에 작게 표시 */}
+        {totalExec > 0 && (
+          <div className="mt-2 pt-2 border-t border-dashed border-gray-100 text-[10px] text-gray-400">
+            관리자 제외됨: 남 {execMale} / 여 {execFemale}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -78,28 +98,43 @@ export const DemographicsSection: React.FC<Props> = ({
   onUnassignedClick,
   realUnassignedCount,
 }) => {
-  // 1. 차트용 데이터 필터링 (인원 0명인 연도 제외)
-  // ⚠️ 주의: 백엔드 distribution 데이터에 관리자가 포함되어 있다면, 그래프 막대에는 관리자가 포함되어 표시됩니다.
-  const validDistribution = useMemo(() => {
-    return data.distribution.filter(
-      (item) => item.maleCount + item.femaleCount > 0,
-    );
+  // 1. 차트용 데이터 가공 (성별별 관리자 제외)
+  const chartData = useMemo(() => {
+    // ✅ 공식 타입으로 캐스팅하여 안전하게 접근
+    const distribution = data.distribution as DemographicsDistributionDto[];
+
+    return distribution
+      .map((item) => {
+        const execMale = item.executiveMaleCount ?? 0;
+        const execFemale = item.executiveFemaleCount ?? 0;
+
+        // ✅ 핵심: 성별 각각에서 관리자 수를 차감 (음수 방지)
+        const pureMale = Math.max(0, item.maleCount - execMale);
+        const pureFemale = Math.max(0, item.femaleCount - execFemale);
+
+        return {
+          ...item,
+          pureMale, // 차트용 (남자 순수)
+          pureFemale, // 차트용 (여자 순수)
+          pureTotal: pureMale + pureFemale, // 필터링용 합계
+        };
+      })
+      .filter((item) => item.pureTotal > 0); // 순수 인원이 0명이면 숨김
   }, [data.distribution]);
 
-  const minChartWidth = Math.max(validDistribution.length * 45, 800);
+  const minChartWidth = Math.max(chartData.length * 45, 800);
 
-  // 2. 미배정 인원 계산 (props 우선, 없으면 계산)
+  // 2. 미배정 인원 처리
   const unassignedCount =
     realUnassignedCount !== undefined
       ? realUnassignedCount
       : Math.max(0, data.totalMemberCount - data.cellMemberCount);
 
-  // 3. 순수 멤버 수 계산 (전체 - 관리자) [수정됨]
+  // 3. 전체 순수 멤버 수 (전체 - 전체 관리자)
   const executiveCount = data.executiveCount ?? 0;
-  const pureTotalMemberCount = data.totalMemberCount - executiveCount;
+  const pureMemberCount = data.totalMemberCount - executiveCount;
 
-  // 4. 그룹별 통계 (대학부/청년부)
-  // ⚠️ 주의: distribution 기반이므로 백엔드 데이터에 따라 관리자가 포함될 수 있음
+  // 4. 그룹별 통계 (대학부/청년부) - 성별까지 정확하게 계산
   const groupStats = useMemo(() => {
     const currentYear = new Date().getFullYear();
     const result = {
@@ -107,19 +142,33 @@ export const DemographicsSection: React.FC<Props> = ({
       cheongnyeon: { male: 0, female: 0, total: 0 },
     };
 
-    data.distribution.forEach((item) => {
-      const koreanAge = currentYear - item.birthYear + 1;
-      const totalInYear = item.maleCount + item.femaleCount;
+    // ✅ 공식 타입 사용
+    const distribution = data.distribution as DemographicsDistributionDto[];
 
-      // 나이 기준 분류
+    distribution.forEach((item) => {
+      const koreanAge = currentYear - item.birthYear + 1;
+
+      // ✅ 성별 별로 관리자 제외하여 집계
+      const pureMaleInYear = Math.max(
+        0,
+        item.maleCount - (item.executiveMaleCount ?? 0),
+      );
+      const pureFemaleInYear = Math.max(
+        0,
+        item.femaleCount - (item.executiveFemaleCount ?? 0),
+      );
+      const pureTotalInYear = pureMaleInYear + pureFemaleInYear;
+
+      if (pureTotalInYear <= 0) return;
+
       if (koreanAge <= 28) {
-        result.daehak.male += item.maleCount;
-        result.daehak.female += item.femaleCount;
-        result.daehak.total += totalInYear;
+        result.daehak.male += pureMaleInYear;
+        result.daehak.female += pureFemaleInYear;
+        result.daehak.total += pureTotalInYear;
       } else {
-        result.cheongnyeon.male += item.maleCount;
-        result.cheongnyeon.female += item.femaleCount;
-        result.cheongnyeon.total += totalInYear;
+        result.cheongnyeon.male += pureMaleInYear;
+        result.cheongnyeon.female += pureFemaleInYear;
+        result.cheongnyeon.total += pureTotalInYear;
       }
     });
     return result;
@@ -127,13 +176,9 @@ export const DemographicsSection: React.FC<Props> = ({
 
   return (
     <div className="space-y-6">
-      {/* 상단 요약 카드 그리드 */}
+      {/* 상단 요약 카드 */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
-        {/* ✅ [수정] 전체 인원: pureTotalMemberCount (관리자 제외) 사용 */}
-        <SummaryCard
-          label="전체 인원 (관리자 제외)"
-          value={pureTotalMemberCount}
-        />
+        <SummaryCard label="전체 인원" value={pureMemberCount} />
 
         <div
           onClick={onUnassignedClick}
@@ -181,7 +226,7 @@ export const DemographicsSection: React.FC<Props> = ({
         />
       </div>
 
-      {/* 그룹별 현황 (대학부/청년부) */}
+      {/* 그룹별 현황 (순수 인원으로 집계된 데이터 표시) */}
       <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-gray-800">그룹별 현황</h3>
@@ -213,22 +258,15 @@ export const DemographicsSection: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* 출생년도별 분포 차트 */}
+      {/* 출생년도별 분포 차트 (정확히 깎인 막대 그래프) */}
       <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="text-lg font-bold text-gray-800">출생년도별 분포</h3>
-            <p className="text-sm text-gray-500 mt-1">
-              관리자를 제외한{" "}
-              <span className="text-indigo-600 font-semibold">
-                순수 셀원 및 미배정 인원
-              </span>{" "}
-              통계
-            </p>
+            <p className="text-sm text-gray-500 mt-1">관리자 제외</p>
           </div>
-          {/* ✅ [수정] 차트 상단 텍스트도 관리자 제외 수치로 통일 */}
           <div className="text-[11px] text-gray-400 bg-gray-50 px-2 py-1 rounded border border-gray-100 self-start sm:self-center">
-            총 {pureTotalMemberCount}명 (관리자 {executiveCount}명 제외)
+            총 {pureMemberCount}명 (관리자 {executiveCount}명 제외)
           </div>
         </div>
 
@@ -236,7 +274,7 @@ export const DemographicsSection: React.FC<Props> = ({
           <div style={{ height: "400px", minWidth: `${minChartWidth}px` }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={validDistribution}
+                data={chartData}
                 margin={{ top: 30, right: 10, left: 0, bottom: 5 }}
                 barSize={16}
               >
@@ -279,15 +317,17 @@ export const DemographicsSection: React.FC<Props> = ({
                     </span>
                   )}
                 />
+
+                {/* ✅ dataKey를 계산된 순수(Pure) 인원 키값으로 설정 */}
                 <Bar
-                  dataKey="maleCount"
+                  dataKey="pureMale"
                   name="남자"
                   stackId="a"
                   fill="#60a5fa"
                   radius={[0, 0, 0, 0]}
                 />
                 <Bar
-                  dataKey="femaleCount"
+                  dataKey="pureFemale"
                   name="여자"
                   stackId="a"
                   fill="#f472b6"
@@ -302,8 +342,9 @@ export const DemographicsSection: React.FC<Props> = ({
   );
 };
 
-// ... SummaryCard, DetailGroupCard (변경 없음) ...
-// (아래 서브 컴포넌트들은 그대로 두시면 됩니다.)
+// ---------------------------
+// 서브 컴포넌트들 (변경 없음)
+// ---------------------------
 const SummaryCard = ({
   label,
   value,
