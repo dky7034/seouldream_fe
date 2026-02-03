@@ -236,29 +236,6 @@ const EditCellPage: React.FC = () => {
     }
   };
 
-  // 🔹 [추가] 셀 삭제 핸들러 (안전한 백엔드 믿고 호출)
-  const handleDelete = async () => {
-    if (!id) return;
-
-    const confirmMsg =
-      `정말 "${originalName}"을(를) 삭제하시겠습니까?\n\n` +
-      `주의: 소속된 멤버들은 자동으로 '미배정' 상태가 됩니다.`;
-
-    if (!window.confirm(confirmMsg)) return;
-
-    setIsDeleting(true);
-    try {
-      await cellService.deleteCell(Number(id));
-      alert("셀이 삭제되었습니다.");
-      navigate("/admin/cells"); // 목록으로 이동
-    } catch (err: any) {
-      console.error("셀 삭제 실패:", err);
-      alert(err.response?.data?.message || "셀 삭제 중 오류가 발생했습니다.");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
   if (isFetching && !error) return <div className="p-6">로딩 중...</div>;
   if (error)
     return (
@@ -490,20 +467,6 @@ const EditCellPage: React.FC = () => {
 
         {/* 하단 버튼 영역 (삭제 버튼 추가됨) */}
         <div className="pt-6 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-          {/* 좌측: 삭제 버튼 (임원진 전용) */}
-          <div>
-            {user?.role === "EXECUTIVE" && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={isSubmitting || isDeleting}
-                className="w-full sm:w-auto px-4 py-2 border border-red-200 text-red-600 rounded-md hover:bg-red-50 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
-              >
-                {isDeleting ? "삭제 중..." : "셀 삭제"}
-              </button>
-            )}
-          </div>
-
           {/* 우측: 취소/저장 버튼 */}
           <div className="flex w-full sm:w-auto gap-2">
             <button
