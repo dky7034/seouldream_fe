@@ -65,7 +65,7 @@ const BirthYearTooltip: React.FC<BirthYearTooltipProps> = ({
 
       {/* 순수 총원 강조 */}
       <div className="flex justify-between items-center mb-2 pb-2 border-b border-gray-100">
-        <span className="text-gray-500 font-medium text-xs">순수 인원</span>
+        <span className="text-gray-500 font-medium text-xs">인원</span>
         <span className="font-extrabold text-indigo-600">{pureTotal}명</span>
       </div>
 
@@ -263,7 +263,6 @@ export const DemographicsSection: React.FC<Props> = ({
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="text-lg font-bold text-gray-800">출생년도별 분포</h3>
-            <p className="text-sm text-gray-500 mt-1">관리자 제외</p>
           </div>
           <div className="text-[11px] text-gray-400 bg-gray-50 px-2 py-1 rounded border border-gray-100 self-start sm:self-center">
             총 {pureMemberCount}명 (관리자 {executiveCount}명 제외)
