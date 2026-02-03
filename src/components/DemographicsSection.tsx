@@ -78,13 +78,6 @@ const BirthYearTooltip: React.FC<BirthYearTooltipProps> = ({
           <span className="text-gray-500">여자</span>
           <span className="font-bold text-pink-500">{pureFemale}명</span>
         </div>
-
-        {/* 관리자가 있는 경우 툴팁에 작게 표시 */}
-        {totalExec > 0 && (
-          <div className="mt-2 pt-2 border-t border-dashed border-gray-100 text-[10px] text-gray-400">
-            관리자 제외됨: 남 {execMale} / 여 {execFemale}
-          </div>
-        )}
       </div>
     </div>
   );
