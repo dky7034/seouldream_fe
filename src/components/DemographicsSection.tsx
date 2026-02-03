@@ -1,3 +1,4 @@
+// src/components/DemographicsSection.tsx
 import React, { useMemo } from "react";
 import {
   BarChart,
@@ -78,6 +79,7 @@ export const DemographicsSection: React.FC<Props> = ({
   realUnassignedCount,
 }) => {
   // 1. 차트용 데이터 필터링 (인원 0명인 연도 제외)
+  // ⚠️ 주의: 백엔드 distribution 데이터에 관리자가 포함되어 있다면, 그래프 막대에는 관리자가 포함되어 표시됩니다.
   const validDistribution = useMemo(() => {
     return data.distribution.filter(
       (item) => item.maleCount + item.femaleCount > 0,
@@ -92,12 +94,12 @@ export const DemographicsSection: React.FC<Props> = ({
       ? realUnassignedCount
       : Math.max(0, data.totalMemberCount - data.cellMemberCount);
 
-  // 3. 순수 셀원 수 계산 (관리자 제외)
-  // 분포도 기준을 잡기 위해 전체에서 임원 수를 뺍니다.
+  // 3. 순수 멤버 수 계산 (전체 - 관리자) [수정됨]
   const executiveCount = data.executiveCount ?? 0;
-  const pureMemberCount = data.totalMemberCount - executiveCount;
+  const pureTotalMemberCount = data.totalMemberCount - executiveCount;
 
   // 4. 그룹별 통계 (대학부/청년부)
+  // ⚠️ 주의: distribution 기반이므로 백엔드 데이터에 따라 관리자가 포함될 수 있음
   const groupStats = useMemo(() => {
     const currentYear = new Date().getFullYear();
     const result = {
@@ -127,7 +129,11 @@ export const DemographicsSection: React.FC<Props> = ({
     <div className="space-y-6">
       {/* 상단 요약 카드 그리드 */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
-        <SummaryCard label="전체 인원" value={data.totalMemberCount} />
+        {/* ✅ [수정] 전체 인원: pureTotalMemberCount (관리자 제외) 사용 */}
+        <SummaryCard
+          label="전체 인원 (관리자 제외)"
+          value={pureTotalMemberCount}
+        />
 
         <div
           onClick={onUnassignedClick}
@@ -220,9 +226,9 @@ export const DemographicsSection: React.FC<Props> = ({
               통계
             </p>
           </div>
-          {/* 총 인원에서 관리자 수를 뺀 수치를 기준 값으로 표시 */}
+          {/* ✅ [수정] 차트 상단 텍스트도 관리자 제외 수치로 통일 */}
           <div className="text-[11px] text-gray-400 bg-gray-50 px-2 py-1 rounded border border-gray-100 self-start sm:self-center">
-            총 {pureMemberCount}명 (관리자 {executiveCount}명 제외)
+            총 {pureTotalMemberCount}명 (관리자 {executiveCount}명 제외)
           </div>
         </div>
 
@@ -296,9 +302,8 @@ export const DemographicsSection: React.FC<Props> = ({
   );
 };
 
-// ---------------------------
-// 서브 컴포넌트: SummaryCard (변경 없음)
-// ---------------------------
+// ... SummaryCard, DetailGroupCard (변경 없음) ...
+// (아래 서브 컴포넌트들은 그대로 두시면 됩니다.)
 const SummaryCard = ({
   label,
   value,
@@ -330,9 +335,6 @@ const SummaryCard = ({
   </div>
 );
 
-// ---------------------------
-// 서브 컴포넌트: DetailGroupCard (모바일 레이아웃 수정됨)
-// ---------------------------
 const DetailGroupCard = ({
   label,
   subLabel,
@@ -355,30 +357,24 @@ const DetailGroupCard = ({
   <div
     className={`p-4 sm:p-5 rounded-lg border ${colorClass} transition-all hover:shadow-sm`}
   >
-    {/* 상단 헤더 영역: 모바일 한 줄 유지 (flex-wrap 방지) */}
     <div className="flex items-center justify-between mb-4 gap-2">
       <div className="flex items-center gap-1.5 min-w-0">
-        {/* 그룹 이름: 꺾임 방지 (shrink-0, whitespace-nowrap) */}
         <span
           className={`shrink-0 text-xs sm:text-sm font-bold px-2.5 py-1 rounded-full ${iconColor} bg-white shadow-sm border border-gray-100 whitespace-nowrap`}
         >
           {label}
         </span>
-        {/* 나이 기준 뱃지 */}
         <span
           className={`shrink-0 text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded ${badgeColor} whitespace-nowrap`}
         >
           {subLabel}
         </span>
       </div>
-      {/* 총 인원수: 모바일 폰트 조정 및 줄바꿈 방지 */}
       <span className="text-xl sm:text-2xl font-extrabold text-gray-800 whitespace-nowrap">
         {totalCount}
         <span className="text-xs sm:text-sm font-medium ml-0.5">명</span>
       </span>
     </div>
-
-    {/* 하단 성별 데이터 영역 */}
     <div className="grid grid-cols-2 gap-2 sm:gap-3 text-sm">
       <div className="flex justify-between items-center bg-white/60 px-3 py-2.5 sm:px-4 sm:py-3 rounded-lg border border-gray-50/50">
         <span className="text-gray-500 font-medium text-xs sm:text-sm">
