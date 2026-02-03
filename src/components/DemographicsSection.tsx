@@ -50,12 +50,6 @@ const BirthYearTooltip: React.FC<BirthYearTooltipProps> = ({
   const pureFemale = getValue("pureFemale");
   const pureTotal = pureMale + pureFemale;
 
-  // ✅ 원본 데이터에서 관리자 수 확인 (공식 타입 사용)
-  const originalData = payload[0].payload as DemographicsDistributionDto;
-  const execMale = originalData.executiveMaleCount ?? 0;
-  const execFemale = originalData.executiveFemaleCount ?? 0;
-  const totalExec = execMale + execFemale;
-
   return (
     <div
       className="rounded-xl bg-white shadow-lg border border-gray-100 px-3 py-3"
