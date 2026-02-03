@@ -1,4 +1,3 @@
-// src/components/DemographicsSection.tsx
 import React, { useMemo } from "react";
 import {
   BarChart,
@@ -16,11 +15,13 @@ import type { DashboardDemographicsDto } from "../types";
 interface Props {
   data: DashboardDemographicsDto;
   onUnassignedClick?: () => void;
-  // ✅ [추가] 외부(DashboardPage)에서 계산된 정확한 미배정 인원수
+  // ✅ 외부에서 계산된 정확한 미배정 인원수 (옵션)
   realUnassignedCount?: number;
 }
 
-// ... (BirthYearTooltip 컴포넌트는 기존과 동일, 생략) ...
+// ---------------------------
+// 툴팁 컴포넌트
+// ---------------------------
 type BirthYearTooltipProps = {
   active?: boolean;
   label?: string | number;
@@ -68,11 +69,15 @@ const BirthYearTooltip: React.FC<BirthYearTooltipProps> = ({
   );
 };
 
+// ---------------------------
+// 메인 컴포넌트
+// ---------------------------
 export const DemographicsSection: React.FC<Props> = ({
   data,
   onUnassignedClick,
-  realUnassignedCount, // ✅ 구조 분해 할당으로 받음
+  realUnassignedCount,
 }) => {
+  // 1. 차트용 데이터 필터링 (인원 0명인 연도 제외)
   const validDistribution = useMemo(() => {
     return data.distribution.filter(
       (item) => item.maleCount + item.femaleCount > 0,
@@ -81,16 +86,18 @@ export const DemographicsSection: React.FC<Props> = ({
 
   const minChartWidth = Math.max(validDistribution.length * 45, 800);
 
-  /**
-   * 3) 미배정 인원 결정 (수정됨)
-   * - props로 realUnassignedCount(6명)가 들어오면 그걸 씁니다.
-   * - 없으면 기존 공식대로 계산합니다.
-   */
+  // 2. 미배정 인원 계산 (props 우선, 없으면 계산)
   const unassignedCount =
     realUnassignedCount !== undefined
       ? realUnassignedCount
       : Math.max(0, data.totalMemberCount - data.cellMemberCount);
 
+  // 3. 순수 셀원 수 계산 (관리자 제외)
+  // 분포도 기준을 잡기 위해 전체에서 임원 수를 뺍니다.
+  const executiveCount = data.executiveCount ?? 0;
+  const pureMemberCount = data.totalMemberCount - executiveCount;
+
+  // 4. 그룹별 통계 (대학부/청년부)
   const groupStats = useMemo(() => {
     const currentYear = new Date().getFullYear();
     const result = {
@@ -100,14 +107,17 @@ export const DemographicsSection: React.FC<Props> = ({
 
     data.distribution.forEach((item) => {
       const koreanAge = currentYear - item.birthYear + 1;
+      const totalInYear = item.maleCount + item.femaleCount;
+
+      // 나이 기준 분류
       if (koreanAge <= 28) {
         result.daehak.male += item.maleCount;
         result.daehak.female += item.femaleCount;
-        result.daehak.total += item.maleCount + item.femaleCount;
+        result.daehak.total += totalInYear;
       } else {
         result.cheongnyeon.male += item.maleCount;
         result.cheongnyeon.female += item.femaleCount;
-        result.cheongnyeon.total += item.maleCount + item.femaleCount;
+        result.cheongnyeon.total += totalInYear;
       }
     });
     return result;
@@ -115,6 +125,7 @@ export const DemographicsSection: React.FC<Props> = ({
 
   return (
     <div className="space-y-6">
+      {/* 상단 요약 카드 그리드 */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
         <SummaryCard label="전체 인원" value={data.totalMemberCount} />
 
@@ -128,7 +139,7 @@ export const DemographicsSection: React.FC<Props> = ({
         >
           <SummaryCard
             label="미배정"
-            value={unassignedCount} // ✅ 이제 6명으로 나옵니다
+            value={unassignedCount}
             icon={<FaUserSlash className="text-orange-400" />}
             highlightColor="text-orange-600"
             bgColor="bg-orange-50"
@@ -147,7 +158,7 @@ export const DemographicsSection: React.FC<Props> = ({
 
         <SummaryCard
           label="관리자"
-          value={data.executiveCount ?? 0}
+          value={executiveCount}
           icon={<FaCrown className="text-purple-400" />}
           highlightColor="text-purple-700"
           bgColor="bg-purple-50"
@@ -164,7 +175,7 @@ export const DemographicsSection: React.FC<Props> = ({
         />
       </div>
 
-      {/* ... 나머지 차트 부분은 기존과 동일하므로 그대로 두시면 됩니다 ... */}
+      {/* 그룹별 현황 (대학부/청년부) */}
       <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-gray-800">그룹별 현황</h3>
@@ -196,13 +207,25 @@ export const DemographicsSection: React.FC<Props> = ({
         </div>
       </div>
 
+      {/* 출생년도별 분포 차트 */}
       <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-        <div className="mb-4">
-          <h3 className="text-lg font-bold text-gray-800">출생년도별 분포</h3>
-          <p className="text-sm text-gray-500 mt-1">
-            가로로 스크롤하여 전체 연령 분포를 확인할 수 있습니다.
-          </p>
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 className="text-lg font-bold text-gray-800">출생년도별 분포</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              관리자를 제외한{" "}
+              <span className="text-indigo-600 font-semibold">
+                순수 셀원 및 미배정 인원
+              </span>{" "}
+              통계
+            </p>
+          </div>
+          {/* 총 인원에서 관리자 수를 뺀 수치를 기준 값으로 표시 */}
+          <div className="text-[11px] text-gray-400 bg-gray-50 px-2 py-1 rounded border border-gray-100 self-start sm:self-center">
+            총 {pureMemberCount}명 (관리자 {executiveCount}명 제외)
+          </div>
         </div>
+
         <div className="w-full overflow-x-auto pb-2 scrollbar-hide">
           <div style={{ height: "400px", minWidth: `${minChartWidth}px` }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -273,7 +296,9 @@ export const DemographicsSection: React.FC<Props> = ({
   );
 };
 
-// Sub Components는 변경 없음 (SummaryCard, DetailGroupCard ...)
+// ---------------------------
+// 서브 컴포넌트: SummaryCard (변경 없음)
+// ---------------------------
 const SummaryCard = ({
   label,
   value,
@@ -305,6 +330,9 @@ const SummaryCard = ({
   </div>
 );
 
+// ---------------------------
+// 서브 컴포넌트: DetailGroupCard (모바일 레이아웃 수정됨)
+// ---------------------------
 const DetailGroupCard = ({
   label,
   subLabel,
@@ -327,23 +355,23 @@ const DetailGroupCard = ({
   <div
     className={`p-4 sm:p-5 rounded-lg border ${colorClass} transition-all hover:shadow-sm`}
   >
-    {/* 상단 헤더 영역: 모바일에서도 한 줄로 유지 */}
+    {/* 상단 헤더 영역: 모바일 한 줄 유지 (flex-wrap 방지) */}
     <div className="flex items-center justify-between mb-4 gap-2">
       <div className="flex items-center gap-1.5 min-w-0">
-        {/* 그룹 이름: shrink-0으로 글자 꺾임 방지 */}
+        {/* 그룹 이름: 꺾임 방지 (shrink-0, whitespace-nowrap) */}
         <span
           className={`shrink-0 text-xs sm:text-sm font-bold px-2.5 py-1 rounded-full ${iconColor} bg-white shadow-sm border border-gray-100 whitespace-nowrap`}
         >
           {label}
         </span>
-        {/* 나이 기준 뱃지: 아주 작은 화면에선 숨기거나 텍스트 조절 */}
+        {/* 나이 기준 뱃지 */}
         <span
           className={`shrink-0 text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded ${badgeColor} whitespace-nowrap`}
         >
           {subLabel}
         </span>
       </div>
-      {/* 총 인원수: 글자가 커서 겹치지 않게 조절 */}
+      {/* 총 인원수: 모바일 폰트 조정 및 줄바꿈 방지 */}
       <span className="text-xl sm:text-2xl font-extrabold text-gray-800 whitespace-nowrap">
         {totalCount}
         <span className="text-xs sm:text-sm font-medium ml-0.5">명</span>
