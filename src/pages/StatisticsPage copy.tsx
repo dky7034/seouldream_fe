@@ -1,3 +1,4 @@
+// src/pages/StatisticsPage.tsx
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -29,20 +30,18 @@ import { semesterService } from "../services/semesterService";
 import { dashboardService } from "../services/dashboardService";
 import { DemographicsSection } from "../components/DemographicsSection";
 
-// ✅ 공식 타입 import
 import type {
   NewcomerStatDto,
   SemesterSummaryDto,
   UnassignedMemberDto,
   SemesterDto,
   DashboardDemographicsDto,
-  DemographicsDistributionDto,
 } from "../types";
 
-// 스크롤바 숨김 스타일
+// 스크롤바 숨김 스타일 (인라인 적용용)
 const scrollbarHideStyle: React.CSSProperties = {
-  msOverflowStyle: "none",
-  scrollbarWidth: "none",
+  msOverflowStyle: "none" /* IE and Edge */,
+  scrollbarWidth: "none" /* Firefox */,
 };
 
 // --- 섹션 헤더 컴포넌트 ---
@@ -120,6 +119,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                       : "text-gray-500"
                 }`}
               >
+                {/* 소수점 제거하여 정수로 표시 */}
                 {Number(growthData.value).toFixed(0)}%
               </span>
             </div>
@@ -230,7 +230,7 @@ const NewcomerGrowthChart = React.memo(
 
 // --- AgeGroupPieChart ---
 const AgeGroupPieChart = React.memo(
-  ({ data }: { data: { twenties: number; thirties: number } }) => {
+  ({ data }: { data: SemesterSummaryDto["ageGroupSummary"] }) => {
     const total = data.twenties + data.thirties;
 
     if (total === 0) {
@@ -277,23 +277,17 @@ const AgeGroupPieChart = React.memo(
 // --- GenderRatioChart ---
 const GenderRatioChart = React.memo(
   ({ data }: { data: DashboardDemographicsDto }) => {
-    const { pureMale, pureFemale } = useMemo(() => {
+    const { male, female } = useMemo(() => {
       let m = 0;
       let f = 0;
-
-      const distribution = data.distribution as DemographicsDistributionDto[];
-
-      distribution.forEach((item) => {
-        const execMale = item.executiveMaleCount ?? 0;
-        const execFemale = item.executiveFemaleCount ?? 0;
-
-        m += Math.max(0, item.maleCount - execMale);
-        f += Math.max(0, item.femaleCount - execFemale);
+      data.distribution.forEach((item) => {
+        m += item.maleCount;
+        f += item.femaleCount;
       });
-      return { pureMale: m, pureFemale: f };
+      return { male: m, female: f };
     }, [data]);
 
-    const total = pureMale + pureFemale;
+    const total = male + female;
 
     if (total === 0) {
       return (
@@ -304,8 +298,8 @@ const GenderRatioChart = React.memo(
     }
 
     const chartData = [
-      { name: "남자", value: pureMale, color: "#60a5fa" },
-      { name: "여자", value: pureFemale, color: "#f472b6" },
+      { name: "남자", value: male, color: "#60a5fa" },
+      { name: "여자", value: female, color: "#f472b6" },
     ];
 
     return (
@@ -336,7 +330,7 @@ const GenderRatioChart = React.memo(
   },
 );
 
-// --- 메인 페이지 컴포넌트 ---
+// --- 메인 페이지 ---
 const StatisticsPage: React.FC = () => {
   const navigate = useNavigate();
 
@@ -349,8 +343,6 @@ const StatisticsPage: React.FC = () => {
   );
 
   const [newcomerStats, setNewcomerStats] = useState<NewcomerStatDto[]>([]);
-
-  // semesterSummary는 참고용으로만 사용 (차트에는 detailDemographics 기반 계산값 사용)
   const [semesterSummary, setSemesterSummary] =
     useState<SemesterSummaryDto | null>(null);
 
@@ -360,11 +352,13 @@ const StatisticsPage: React.FC = () => {
     [],
   );
 
-  // 1. 학기 목록 로딩
+  // 1. 학기 목록 로딩 (활성 학기만)
   useEffect(() => {
+    // ✅ true 전달: 활성 학기만 조회
     semesterService
       .getAllSemesters(true)
       .then((list) => {
+        // 최신순 정렬
         const sortedList = list.sort(
           (a, b) =>
             new Date(b.startDate).getTime() - new Date(a.startDate).getTime(),
@@ -372,6 +366,7 @@ const StatisticsPage: React.FC = () => {
         setSemesters(sortedList);
 
         if (sortedList.length > 0) {
+          // 현재 날짜가 포함된 학기를 찾거나, 없으면 최신 학기를 선택
           const today = new Date();
           const currentMonthTotal =
             today.getFullYear() * 12 + (today.getMonth() + 1);
@@ -389,11 +384,13 @@ const StatisticsPage: React.FC = () => {
             );
           });
 
+          // 활성 학기 중 현재 날짜에 해당하는 게 있으면 선택, 없으면 가장 최신(0번째) 선택
           const targetId = currentSemester
             ? currentSemester.id
             : sortedList[0].id;
           setSelectedSemesterId(targetId);
         } else {
+          // 활성 학기가 아예 없으면 로딩 종료
           setIsInitialLoading(false);
         }
       })
@@ -415,6 +412,7 @@ const StatisticsPage: React.FC = () => {
         const semester = semesters.find((s) => s.id === selectedSemesterId);
         if (!semester) return;
 
+        // 미래 날짜 제한 로직 (Today Cap)
         const { startDate, endDate } = semester;
         const today = new Date();
         const endObj = new Date(endDate);
@@ -422,9 +420,13 @@ const StatisticsPage: React.FC = () => {
         today.setHours(23, 59, 59, 999);
         endObj.setHours(23, 59, 59, 999);
 
+        // 오늘보다 미래라면, 오늘 날짜로 잘라서 API 요청
         const effectiveEndDate =
           endObj > today
-            ? `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+            ? `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(
+                2,
+                "0",
+              )}-${String(today.getDate()).padStart(2, "0")}`
             : endDate;
 
         const [newcomers, summary, dashboardData, unassigned] =
@@ -450,6 +452,7 @@ const StatisticsPage: React.FC = () => {
           setDetailDemographics(dashboardData.demographics);
         }
 
+        // 임원(EXECUTIVE) 제외 필터링
         const filteredUnassigned = (unassigned as any[]).filter(
           (m) => m.role !== "EXECUTIVE",
         );
@@ -485,41 +488,6 @@ const StatisticsPage: React.FC = () => {
     }));
   }, [unassignedList]);
 
-  // ✅ [수정] 관리자를 제외하고, 누락 인원 없이 그룹 기준(28세 기준)으로 전체 집계
-  const pureAgeGroupSummary = useMemo(() => {
-    if (!detailDemographics) return { twenties: 0, thirties: 0 };
-
-    const currentYear = new Date().getFullYear();
-    const distribution =
-      detailDemographics.distribution as DemographicsDistributionDto[];
-
-    let twenties = 0;
-    let thirties = 0;
-
-    distribution.forEach((item) => {
-      // 순수 인원 (관리자 제외)
-      const pureCount = Math.max(
-        0,
-        item.maleCount +
-          item.femaleCount -
-          ((item.executiveMaleCount ?? 0) + (item.executiveFemaleCount ?? 0)),
-      );
-
-      if (pureCount <= 0) return;
-
-      const koreanAge = currentYear - item.birthYear + 1;
-
-      // ⚠️ 20~29, 30~39가 아니라 공동체 기준(28세 이하 / 29세 이상)으로 전체 포함
-      if (koreanAge <= 28) {
-        twenties += pureCount;
-      } else {
-        thirties += pureCount;
-      }
-    });
-
-    return { twenties, thirties };
-  }, [detailDemographics]);
-
   const scrollToUnassigned = () => {
     const element = document.getElementById("unassigned-section");
     if (element) {
@@ -535,6 +503,7 @@ const StatisticsPage: React.FC = () => {
     );
   }
 
+  // 활성 학기가 없을 경우 처리 (초기 로딩 이후)
   if (!isInitialLoading && semesters.length === 0) {
     return (
       <div className="bg-gray-50 min-h-screen pb-12">
@@ -588,6 +557,7 @@ const StatisticsPage: React.FC = () => {
                 좌우로 스크롤
               </span>
             </div>
+
             <div
               className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap scrollbar-hide"
               style={scrollbarHideStyle}
@@ -694,21 +664,24 @@ const StatisticsPage: React.FC = () => {
 
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* 1. 이번 학기 연령 구성비 */}
+                {/* 1. 이번 학기 연령 구성비 (왼쪽) */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-between">
                   <div className="w-full text-left mb-2">
                     <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                       연령 구성비{" "}
                       <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                        관리자 제외
+                        2030
                       </span>
                     </h3>
-                    <p className="text-sm text-gray-500 mt-1">20대/30대 비율</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      20대/30대 비율 분포
+                    </p>
                   </div>
-                  {detailDemographics ? (
+                  {semesterSummary ? (
                     <div className="w-full max-w-[300px]">
-                      {/* ✅ 모든 인원 포함한 순수 데이터 전달 */}
-                      <AgeGroupPieChart data={pureAgeGroupSummary} />
+                      <AgeGroupPieChart
+                        data={semesterSummary.ageGroupSummary}
+                      />
                     </div>
                   ) : (
                     <div className="h-[200px] w-full flex items-center justify-center text-gray-400">
@@ -717,13 +690,13 @@ const StatisticsPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* 2. 성별 비율 */}
+                {/* 2. 성별 비율 (오른쪽) */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-between">
                   <div className="w-full text-left mb-2">
                     <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                       성별 비율{" "}
                       <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                        관리자 제외
+                        전체
                       </span>
                     </h3>
                     <p className="text-sm text-gray-500 mt-1">
@@ -732,7 +705,6 @@ const StatisticsPage: React.FC = () => {
                   </div>
                   {detailDemographics ? (
                     <div className="w-full max-w-[300px]">
-                      {/* ✅ 관리자 제외 계산 수행 */}
                       <GenderRatioChart data={detailDemographics} />
                     </div>
                   ) : (
@@ -743,13 +715,12 @@ const StatisticsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* 3. 상세 지표 (DemographicsSection) */}
+              {/* 3. 상세 지표 */}
               <div className="w-full">
                 {detailDemographics ? (
                   <DemographicsSection
                     data={detailDemographics}
                     onUnassignedClick={scrollToUnassigned}
-                    realUnassignedCount={unassignedList.length}
                   />
                 ) : (
                   <div className="h-[200px] flex items-center justify-center bg-white rounded-lg border border-gray-100 text-gray-400">
@@ -808,6 +779,21 @@ const StatisticsPage: React.FC = () => {
                               ` (만 ${member.displayAge}세)`}
                           </span>
                         </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-4">
+                      <div>
+                        <span className="block text-xs text-gray-400">
+                          연락처
+                        </span>
+                        {member.phone}
+                      </div>
+                      <div>
+                        <span className="block text-xs text-gray-400">
+                          등록 연도
+                        </span>
+                        {member.registeredDate?.substring(0, 4) || "-"}
                       </div>
                     </div>
 
