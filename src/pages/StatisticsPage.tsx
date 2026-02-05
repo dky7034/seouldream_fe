@@ -29,10 +29,9 @@ import { semesterService } from "../services/semesterService";
 import { dashboardService } from "../services/dashboardService";
 import { DemographicsSection } from "../components/DemographicsSection";
 
-// ✅ 공식 타입 import
+// ✅ 공식 타입 import (SemesterSummaryDto 제거됨)
 import type {
   NewcomerStatDto,
-  SemesterSummaryDto,
   UnassignedMemberDto,
   SemesterDto,
   DashboardDemographicsDto,
@@ -350,9 +349,8 @@ const StatisticsPage: React.FC = () => {
 
   const [newcomerStats, setNewcomerStats] = useState<NewcomerStatDto[]>([]);
 
-  // semesterSummary는 참고용으로만 사용 (차트에는 detailDemographics 기반 계산값 사용)
-  const [semesterSummary, setSemesterSummary] =
-    useState<SemesterSummaryDto | null>(null);
+  // ❌ [삭제됨] semesterSummary 상태 및 관련 코드 제거 완료
+  // const [semesterSummary, setSemesterSummary] = useState<SemesterSummaryDto | null>(null);
 
   const [detailDemographics, setDetailDemographics] =
     useState<DashboardDemographicsDto | null>(null);
@@ -424,28 +422,32 @@ const StatisticsPage: React.FC = () => {
 
         const effectiveEndDate =
           endObj > today
-            ? `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+            ? `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(
+                2,
+                "0",
+              )}-${String(today.getDate()).padStart(2, "0")}`
             : endDate;
 
-        const [newcomers, summary, dashboardData, unassigned] =
-          await Promise.all([
-            statisticsService.getNewcomerStats(
-              "MONTH",
-              startDate,
-              effectiveEndDate,
-            ),
-            statisticsService.getSemesterSummary(selectedSemesterId),
-            dashboardService.getDashboardData("SEMESTER", {
-              startDate,
-              endDate: effectiveEndDate,
-            }),
-            statisticsService.getUnassignedMembers(),
-          ]);
+        // ✅ [수정] getSemesterSummary 호출 제거
+        const [newcomers, dashboardData, unassigned] = await Promise.all([
+          statisticsService.getNewcomerStats(
+            "MONTH",
+            startDate,
+            effectiveEndDate,
+          ),
+          // statisticsService.getSemesterSummary(selectedSemesterId), // 삭제됨
+          dashboardService.getDashboardData("SEMESTER", {
+            startDate,
+            endDate: effectiveEndDate,
+          }),
+          statisticsService.getUnassignedMembers(),
+        ]);
 
         if (ignore) return;
 
         setNewcomerStats(newcomers);
-        setSemesterSummary(summary);
+        // setSemesterSummary(summary); // 삭제됨
+
         if (dashboardData.demographics) {
           setDetailDemographics(dashboardData.demographics);
         }
@@ -703,11 +705,13 @@ const StatisticsPage: React.FC = () => {
                         관리자 제외
                       </span>
                     </h3>
-                    <p className="text-sm text-gray-500 mt-1">20대/30대 비율</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      20대/30대 비율 분포
+                    </p>
                   </div>
                   {detailDemographics ? (
                     <div className="w-full max-w-[300px]">
-                      {/* ✅ 모든 인원 포함한 순수 데이터 전달 */}
+                      {/* ✅ 계산된 pureAgeGroupSummary 사용 */}
                       <AgeGroupPieChart data={pureAgeGroupSummary} />
                     </div>
                   ) : (
@@ -732,7 +736,7 @@ const StatisticsPage: React.FC = () => {
                   </div>
                   {detailDemographics ? (
                     <div className="w-full max-w-[300px]">
-                      {/* ✅ 관리자 제외 계산 수행 */}
+                      {/* ✅ 내부에서 관리자 제외 계산 수행 */}
                       <GenderRatioChart data={detailDemographics} />
                     </div>
                   ) : (
@@ -743,7 +747,7 @@ const StatisticsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* 3. 상세 지표 (DemographicsSection) */}
+              {/* 3. 상세 지표 */}
               <div className="w-full">
                 {detailDemographics ? (
                   <DemographicsSection
